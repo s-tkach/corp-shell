@@ -7,6 +7,7 @@ on:
     paths:
       - "shell/**"
       - "sst.config.ts"
+      - "drizzle.config.ts"
       - "pnpm-workspace.yaml"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -45,6 +46,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Apply database migrations
+        run: pnpm drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Deploy to prod
         run: npx sst deploy --stage prod

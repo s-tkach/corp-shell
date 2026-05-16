@@ -4,13 +4,15 @@
   "private": true,
   "scripts": {
     "typecheck": "pnpm --filter shell typecheck",
-    "lint": "pnpm --filter shell lint"
+    "lint": "pnpm --filter shell lint",
+    "drizzle-kit": "drizzle-kit"
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0",
     "pnpm": ">=9.0.0"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.31.10",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "sst": "^4.14.1",

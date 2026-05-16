@@ -1,0 +1,136 @@
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  idpSource: text("idp_source").notNull(),
+  idpSubject: text("idp_subject").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  preferences: jsonb("preferences"),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const roles = pgTable("roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.roleId)],
+);
+
+export const idpGroupRoleMappings = pgTable(
+  "idp_group_role_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    idpGroupName: text("idp_group_name").notNull(),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.idpGroupName, t.roleId)],
+);
+
+export const subscriptionTiers = pgTable("subscription_tiers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  level: integer("level").notNull(),
+  upgradeCtaHeadline: text("upgrade_cta_headline"),
+  upgradeCtaBody: text("upgrade_cta_body"),
+  upgradeCtaLabel: text("upgrade_cta_label"),
+  upgradeUrl: text("upgrade_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tierId: uuid("tier_id")
+    .notNull()
+    .references(() => subscriptionTiers.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const menuSections = pgTable("menu_sections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  label: text("label").notNull(),
+  icon: text("icon"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const menuItems = pgTable("menu_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sectionId: uuid("section_id")
+    .notNull()
+    .references(() => menuSections.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  route: text("route").notNull(),
+  icon: text("icon"),
+  badge: text("badge"),
+  requiredRoles: jsonb("required_roles").$type<string[]>().notNull().default([]),
+  requiredSubLevel: integer("required_sub_level").notNull().default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const appRegistry = pgTable("app_registry", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  remoteUrl: text("remote_url").notNull(),
+  routePrefix: text("route_prefix").notNull().unique(),
+  healthCheckUrl: text("health_check_url"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  lastHealthyAt: timestamp("last_healthy_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const shellConfig = pgTable("shell_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  appName: text("app_name").notNull(),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color"),
+  oktaDomain: text("okta_domain"),
+  oktaClientId: text("okta_client_id"),
+  setupComplete: boolean("setup_complete").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const authEvents = pgTable("auth_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: text("email"),
+  eventType: text("event_type").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
