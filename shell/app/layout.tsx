@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shell/theme-provider";
+import { CloudWatchRum } from "@/components/shell/cloudwatch-rum";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +30,11 @@ export default async function RootLayout({
   const theme =
     themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
 
+  const rumAppId = process.env.CLOUDWATCH_RUM_APP_ID;
+  const rumIdentityPoolId = process.env.CLOUDWATCH_RUM_IDENTITY_POOL_ID;
+  const rumRegion = process.env.CLOUDWATCH_RUM_REGION ?? "us-east-1";
+  const rumEndpoint = process.env.CLOUDWATCH_RUM_ENDPOINT ?? "https://dataplane.rum.us-east-1.amazonaws.com";
+
   return (
     <html
       lang="en"
@@ -36,6 +42,14 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-full">
+        {rumAppId && rumIdentityPoolId && (
+          <CloudWatchRum
+            appId={rumAppId}
+            identityPoolId={rumIdentityPoolId}
+            region={rumRegion}
+            endpoint={rumEndpoint}
+          />
+        )}
         <ThemeProvider
           attribute="class"
           defaultTheme={theme}

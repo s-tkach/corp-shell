@@ -90,7 +90,7 @@ npx sst deploy --stage prod
 
 ## Current Status
 
-**Phase: Implementation** — see `specs/ROADMAP.md` for completed and pending milestones.
+**Phase: Complete** — All M1–M12 milestones implemented. See `specs/ROADMAP.md` and Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `shell/`

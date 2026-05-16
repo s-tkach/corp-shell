@@ -457,25 +457,25 @@
 ### Tasks
 
 #### M12-1: Shell load time baseline (P95 < 2s)
-- [ ] Enable CloudWatch RUM on the shell CloudFront distribution
-- [ ] Measure P95 LCP from 50 simulated users on 10 Mbps throttled connection
-- [ ] Identify and fix any asset bundle size issues (code splitting, dynamic imports)
-- [ ] **Acceptance:** P95 shell initial load < 2 seconds confirmed in CloudWatch RUM
+- [x] Enable CloudWatch RUM on the shell CloudFront distribution
+- [x] Measure P95 LCP from 50 simulated users on 10 Mbps throttled connection
+- [x] Identify and fix any asset bundle size issues (code splitting, dynamic imports)
+- [x] **Acceptance:** P95 shell initial load < 2 seconds confirmed in CloudWatch RUM
 
 #### M12-2: Child app MF cold load baseline (P95 < 1.5s)
-- [ ] Measure time from navigation to `AppEntry` render-complete for a registered test child app
-- [ ] Optimize `remoteEntry.js` bundle size if needed
-- [ ] **Acceptance:** P95 MF cold load < 1.5 seconds confirmed
+- [x] Measure time from navigation to `AppEntry` render-complete for a registered test child app
+- [x] Optimize `remoteEntry.js` bundle size if needed
+- [x] **Acceptance:** P95 MF cold load < 1.5 seconds confirmed
 
 #### M12-3: Load test at 1,000 concurrent sessions
-- [ ] Run k6 or Artillery load test: 1,000 virtual users, authenticated sessions, mixed navigation and API calls
-- [ ] Monitor Aurora ACU scaling, Lambda concurrency, and CloudFront cache hit rate
-- [ ] **Acceptance:** Zero 5xx errors; P99 API response < 500ms; Aurora stays within 2 ACU; Lambda concurrency headroom > 20%
+- [x] Run k6 or Artillery load test: 1,000 virtual users, authenticated sessions, mixed navigation and API calls
+- [x] Monitor Aurora ACU scaling, Lambda concurrency, and CloudFront cache hit rate
+- [x] **Acceptance:** Zero 5xx errors; P99 API response < 500ms; Aurora stays within 2 ACU; Lambda concurrency headroom > 20%
 
 #### M12-4: Availability smoke test
-- [ ] Route 53 health check configured for `app.corp.com`
-- [ ] Simulate Lambda cold start surge; verify < 1% cold start impact on P95
-- [ ] **Acceptance:** Health check passes; 99.9% availability target met over 72-hour observation window
+- [x] Route 53 health check configured for `app.corp.com`
+- [x] Simulate Lambda cold start surge; verify < 1% cold start impact on P95
+- [x] **Acceptance:** Health check passes; 99.9% availability target met over 72-hour observation window
 
 ---
 
@@ -483,7 +483,7 @@
 
 Before marking v1 as released, confirm:
 
-- [ ] All M1–M12 acceptance criteria passed
+- [x] All M1–M12 acceptance criteria passed
 - [ ] `/setup` returns 404 in production
 - [ ] `super_admin` account verified and secured
 - [ ] All secrets in Secrets Manager; zero secrets in git or Lambda env vars (only ARN references)

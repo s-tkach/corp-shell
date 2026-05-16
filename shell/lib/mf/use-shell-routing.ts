@@ -53,9 +53,14 @@ export function useShellRouting(apps: RegisteredApp[]): RoutingState {
       ? match.remoteUrl
       : `${match.remoteUrl}/remoteEntry.js`;
 
+    const markName = `mf-load-start:${match.name}`;
+    const measureName = `mf-cold-load:${match.name}`;
+    performance.mark(markName);
+
     import("./load-remote")
       .then((mod) => mod.loadRemoteModule(match!.name, remoteEntryUrl))
       .then((remote: RemoteModule) => {
+        performance.measure(measureName, markName);
         setState({ AppEntry: remote.AppEntry, loading: false, error: null });
       })
       .catch((err: unknown) => {

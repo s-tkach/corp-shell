@@ -43,6 +43,45 @@ export default $config({
       },
     });
 
+    // Route 53 health check for 99.9% availability monitoring (M12-4)
+    // Only provisioned in prod — health check polls every 10s from multiple AWS regions
+    if ($app.stage === "prod") {
+      const healthCheck = new aws.route53.HealthCheck("ShellHealthCheck", {
+        fqdn: "app.corp.com",
+        port: 443,
+        type: "HTTPS",
+        resourcePath: "/api/health",
+        failureThreshold: 3,
+        requestInterval: 10,
+        // CloudWatch alarm triggers when health check fails across 3 consecutive periods
+        enableSni: true,
+        tags: {
+          project: "corp-shell",
+          stage: "prod",
+        },
+      });
+
+      // CloudWatch alarm: pages on-call if health check fails
+      new aws.cloudwatch.MetricAlarm("ShellHealthAlarm", {
+        name: "corp-shell-health-check",
+        comparisonOperator: "LessThanThreshold",
+        evaluationPeriods: 1,
+        metricName: "HealthCheckStatus",
+        namespace: "AWS/Route53",
+        period: 60,
+        statistic: "Minimum",
+        threshold: 1,
+        treatMissingData: "breaching",
+        dimensions: {
+          HealthCheckId: healthCheck.id,
+        },
+        tags: {
+          project: "corp-shell",
+          stage: "prod",
+        },
+      });
+    }
+
     return {
       shellUrl: shell.url,
     };
