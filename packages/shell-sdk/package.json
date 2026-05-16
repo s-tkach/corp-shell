@@ -2,19 +2,26 @@
   "name": "@corp/shell-sdk",
   "version": "0.1.0",
   "description": "Shell SDK for Corp child apps",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "default": "./src/index.ts"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     },
     "./tailwind": {
-      "default": "./src/tailwind/preset.ts"
+      "import": "./dist/esm/tailwind/preset.js",
+      "require": "./dist/tailwind/preset.js",
+      "types": "./dist/tailwind/preset.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc --declaration --declarationDir dist && tsc -p tsconfig.esm.json"
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -22,6 +29,7 @@
   },
   "devDependencies": {
     "@types/react": "^19",
+    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

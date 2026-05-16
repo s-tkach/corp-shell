@@ -1,6 +1,13 @@
-import type { Config } from "tailwindcss";
+export interface ShellTailwindPreset {
+  theme: {
+    extend: {
+      colors: Record<string, string>;
+      spacing: Record<string, string>;
+    };
+  };
+}
 
-export const shellPreset: Partial<Config> = {
+export const shellPreset: ShellTailwindPreset = {
   theme: {
     extend: {
       colors: {

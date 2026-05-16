@@ -24,18 +24,27 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
+  packages/create-shell-app:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.41
+        version: 20.19.41
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/shell-sdk:
     dependencies:
       react:
         specifier: '>=18'
         version: 19.2.4
-      tailwindcss:
-        specifier: '>=3'
-        version: 4.3.0
     devDependencies:
       '@types/react':
         specifier: ^19
         version: 19.2.14
+      tailwindcss:
+        specifier: ^4
+        version: 4.3.0
       typescript:
         specifier: ^5
         version: 5.9.3

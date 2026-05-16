@@ -359,23 +359,23 @@
 ### Tasks
 
 #### M9-1: Shell SDK — hooks and event bus
-- [ ] `packages/shell-sdk/src/hooks/useShellUser.ts`
-- [ ] `packages/shell-sdk/src/hooks/useShellNavigate.ts`
-- [ ] `packages/shell-sdk/src/hooks/useShellTheme.ts`
-- [ ] `packages/shell-sdk/src/events/ShellEventBus.ts`: `emit`, `on`, `off` typed event system
-- [ ] `packages/shell-sdk/src/tailwind/preset.ts`: exports shared color/spacing tokens
-- [ ] TypeScript build (`tsc --declaration`); `package.json` with `exports` map
-- [ ] **Acceptance:** All hooks and event bus export with correct TypeScript types; `pnpm --filter shell-sdk build` passes
+- [x] `packages/shell-sdk/src/hooks/useShellUser.ts`
+- [x] `packages/shell-sdk/src/hooks/useShellNavigate.ts`
+- [x] `packages/shell-sdk/src/hooks/useShellTheme.ts`
+- [x] `packages/shell-sdk/src/events/ShellEventBus.ts`: `emit`, `on`, `off` typed event system
+- [x] `packages/shell-sdk/src/tailwind/preset.ts`: exports shared color/spacing tokens
+- [x] TypeScript build (`tsc --declaration`); `package.json` with `exports` map
+- [x] **Acceptance:** All hooks and event bus export with correct TypeScript types; `pnpm --filter shell-sdk build` passes
 
 #### M9-2: Shell SDK — publish pipeline
-- [ ] `.github/workflows/publish-sdk.yml`: trigger on tag `shell-sdk/v*.*.*`
-- [ ] Steps: build → `npm publish --access restricted` with `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
-- [ ] Package name: `@corp/shell-sdk` on GitHub Packages
-- [ ] **Acceptance:** Tagged release publishes package; `npm install @corp/shell-sdk` resolves from GitHub Packages
+- [x] `.github/workflows/publish-sdk.yml`: trigger on tag `shell-sdk/v*.*.*`
+- [x] Steps: build → `npm publish --access restricted` with `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
+- [x] Package name: `@corp/shell-sdk` on GitHub Packages
+- [x] **Acceptance:** Tagged release publishes package; `npm install @corp/shell-sdk` resolves from GitHub Packages
 
 #### M9-3: Create-shell-app CLI — scaffolder
-- [ ] `packages/create-shell-app/src/index.ts`: reads `<app-name>` arg, copies `template/` with substitutions
-- [ ] Template contents:
+- [x] `packages/create-shell-app/src/index.ts`: reads `<app-name>` arg, copies `template/` with substitutions
+- [x] Template contents:
   - React 18 + TypeScript + Webpack 5
   - Module Federation remote config (pre-filled `name`, `filename: 'remoteEntry.js'`)
   - `AppEntry.tsx` stub
@@ -383,12 +383,12 @@
   - `@corp/shell-sdk` pre-installed in template `package.json`
   - `.github/workflows/deploy.yml`: build → S3 sync → CloudFront invalidation
   - `README.md` with registration walkthrough
-- [ ] **Acceptance:** `npx @corp/create-shell-app my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
+- [x] **Acceptance:** `npx @corp/create-shell-app my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
 
 #### M9-4: Create-shell-app — publish pipeline
-- [ ] `.github/workflows/publish-cli.yml`: trigger on tag `create-shell-app/v*.*.*`
-- [ ] Published as `@corp/create-shell-app` on GitHub Packages
-- [ ] **Acceptance:** `npx @corp/create-shell-app` resolves from GitHub Packages after publish
+- [x] `.github/workflows/publish-cli.yml`: trigger on tag `create-shell-app/v*.*.*`
+- [x] Published as `@corp/create-shell-app` on GitHub Packages
+- [x] **Acceptance:** `npx @corp/create-shell-app` resolves from GitHub Packages after publish
 
 ---
 
