@@ -87,7 +87,7 @@ npx sst deploy --stage prod
 
 ## Current Status
 
-**Phase: Implementation** — M1 complete. Next: M2 (Database Schema & Migrations).
+**Phase: Implementation** — M1 and M2 complete. Next: M3 (First-Run Setup Wizard).
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `shell/`

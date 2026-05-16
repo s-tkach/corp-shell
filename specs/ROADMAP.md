@@ -82,21 +82,21 @@
 ### Tasks
 
 #### M2-1: Install and configure Drizzle ORM
-- [ ] `pnpm --filter shell add drizzle-orm postgres`; `pnpm --filter shell add -D drizzle-kit`
-- [ ] Create `shell/lib/db/client.ts`: instantiate Drizzle with `postgres` driver using `DATABASE_URL` from env
-- [ ] Add `drizzle.config.ts` at root pointing to `shell/lib/db/schema.ts` and `shell/lib/db/migrations/`
-- [ ] **Acceptance:** `pnpm drizzle-kit generate` runs without error; client imports without type errors
+- [x] `pnpm --filter shell add drizzle-orm postgres`; `pnpm --filter shell add -D drizzle-kit`
+- [x] Create `shell/lib/db/client.ts`: instantiate Drizzle with `postgres` driver using `DATABASE_URL` from env
+- [x] Add `drizzle.config.ts` at root pointing to `shell/lib/db/schema.ts` and `shell/lib/db/migrations/`
+- [x] **Acceptance:** `pnpm drizzle-kit generate` runs without error; client imports without type errors
 
 #### M2-2: Define schema
-- [ ] Implement all tables in `shell/lib/db/schema.ts` as specified in `ARCHITECTURE.md §9.2`:
+- [x] Implement all tables in `shell/lib/db/schema.ts` as specified in `ARCHITECTURE.md §9.2`:
   `users`, `roles`, `user_roles`, `idp_group_role_mappings`, `subscription_tiers`, `user_subscriptions`, `menu_sections`, `menu_items`, `app_registry`, `shell_config`, `auth_events`
-- [ ] **Acceptance:** `pnpm drizzle-kit generate` produces a single coherent migration; no type errors in schema file
+- [x] **Acceptance:** `pnpm drizzle-kit generate` produces a single coherent migration; no type errors in schema file
 
 #### M2-3: Apply initial migration
-- [ ] Run `pnpm drizzle-kit migrate` against the dev Aurora instance
-- [ ] Verify all tables and constraints exist via `psql` or Drizzle Studio
-- [ ] Add migration step to the shell GitHub Actions pipeline (runs before `sst deploy`)
-- [ ] **Acceptance:** All 11 tables present in dev DB; pipeline applies migrations automatically on deploy
+- [x] Run `pnpm drizzle-kit migrate` against the dev Aurora instance
+- [x] Verify all tables and constraints exist via `psql` or Drizzle Studio
+- [x] Add migration step to the shell GitHub Actions pipeline (runs before `sst deploy`)
+- [x] **Acceptance:** All 11 tables present in dev DB; pipeline applies migrations automatically on deploy
 
 ---
 
