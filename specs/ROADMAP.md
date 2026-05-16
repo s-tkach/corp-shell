@@ -321,40 +321,34 @@
 ### Tasks
 
 #### M8-1: Install and configure `@module-federation/nextjs-mf`
-- [ ] `pnpm --filter shell add @module-federation/nextjs-mf`
-- [ ] `shell/next.config.ts`: add `NextFederationPlugin` with `name: 'shell'` and shared singletons (`react`, `react-dom`, `@corp/shell-sdk`)
-- [ ] Remotes loaded from DB via `shell/lib/mf/router.ts`; cached 60 seconds
-- [ ] **Acceptance:** `pnpm --filter shell build` succeeds with MF plugin; no shared module conflicts
+- [x] `@module-federation/nextjs-mf` is incompatible with Next.js 16 (supports up to 15); implemented via runtime script federation instead
+- [x] `shell/next.config.ts`: added `transpilePackages: ["@corp/shell-sdk"]`; remotes resolved at runtime via `shell/lib/mf/router.ts`
+- [x] `proxy.ts` merged with deprecated `middleware.ts` (Next.js 16 requires one file only)
+- [x] **Acceptance:** `pnpm --filter shell build` compiles successfully; no shared module conflicts
 
 #### M8-2: Remote resolution and route registry
-- [ ] `shell/lib/mf/router.ts`: `fetchRegisteredApps()` queries `app_registry`, maps `routePrefix → remoteEntry URL`
-- [ ] `useShellRouting()` hook: given current `pathname`, finds longest matching `routePrefix` → returns lazy-loaded `AppEntry`
-- [ ] **Acceptance:** Hook resolves correct remote for a given pathname; unmatched routes return null
+- [x] `shell/lib/mf/router.ts`: `fetchRegisteredApps()` queries `app_registry` with 60-second cache; `resolveAppForPath()` returns longest-prefix match
+- [x] `shell/lib/mf/use-shell-routing.ts`: `useShellRouting(apps)` hook resolves the matching app for current pathname, lazy-loads `AppEntry` via runtime script federation
+- [x] `shell/lib/mf/load-remote.ts`: `loadRemoteModule()` injects remote entry script and initialises MF container
+- [x] **Acceptance:** Hook resolves correct remote for a given pathname; unmatched routes return null
 
 #### M8-3: Child app mount page
-- [ ] `app/(shell)/[...slug]/page.tsx` (Client Component):
-  ```tsx
-  const AppEntry = useShellRouting();
-  return (
-    <ErrorBoundary fallback={<AppErrorView />}>
-      <Suspense fallback={<AppSkeleton />}>
-        <AppEntry />
-      </Suspense>
-    </ErrorBoundary>
-  );
-  ```
-- [ ] `AppSkeleton`: loading placeholder matching shell layout dimensions
-- [ ] `AppErrorView`: error UI scoped to content area; sidebar and header unaffected
-- [ ] **Acceptance:** Navigating to a registered route loads `AppEntry`; crash in child app shows `AppErrorView` only
+- [x] `app/(shell)/[...slug]/page.tsx` (Server Component): fetches apps + session, passes to `ChildAppHost`
+- [x] `app/(shell)/[...slug]/child-app-host.tsx` (Client Component): renders `AppEntry` wrapped in `AppErrorBoundary` + `Suspense`
+- [x] `shell/components/shell/app-skeleton.tsx`: loading placeholder matching shell layout dimensions
+- [x] `shell/components/shell/app-error-view.tsx`: error UI scoped to content area; sidebar and header unaffected
+- [x] `shell/components/shell/error-boundary.tsx`: `AppErrorBoundary` class component
+- [x] **Acceptance:** Navigating to a registered route loads `AppEntry`; crash in child app shows `AppErrorView` only
 
 #### M8-4: ShellSDKProvider wrapper
-- [ ] Wrap `AppEntry` in `<ShellSDKProvider>` passing `user`, `navigate`, `theme` values from session and Zustand
-- [ ] **Acceptance:** `useShellUser()` inside a child app returns correct user data; `useShellTheme()` returns current theme
+- [x] `shell/components/shell/shell-sdk-provider.tsx`: wraps `AppEntry` in `ShellContext.Provider` with `user`, `navigate` (router.push), `theme` (next-themes)
+- [x] `packages/shell-sdk/`: `@corp/shell-sdk` — `ShellContext`, `useShellUser`, `useShellNavigate`, `useShellTheme`, `ShellEventBus`, tailwind preset
+- [x] **Acceptance:** `useShellUser()` inside a child app returns correct user data; `useShellTheme()` returns current theme
 
 #### M8-5: End-to-end MF smoke test
-- [ ] Create a minimal test child app in `packages/test-child-app/` (not published): exposes `AppEntry` that renders user email from `useShellUser()`
-- [ ] Register it in dev Admin Panel; verify it loads in the `[...slug]` route
-- [ ] **Acceptance:** Test child app renders user email via SDK hook; ErrorBoundary catches a manually thrown error
+- [x] `packages/test-child-app/`: exposes `AppEntry` that renders user email from `useShellUser()`; webpack 5 + Module Federation config; `public/mf-manifest.json`
+- [x] Register in dev Admin Panel at routePrefix `/test-app`; loads in `[...slug]` route
+- [x] **Acceptance:** Test child app renders user email via SDK hook; ErrorBoundary catches a manually thrown error
 
 ---
 

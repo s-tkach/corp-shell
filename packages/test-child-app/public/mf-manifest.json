@@ -1,0 +1,8 @@
+{
+  "name": "testChildApp",
+  "version": "0.1.0",
+  "routePrefix": "/test-app",
+  "routes": [
+    { "path": "/test-app", "label": "Test App Home" }
+  ]
+}

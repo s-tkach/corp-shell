@@ -1,0 +1,22 @@
+{
+  "name": "@corp/test-child-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "serve": "webpack serve --config webpack.config.js --port 3001"
+  },
+  "dependencies": {
+    "@corp/shell-sdk": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  }
+}
