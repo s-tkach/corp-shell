@@ -128,8 +128,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Resolve subscription for token
         const subRow = await db
           .select({
+            id: userSubscriptions.id,
             slug: subscriptionTiers.slug,
             level: subscriptionTiers.level,
+            expiresAt: userSubscriptions.expiresAt,
           })
           .from(userSubscriptions)
           .innerJoin(
@@ -139,7 +141,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(userSubscriptions.userId, userId))
           .limit(1);
 
-        const tier = subRow[0];
+        let tier = subRow[0];
+
+        // Downgrade expired subscriptions to free
+        if (tier && tier.expiresAt && tier.expiresAt < new Date() && tier.slug !== "free") {
+          const freeTier = await db
+            .select({ id: subscriptionTiers.id, slug: subscriptionTiers.slug, level: subscriptionTiers.level })
+            .from(subscriptionTiers)
+            .where(eq(subscriptionTiers.slug, "free"))
+            .limit(1);
+          if (freeTier[0]) {
+            await db
+              .update(userSubscriptions)
+              .set({ tierId: freeTier[0].id, expiresAt: null })
+              .where(eq(userSubscriptions.id, tier.id));
+            tier = { ...freeTier[0], id: tier.id, expiresAt: null };
+          }
+        }
 
         token.userId = userId;
         token.roles = roleSlugs;

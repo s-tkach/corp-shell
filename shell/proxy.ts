@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { shellConfig } from "@/lib/db/schema";
+import { menuItems, shellConfig } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const ADMIN_ROUTES = ["/admin", "/api/admin"];
 const ADMIN_ROLES = new Set(["super_admin", "admin"]);
@@ -22,6 +23,17 @@ function isAdminRoute(pathname: string): boolean {
 
 function hasAdminRole(roles: string[]): boolean {
   return roles.some((r) => ADMIN_ROLES.has(r));
+}
+
+async function getRequiredSubLevel(pathname: string): Promise<number | null> {
+  const rows = await db
+    .select({ requiredSubLevel: menuItems.requiredSubLevel })
+    .from(menuItems)
+    .where(eq(menuItems.route, pathname))
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.requiredSubLevel === 0) return null;
+  return row.requiredSubLevel;
 }
 
 export async function proxy(request: NextRequest) {
@@ -58,11 +70,25 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(new URL("/403", request.url));
   }
 
+  // Subscription gate: skip for /upgrade itself to avoid redirect loop
+  if (!pathname.startsWith("/upgrade") && !isAdminRoute(pathname)) {
+    const requiredLevel = await getRequiredSubLevel(pathname);
+    if (requiredLevel !== null) {
+      const userLevel: number = session.user.subscriptionLevel ?? 0;
+      if (userLevel < requiredLevel) {
+        const upgradeUrl = new URL("/upgrade", request.url);
+        upgradeUrl.searchParams.set("from", pathname);
+        upgradeUrl.searchParams.set("level", String(requiredLevel));
+        return NextResponse.redirect(upgradeUrl);
+      }
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
+    "/((?!api/auth|api/internal|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
   ],
 };

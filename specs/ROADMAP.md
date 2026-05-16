@@ -399,21 +399,21 @@
 ### Tasks
 
 #### M10-1: Subscription gate in middleware and Server Component
-- [ ] Middleware: for routes with `requiredSubLevel > 0`, check `session.subscriptionLevel`; if insufficient, redirect to `/upgrade?from={route}`
-- [ ] `app/(shell)/upgrade/page.tsx`: renders Upgrade Prompt content from `subscription_tiers.upgradeCta` / `upgradeUrl` for the required tier
-- [ ] **Acceptance:** User with `free` tier accessing a `standard` route sees Upgrade Prompt; `standard` user passes through
+- [x] Middleware: for routes with `requiredSubLevel > 0`, check `session.subscriptionLevel`; if insufficient, redirect to `/upgrade?from={route}`
+- [x] `app/(shell)/upgrade/page.tsx`: renders Upgrade Prompt content from `subscription_tiers.upgradeCta` / `upgradeUrl` for the required tier
+- [x] **Acceptance:** User with `free` tier accessing a `standard` route sees Upgrade Prompt; `standard` user passes through
 
 #### M10-2: Subscription expiry enforcement
-- [ ] In NextAuth.js `jwt()` callback: if `user_subscriptions.expiresAt` is in the past, downgrade to `free` tier and update DB
-- [ ] **Acceptance:** User with expired subscription gets `free` tier on next login; DB updated
+- [x] In NextAuth.js `jwt()` callback: if `user_subscriptions.expiresAt` is in the past, downgrade to `free` tier and update DB
+- [x] **Acceptance:** User with expired subscription gets `free` tier on next login; DB updated
 
 #### M10-3: Webhook endpoint
-- [ ] `POST /api/internal/subscriptions/assign`:
+- [x] `POST /api/internal/subscriptions/assign`:
   - Validate `X-Webhook-Signature` header (HMAC-SHA256 with `WEBHOOK_SECRET` from Secrets Manager, constant-time compare)
   - Payload: `{ userId, tierId, expiresAt? }`
   - Write to `user_subscriptions`
   - Return 200; invalid signature returns 401
-- [ ] **Acceptance:** Valid signed request updates user tier; unsigned/wrong-signature request returns 401; no timing attack surface
+- [x] **Acceptance:** Valid signed request updates user tier; unsigned/wrong-signature request returns 401; no timing attack surface
 
 ---
 
