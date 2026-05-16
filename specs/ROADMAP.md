@@ -107,34 +107,34 @@
 ### Tasks
 
 #### M3-1: Setup detection middleware
-- [ ] In `shell/middleware.ts`: query `shell_config.setup_complete`
+- [x] In `shell/middleware.ts`: query `shell_config.setup_complete`
   - If `false` (or no row): redirect all non-`/setup` traffic to `/setup`
   - If `true`: return 404 for `/setup`
-- [ ] Cache the `setup_complete` flag in the JWT once setup is done (avoids DB hit on every request post-setup)
-- [ ] **Acceptance:** Visiting any route on a fresh DB redirects to `/setup`; visiting `/setup` after completion returns 404
+- [x] Cache the `setup_complete` flag in the JWT once setup is done (avoids DB hit on every request post-setup)
+- [x] **Acceptance:** Visiting any route on a fresh DB redirects to `/setup`; visiting `/setup` after completion returns 404
 
 #### M3-2: Wizard UI scaffold (Step 1 — Branding)
-- [ ] Multi-step form component at `app/setup/page.tsx` (Client Component, local React state only)
-- [ ] Step 1: app name text input, logo image upload (preview), primary color picker (Shadcn color input)
-- [ ] Logo upload: `POST /api/setup/upload-logo` → generates S3 presigned PUT URL → client uploads directly to S3
-- [ ] **Acceptance:** Logo uploads to S3; preview renders in wizard; step 1 → step 2 navigation works
+- [x] Multi-step form component at `app/setup/page.tsx` (Client Component, local React state only)
+- [x] Step 1: app name text input, logo image upload (preview), primary color picker (Shadcn color input)
+- [x] Logo upload: `POST /api/setup/upload-logo` → generates S3 presigned PUT URL → client uploads directly to S3
+- [x] **Acceptance:** Logo uploads to S3; preview renders in wizard; step 1 → step 2 navigation works
 
 #### M3-3: Wizard Step 2 — Okta Connection
-- [ ] Fields: Okta domain, Client ID, Client Secret
-- [ ] On "Test Connection": `GET /api/setup/validate-okta?domain={domain}` → server pings `https://{domain}/.well-known/openid-configuration`
-- [ ] Inline success ("Connected ✓") or error with exact failure message
-- [ ] Wizard does not allow proceeding until connection is valid
-- [ ] **Acceptance:** Valid domain shows success; invalid domain shows specific error; step cannot advance until valid
+- [x] Fields: Okta domain, Client ID, Client Secret
+- [x] On "Test Connection": `GET /api/setup/validate-okta?domain={domain}` → server pings `https://{domain}/.well-known/openid-configuration`
+- [x] Inline success ("Connected ✓") or error with exact failure message
+- [x] Wizard does not allow proceeding until connection is valid
+- [x] **Acceptance:** Valid domain shows success; invalid domain shows specific error; step cannot advance until valid
 
 #### M3-4: Wizard Step 3 — Super Admin verification
-- [ ] Input: Okta email address for the super admin
-- [ ] "Verify via Okta Login" button: triggers NextAuth.js Okta sign-in inline (uses credentials entered in Step 2)
-- [ ] On callback: verify that the authenticated email matches the input; show mismatch error if not
-- [ ] **Acceptance:** Correct Okta user verified; mismatch shows error and allows retry; no session persisted until Step 4 launch
+- [x] Input: Okta email address for the super admin
+- [x] "Verify via Okta Login" button: triggers NextAuth.js Okta sign-in inline (uses credentials entered in Step 2)
+- [x] On callback: verify that the authenticated email matches the input; show mismatch error if not
+- [x] **Acceptance:** Correct Okta user verified; mismatch shows error and allows retry; no session persisted until Step 4 launch
 
 #### M3-5: Wizard Step 4 — Review & Launch
-- [ ] Summary card displaying all inputs from Steps 1–3
-- [ ] "Launch Shell" button: `POST /api/setup/complete` atomically writes:
+- [x] Summary card displaying all inputs from Steps 1–3
+- [x] "Launch Shell" button: `POST /api/setup/complete` atomically writes:
   - `shell_config` row (branding, Okta domain, `setup_complete = true`)
   - Default `subscription_tiers` (free level 0, standard level 1, enterprise level 2)
   - Default `roles` (super_admin `isSystem=true`, admin)
@@ -142,8 +142,8 @@
   - `user_roles` (super_admin → super admin user)
   - `user_subscriptions` (enterprise tier, no expiry)
   - Stores Okta Client Secret to Secrets Manager (not in DB)
-- [ ] Redirects to `/dashboard` on success
-- [ ] **Acceptance:** All DB writes succeed atomically; `/setup` returns 404 after completion; `/dashboard` loads
+- [x] Redirects to `/dashboard` on success
+- [x] **Acceptance:** All DB writes succeed atomically; `/setup` returns 404 after completion; `/dashboard` loads
 
 ---
 

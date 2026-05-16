@@ -45,6 +45,9 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 - No unused variables, imports, or exports.
 - Consistent naming that mirrors the domain language in the PRD.
 
+### Roadmap Tracking
+- After implementing any M1–M12 roadmap feature (or set of tasks), mark all completed tasks as `[x]` in `specs/ROADMAP.md` and update the **Current Status** section in `CLAUDE.md` to reflect the new milestone.
+
 ### Git
 - Commit only when explicitly asked.
 - Commit messages: concise, present tense, describe *why* not *what*.
@@ -87,7 +90,7 @@ npx sst deploy --stage prod
 
 ## Current Status
 
-**Phase: Implementation** — M1 and M2 complete. Next: M3 (First-Run Setup Wizard).
+**Phase: Implementation** — see `specs/ROADMAP.md` for completed and pending milestones.
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `shell/`
