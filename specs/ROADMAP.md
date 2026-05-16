@@ -196,25 +196,25 @@
 ### Tasks
 
 #### M5-1: Route protection middleware
-- [ ] Extend `shell/middleware.ts` (post-setup path):
+- [x] Extend `shell/middleware.ts` (post-setup path):
   - No session → redirect to `/api/auth/signin`
   - Session valid → continue
-- [ ] Apply to all routes except `/api/auth/**`, `/(auth)/**`, `/_next/**`, `/favicon.ico`
-- [ ] **Acceptance:** Unauthenticated request to `/dashboard` redirects to Okta; authenticated request passes through
+- [x] Apply to all routes except `/api/auth/**`, `/(auth)/**`, `/_next/**`, `/favicon.ico`
+- [x] **Acceptance:** Unauthenticated request to `/dashboard` redirects to Okta; authenticated request passes through
 
 #### M5-2: Admin route guard
-- [ ] Middleware: for routes matching `/admin/**` and `/api/admin/**`, assert `session.roles` includes `super_admin` or `admin`
-- [ ] Unauthorized → render `app/(shell)/403/page.tsx` with "Access Denied" message (no redirect loop)
-- [ ] **Acceptance:** User without admin role visiting `/admin/menu` sees 403 page; admin role user passes through
+- [x] Middleware: for routes matching `/admin/**` and `/api/admin/**`, assert `session.roles` includes `super_admin` or `admin`
+- [x] Unauthorized → render `app/(shell)/403/page.tsx` with "Access Denied" message (no redirect loop)
+- [x] **Acceptance:** User without admin role visiting `/admin/menu` sees 403 page; admin role user passes through
 
 #### M5-3: API route role enforcement
-- [ ] Create `shell/lib/auth-guard.ts`: `requireRoles(roles: string[])` helper — reads session, throws 403 response if roles not satisfied
-- [ ] Apply to all `admin/**` API handlers and any other role-restricted endpoints
-- [ ] **Acceptance:** `curl` to `/api/admin/users` without admin session returns HTTP 403 JSON
+- [x] Create `shell/lib/auth-guard.ts`: `requireRoles(roles: string[])` helper — reads session, throws 403 response if roles not satisfied
+- [x] Apply to all `admin/**` API handlers and any other role-restricted endpoints
+- [x] **Acceptance:** `curl` to `/api/admin/users` without admin session returns HTTP 403 JSON
 
 #### M5-4: 403 page
-- [ ] `app/(shell)/403/page.tsx`: "Access Denied" UI with link back to `/dashboard`
-- [ ] **Acceptance:** Renders correctly for both middleware-blocked and API-blocked scenarios
+- [x] `app/(shell)/403/page.tsx`: "Access Denied" UI with link back to `/dashboard`
+- [x] **Acceptance:** Renders correctly for both middleware-blocked and API-blocked scenarios
 
 ---
 
