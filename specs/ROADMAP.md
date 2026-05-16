@@ -154,38 +154,38 @@
 ### Tasks
 
 #### M4-1: Install and configure NextAuth.js v5
-- [ ] `pnpm --filter shell add next-auth@beta`
-- [ ] Create `shell/lib/auth.ts`: configure Okta provider reading `OKTA_DOMAIN`, `OKTA_CLIENT_ID`, `OKTA_CLIENT_SECRET` from Secrets Manager (resolved at Lambda start)
-- [ ] Wire `GET/POST /api/auth/[...nextauth]` route handler
-- [ ] Set `NEXTAUTH_SECRET` (Secrets Manager) for JWT encryption
-- [ ] **Acceptance:** Visiting a protected route redirects to Okta; successful login returns to shell
+- [x] `pnpm --filter shell add next-auth@beta`
+- [x] Create `shell/lib/auth.ts`: configure Okta provider reading `OKTA_DOMAIN`, `OKTA_CLIENT_ID`, `OKTA_CLIENT_SECRET` from Secrets Manager (resolved at Lambda start)
+- [x] Wire `GET/POST /api/auth/[...nextauth]` route handler
+- [x] Set `NEXTAUTH_SECRET` (Secrets Manager) for JWT encryption
+- [x] **Acceptance:** Visiting a protected route redirects to Okta; successful login returns to shell
 
 #### M4-2: JWT callback — group mapping & subscription resolution
-- [ ] In NextAuth.js `jwt()` callback:
+- [x] In NextAuth.js `jwt()` callback:
   1. Extract `groups[]` from Okta ID token
   2. Query `idp_group_role_mappings` → resolve shell role slugs
   3. Query `user_subscriptions` → get tier and level
   4. Embed `{ userId, roles, subscriptionTier, subscriptionLevel }` in JWT payload
-- [ ] **Acceptance:** `session.user.roles` and `session.user.subscriptionLevel` are populated after login
+- [x] **Acceptance:** `session.user.roles` and `session.user.subscriptionLevel` are populated after login
 
 #### M4-3: JIT user provisioning
-- [ ] In `jwt()` callback, if user email not found in `users` table:
+- [x] In `jwt()` callback, if user email not found in `users` table:
   - `INSERT users` (email, displayName, idpSource='okta', idpSubject)
   - `INSERT user_roles` for each mapped role
   - `INSERT user_subscriptions` (free tier)
   - `INSERT auth_events` (LOGIN + JIT_PROVISION)
-- [ ] Existing users: update `lastLoginAt`; write `auth_events` (LOGIN)
-- [ ] **Acceptance:** First login creates user record; subsequent logins update `lastLoginAt`; no duplicate rows
+- [x] Existing users: update `lastLoginAt`; write `auth_events` (LOGIN)
+- [x] **Acceptance:** First login creates user record; subsequent logins update `lastLoginAt`; no duplicate rows
 
 #### M4-4: Logout — RP-Initiated Logout
-- [ ] `signOut()` handler: clear local session cookie + redirect to Okta `/v1/logout?id_token_hint=...&post_logout_redirect_uri=...`
-- [ ] Write `auth_events` (LOGOUT) before clearing session
-- [ ] **Acceptance:** Logging out clears the cookie and ends the Okta session (verified by attempting to access a protected resource immediately after)
+- [x] `signOut()` handler: clear local session cookie + redirect to Okta `/v1/logout?id_token_hint=...&post_logout_redirect_uri=...`
+- [x] Write `auth_events` (LOGOUT) before clearing session
+- [x] **Acceptance:** Logging out clears the cookie and ends the Okta session (verified by attempting to access a protected resource immediately after)
 
 #### M4-5: Auth failure handling
-- [ ] `/app/(auth)/error/page.tsx`: display human-readable message for NextAuth.js error codes (`OAuthCallbackError`, `AccessDenied`, etc.)
-- [ ] Write `auth_events` (FAILURE) for any callback error
-- [ ] **Acceptance:** Simulated Okta error shows friendly error page; failure event written to DB
+- [x] `/app/(auth)/error/page.tsx`: display human-readable message for NextAuth.js error codes (`OAuthCallbackError`, `AccessDenied`, etc.)
+- [x] Write `auth_events` (FAILURE) for any callback error
+- [x] **Acceptance:** Simulated Okta error shows friendly error page; failure event written to DB
 
 ---
 
