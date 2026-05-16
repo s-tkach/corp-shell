@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shell/theme-provider";
 
@@ -18,11 +19,16 @@ export const metadata: Metadata = {
   description: "Corporate Application Shell",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get("theme")?.value;
+  const theme =
+    themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
+
   return (
     <html
       lang="en"
@@ -32,7 +38,7 @@ export default function RootLayout({
       <body className="h-full">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme={theme}
           enableSystem
           disableTransitionOnChange
         >

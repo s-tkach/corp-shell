@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { SearchParams } from "next/dist/server/request/search-params";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -33,12 +34,12 @@ export default async function AuthErrorPage({
       <div className="max-w-md rounded-lg border p-8 shadow-sm">
         <h1 className="mb-4 text-2xl font-semibold">Sign-in Error</h1>
         <p className="mb-6 text-muted-foreground">{message}</p>
-        <a
+        <Link
           href="/api/auth/signin"
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Try Again
-        </a>
+        </Link>
       </div>
     </div>
   );

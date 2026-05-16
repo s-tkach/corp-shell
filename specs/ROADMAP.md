@@ -225,33 +225,33 @@
 ### Tasks
 
 #### M6-1: Menu API
-- [ ] `GET /api/menu`: reads `menu_sections` + `menu_items` from DB, filters by `session.roles` and `session.subscriptionLevel`, returns ordered tree
-- [ ] Response cached with a short TTL (revalidated on menu config change via Admin Panel)
-- [ ] **Acceptance:** API returns correct items for a given role/tier combination; items the user lacks access to are absent
+- [x] `GET /api/menu`: reads `menu_sections` + `menu_items` from DB, filters by `session.roles` and `session.subscriptionLevel`, returns ordered tree
+- [x] Response cached with a short TTL (revalidated on menu config change via Admin Panel)
+- [x] **Acceptance:** API returns correct items for a given role/tier combination; items the user lacks access to are absent
 
 #### M6-2: Server-side menu render in RootLayout
-- [ ] `shell/app/layout.tsx` (Server Component): call `auth()` → call `/api/menu` (server-side fetch) → pass menu tree to `<Sidebar>`
-- [ ] `<Sidebar>` renders sections and items; highlights active route
-- [ ] **Acceptance:** Sidebar shows role-filtered menu on every page load without client-side flash
+- [x] `shell/app/layout.tsx` (Server Component): call `auth()` → call `/api/menu` (server-side fetch) → pass menu tree to `<Sidebar>`
+- [x] `<Sidebar>` renders sections and items; highlights active route
+- [x] **Acceptance:** Sidebar shows role-filtered menu on every page load without client-side flash
 
 #### M6-3: Sidebar collapse state persistence
-- [ ] Zustand store for collapse state (client-side optimistic)
-- [ ] On toggle: `PATCH /api/users/me/preferences` writes `sidebarCollapsed` to a `user_preferences` JSON column on `users`
-- [ ] On load: initial state read from session (embedded at login) or API
-- [ ] **Acceptance:** Collapse state survives page refresh and new browser sessions for the same user
+- [x] Zustand store for collapse state (client-side optimistic)
+- [x] On toggle: `PATCH /api/users/me/preferences` writes `sidebarCollapsed` to a `user_preferences` JSON column on `users`
+- [x] On load: initial state read from session (embedded at login) or API
+- [x] **Acceptance:** Collapse state survives page refresh and new browser sessions for the same user
 
 #### M6-4: Top header bar
-- [ ] App logo + name from `shell_config` (server-fetched in RootLayout)
-- [ ] Breadcrumb trail derived from current route and menu tree
-- [ ] User avatar dropdown: display name, role badges, logout button
-- [ ] Notification slot (empty div with `data-shell-notifications` — child apps can mount here via SDK)
-- [ ] **Acceptance:** Logo, name, breadcrumbs, and user dropdown all render correctly; logout triggers M4-4 flow
+- [x] App logo + name from `shell_config` (server-fetched in RootLayout)
+- [x] Breadcrumb trail derived from current route and menu tree
+- [x] User avatar dropdown: display name, role badges, logout button
+- [x] Notification slot (empty div with `data-shell-notifications` — child apps can mount here via SDK)
+- [x] **Acceptance:** Logo, name, breadcrumbs, and user dropdown all render correctly; logout triggers M4-4 flow
 
 #### M6-5: Light/dark mode toggle
-- [ ] Shadcn `ThemeProvider` already installed (M1-2); wire toggle button in header
-- [ ] Persist preference: `PATCH /api/users/me/preferences` with `theme: 'light' | 'dark'`
-- [ ] On load: server embeds theme preference in root HTML `class` to avoid flash
-- [ ] **Acceptance:** Toggle changes theme instantly; preference persists across sessions
+- [x] Shadcn `ThemeProvider` already installed (M1-2); wire toggle button in header
+- [x] Persist preference: `PATCH /api/users/me/preferences` with `theme: 'light' | 'dark'`
+- [x] On load: server embeds theme preference in root HTML `class` to avoid flash
+- [x] **Acceptance:** Toggle changes theme instantly; preference persists across sessions
 
 ---
 
