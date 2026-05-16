@@ -57,15 +57,70 @@ aws-corp-shell-app/
 
 ### Prerequisites
 
-- Node 20 LTS
-- pnpm 9.x
-- AWS credentials configured
+- Node 20 LTS (enforced — `package.json` rejects other major versions)
+- pnpm 9.x+
+- Docker (for local PostgreSQL)
+- AWS CLI + credentials configured
 - An Okta application registered (Web, OIDC, Authorization Code + PKCE)
+
+#### Install Node 20 via nvm
+
+```bash
+nvm install 20
+nvm use 20
+```
+
+#### Install AWS CLI (macOS)
+
+```bash
+brew install awscli
+aws configure   # enter Access Key ID, Secret, region, output format
+```
 
 ### Install dependencies
 
 ```bash
 pnpm install
+```
+
+### Start a local database
+
+```bash
+docker run -d \
+  --name shell-pg \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=shell_dev \
+  -p 5432:5432 \
+  postgres:15
+```
+
+### Create local env file
+
+Create `shell/.env.local` (gitignored — never commit):
+
+```bash
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=<openssl rand -base64 32>
+
+# Okta OIDC
+OKTA_CLIENT_ID=<from Okta app>
+OKTA_CLIENT_SECRET=<from Okta app>
+OKTA_ISSUER=https://<your-okta-domain>/oauth2/default
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
+
+# Webhook (any random string locally)
+WEBHOOK_SECRET=<openssl rand -base64 32>
+```
+
+Okta redirect URI to register: `http://localhost:3000/api/auth/callback/okta`
+
+### Run database migrations
+
+```bash
+pnpm drizzle-kit migrate
 ```
 
 ### Development
@@ -74,7 +129,7 @@ pnpm install
 pnpm --filter shell dev
 ```
 
-Shell runs at `http://localhost:3000`. On first visit, the setup wizard captures branding and Okta config.
+Shell runs at `http://localhost:3000`. On first visit you are redirected to `/setup` — complete the 4-step wizard (branding → Okta → super-admin → launch). After completion `/setup` returns 404 permanently.
 
 ### Common commands
 

@@ -21,8 +21,8 @@ function log(level: LogLevel, message: string, meta: LogMeta = {}) {
     timestamp: new Date().toISOString(),
     ...meta,
   };
-  // CloudWatch captures Lambda stdout automatically
-  process.stdout.write(JSON.stringify(entry) + "\n");
+  // CloudWatch captures stdout automatically; console.log works in both Node and Edge runtimes
+  console.log(JSON.stringify(entry));
 }
 
 export const logger = {

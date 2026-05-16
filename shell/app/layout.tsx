@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shell/theme-provider";
 import { CloudWatchRum } from "@/components/shell/cloudwatch-rum";
@@ -20,15 +21,36 @@ export const metadata: Metadata = {
   description: "Corporate Application Shell",
 };
 
-export default async function RootLayout({
+async function ThemedShell({
+  cookiePromise,
+  children,
+}: {
+  cookiePromise: ReturnType<typeof cookies>;
+  children: React.ReactNode;
+}) {
+  const cookieStore = await cookiePromise;
+  const themeCookie = cookieStore.get("theme")?.value;
+  const theme =
+    themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
+
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme={theme}
+      enableSystem
+      disableTransitionOnChange
+    >
+      {children}
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const themeCookie = cookieStore.get("theme")?.value;
-  const theme =
-    themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
+  const cookiePromise = cookies();
 
   const rumAppId = process.env.CLOUDWATCH_RUM_APP_ID;
   const rumIdentityPoolId = process.env.CLOUDWATCH_RUM_IDENTITY_POOL_ID;
@@ -50,14 +72,11 @@ export default async function RootLayout({
             endpoint={rumEndpoint}
           />
         )}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme={theme}
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <Suspense>
+          <ThemedShell cookiePromise={cookiePromise}>
+            {children}
+          </ThemedShell>
+        </Suspense>
       </body>
     </html>
   );
