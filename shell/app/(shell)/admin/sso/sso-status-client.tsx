@@ -8,7 +8,7 @@ import { CheckCircle, XCircle, RefreshCw } from "lucide-react";
 
 interface SsoStatus {
   connected: boolean;
-  domain?: string;
+  issuer?: string;
   clientId?: string | null;
   error?: string;
 }
@@ -35,7 +35,7 @@ export function SsoStatusClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">SSO Status</h1>
-          <p className="text-muted-foreground">Okta OIDC connection health</p>
+          <p className="text-muted-foreground">OIDC connection health</p>
         </div>
         <Button variant="outline" onClick={() => void fetchStatus()} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -65,8 +65,8 @@ export function SsoStatusClient() {
             <>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Okta Domain</p>
-                  <p className="font-mono">{status.domain ?? "—"}</p>
+                  <p className="text-muted-foreground">Issuer</p>
+                  <p className="font-mono">{status.issuer ?? "—"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Client ID</p>

@@ -26,16 +26,16 @@ interface WizardData {
   logoUrl: string;
   primaryColor: string;
   // Step 2
-  oktaDomain: string;
-  oktaClientId: string;
-  oktaClientSecret: string;
+  oidcIssuer: string;
+  oidcClientId: string;
+  oidcClientSecret: string;
   // Step 3
   superAdminEmail: string;
 }
 
 const TOTAL_STEPS = 4;
 
-const STEP_LABELS = ["Branding", "Okta Connection", "Super Admin", "Review & Launch"];
+const STEP_LABELS = ["Branding", "Identity Provider", "Super Admin", "Review & Launch"];
 
 // ────────────────────────────────────────────────────────────
 // Step indicator
@@ -223,10 +223,10 @@ function Step1({
 }
 
 // ────────────────────────────────────────────────────────────
-// Step 2 — Okta Connection
+// Step 2 — Identity Provider (generic OIDC)
 // ────────────────────────────────────────────────────────────
 
-type OktaStatus = "idle" | "testing" | "ok" | "error";
+type OidcStatus = "idle" | "testing" | "ok" | "error";
 
 function Step2({
   data,
@@ -239,13 +239,13 @@ function Step2({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const [status, setStatus] = useState<OktaStatus>("idle");
+  const [status, setStatus] = useState<OidcStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   const canTest =
-    data.oktaDomain.trim().length > 0 &&
-    data.oktaClientId.trim().length > 0 &&
-    data.oktaClientSecret.trim().length > 0;
+    data.oidcIssuer.trim().length > 0 &&
+    data.oidcClientId.trim().length > 0 &&
+    data.oidcClientSecret.trim().length > 0;
 
   const canProceed = status === "ok";
 
@@ -254,7 +254,7 @@ function Step2({
     setErrorMsg("");
     try {
       const res = await fetch(
-        `/api/setup/validate-okta?domain=${encodeURIComponent(data.oktaDomain.trim())}`
+        `/api/setup/validate-oidc?issuer=${encodeURIComponent(data.oidcIssuer.trim())}`
       );
       if (!res.ok) {
         const body = (await res.json()) as { error: string };
@@ -270,46 +270,46 @@ function Step2({
   return (
     <>
       <CardHeader>
-        <CardTitle>Okta Connection</CardTitle>
+        <CardTitle>Identity Provider</CardTitle>
         <CardDescription>
-          Enter your Okta OIDC credentials. The issuer will be auto-derived as{" "}
-          <code className="text-xs">{"https://{domain}/oauth2/default"}</code>.
+          Enter your OIDC credentials. Works with any standard OIDC provider — Auth0, Okta,
+          Google Workspace, Keycloak, and others.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="oktaDomain">Okta Domain</Label>
+          <Label htmlFor="oidcIssuer">Issuer URL</Label>
           <Input
-            id="oktaDomain"
-            placeholder="corp.okta.com"
-            value={data.oktaDomain}
+            id="oidcIssuer"
+            placeholder="https://your-tenant.auth0.com/"
+            value={data.oidcIssuer}
             onChange={(e) => {
-              onChange({ oktaDomain: e.target.value });
+              onChange({ oidcIssuer: e.target.value });
               setStatus("idle");
             }}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="oktaClientId">Client ID</Label>
+          <Label htmlFor="oidcClientId">Client ID</Label>
           <Input
-            id="oktaClientId"
-            placeholder="0oa..."
-            value={data.oktaClientId}
+            id="oidcClientId"
+            placeholder="your-client-id"
+            value={data.oidcClientId}
             onChange={(e) => {
-              onChange({ oktaClientId: e.target.value });
+              onChange({ oidcClientId: e.target.value });
               setStatus("idle");
             }}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="oktaClientSecret">Client Secret</Label>
+          <Label htmlFor="oidcClientSecret">Client Secret</Label>
           <Input
-            id="oktaClientSecret"
+            id="oidcClientSecret"
             type="password"
             placeholder="••••••••"
-            value={data.oktaClientSecret}
+            value={data.oidcClientSecret}
             onChange={(e) => {
-              onChange({ oktaClientSecret: e.target.value });
+              onChange({ oidcClientSecret: e.target.value });
               setStatus("idle");
             }}
           />
@@ -369,8 +369,8 @@ function Step3({
       <CardHeader>
         <CardTitle>Super Admin</CardTitle>
         <CardDescription>
-          Enter the Okta email address that will become the initial super admin. Full Okta
-          verification is wired in M4 (Authentication milestone).
+          Enter the email address that will become the initial super admin. This must match the
+          email returned by your OIDC provider on first login.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -385,8 +385,8 @@ function Step3({
           />
         </div>
         <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-300">
-          <strong>Note:</strong> Okta login verification will be enabled once M4 (Authentication)
-          is complete. For now the email is stored as the designated super admin.
+          <strong>Note:</strong> The super admin role is granted based on this email. Make sure it
+          matches exactly what your OIDC provider will send.
         </div>
       </CardContent>
       <CardFooter className="justify-between">
@@ -440,8 +440,8 @@ function Step4({
     ["App Name", data.appName],
     ["Logo", data.logoUrl || "(none)"],
     ["Brand Color", data.primaryColor],
-    ["Okta Domain", data.oktaDomain],
-    ["Client ID", data.oktaClientId],
+    ["OIDC Issuer", data.oidcIssuer],
+    ["Client ID", data.oidcClientId],
     ["Client Secret", "••••••••"],
     ["Super Admin Email", data.superAdminEmail],
   ];
@@ -487,9 +487,9 @@ const DEFAULT_DATA: WizardData = {
   appName: "",
   logoUrl: "",
   primaryColor: "#0f172a",
-  oktaDomain: "",
-  oktaClientId: "",
-  oktaClientSecret: "",
+  oidcIssuer: "",
+  oidcClientId: "",
+  oidcClientSecret: "",
   superAdminEmail: "",
 };
 

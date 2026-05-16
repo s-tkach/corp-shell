@@ -15,19 +15,19 @@ interface SetupPayload {
   appName: string;
   logoUrl: string;
   primaryColor: string;
-  oktaDomain: string;
-  oktaClientId: string;
-  oktaClientSecret: string;
+  oidcIssuer: string;
+  oidcClientId: string;
+  oidcClientSecret: string;
   superAdminEmail: string;
 }
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<SetupPayload>;
 
-  const { appName, logoUrl, primaryColor, oktaDomain, oktaClientId, oktaClientSecret, superAdminEmail } =
+  const { appName, logoUrl, primaryColor, oidcIssuer, oidcClientId, oidcClientSecret, superAdminEmail } =
     body;
 
-  if (!appName?.trim() || !oktaDomain?.trim() || !oktaClientId?.trim() || !oktaClientSecret?.trim() || !superAdminEmail?.trim()) {
+  if (!appName?.trim() || !oidcIssuer?.trim() || !oidcClientId?.trim() || !oidcClientSecret?.trim() || !superAdminEmail?.trim()) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -41,10 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
   }
 
-  // Store Okta client secret to Secrets Manager (if configured)
-  // In dev without SST this is a no-op; the value is still written to shell_config
-  // for reference. In prod the secret value is stripped and stored securely.
-  await maybeStoreSecret("OKTA_CLIENT_SECRET", oktaClientSecret);
+  // Store OIDC client secret to Secrets Manager (if configured)
+  // In dev without SST this is a no-op. In prod the secret is stored securely.
+  await maybeStoreSecret("OIDC_CLIENT_SECRET", oidcClientSecret);
 
   // Atomic write — Drizzle wraps this in a transaction
   await db.transaction(async (tx) => {
@@ -53,8 +52,8 @@ export async function POST(request: Request) {
       appName: appName.trim(),
       logoUrl: logoUrl || null,
       primaryColor: primaryColor || "#0f172a",
-      oktaDomain: oktaDomain.trim(),
-      oktaClientId: oktaClientId.trim(),
+      oidcIssuer: oidcIssuer.trim(),
+      oidcClientId: oidcClientId.trim(),
       setupComplete: true,
     });
 
@@ -89,8 +88,8 @@ export async function POST(request: Request) {
       .values({
         email: superAdminEmail.trim().toLowerCase(),
         displayName: superAdminEmail.split("@")[0] ?? superAdminEmail,
-        idpSource: "okta",
-        idpSubject: superAdminEmail.trim().toLowerCase(), // replaced with real sub at M4
+        idpSource: "oidc",
+        idpSubject: superAdminEmail.trim().toLowerCase(), // replaced with real sub on first login
       })
       .returning();
 

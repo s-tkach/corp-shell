@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The Corporate Application Shell is a **Next.js 15 monorepo** deployed serverlessly on AWS via SST v3. It acts as a host for independently deployed micro-frontends (Module Federation), provides SSO via Okta OIDC, and exposes an admin panel for all runtime configuration. There is no separate backend service — Next.js API routes serve as the API layer.
+The Corporate Application Shell is a **Next.js 15 monorepo** deployed serverlessly on AWS via SST v3. It acts as a host for independently deployed micro-frontends (Module Federation), provides SSO via OIDC, and exposes an admin panel for all runtime configuration. There is no separate backend service — Next.js API routes serve as the API layer.
 
 ---
 
@@ -48,7 +48,7 @@ aws-corp-shell-app/                  ← monorepo root
 │   │   ├── shell/                   # Sidebar, Header, Breadcrumbs, ErrorBoundary, AppSkeleton
 │   │   └── ui/                      # Shadcn/ui components
 │   ├── lib/
-│   │   ├── auth.ts                  # NextAuth.js config + Okta provider
+│   │   ├── auth.ts                  # NextAuth.js config + OIDC provider
 │   │   ├── db/
 │   │   │   ├── client.ts            # Drizzle ORM client (serverless pg)
 │   │   │   ├── schema.ts            # All table definitions
@@ -80,14 +80,14 @@ aws-corp-shell-app/                  ← monorepo root
 | Shell framework | Next.js App Router | 15.x | SSR for layout/auth; API routes as backend |
 | UI components | Shadcn/ui + Tailwind CSS | v4 | Forked from `satnaing/shadcn-admin` |
 | Module Federation | `@module-federation/nextjs-mf` | latest | MF core team maintained |
-| Authentication | NextAuth.js (Auth.js) | v5 | Okta OIDC; httpOnly JWT session cookie |
+| Authentication | NextAuth.js (Auth.js) | v5 | Generic OIDC; httpOnly JWT session cookie |
 | Client state | Zustand | 4.x | Shell UI state only (sidebar collapse, theme) |
 | ORM | Drizzle ORM | latest | Type-safe; no persistent connection pool |
 | Database | Aurora Serverless v2 (PostgreSQL) | 15.x | Scales to zero in dev; single DB for all shell data |
 | Compute | AWS Lambda via SST v3 | — | Serverless Next.js; no EC2/ECS |
 | CDN / Static | AWS CloudFront + S3 | — | Shell assets + child app remoteEntry files |
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
-| Secrets | AWS Secrets Manager | — | Okta client secret, webhook HMAC key, DB URL |
+| Secrets | AWS Secrets Manager | — | OIDC client secret, webhook HMAC key, DB URL |
 | IaC | SST v3 (Ion / Pulumi) | 3.x | Single `sst.config.ts` defines all resources |
 | CI/CD | GitHub Actions | — | Shell and child apps deploy independently |
 | Package registry | GitHub Packages | — | `@corp/shell-sdk`, `@corp/create-shell-app` |
@@ -121,11 +121,11 @@ Route 53 ──→ CloudFront (shell distribution)
   OIDC (PKCE)
   │
   ▼
-Okta (corp.okta.com)
+OIDC Provider (any OIDC-compliant issuer)
   Authorization Server + groups claim + RP-Initiated Logout
 
 AWS Secrets Manager
-  OKTA_CLIENT_SECRET, WEBHOOK_SECRET, DATABASE_URL
+  OIDC_CLIENT_SECRET, WEBHOOK_SECRET, DATABASE_URL
 
 GitHub Packages
   @corp/shell-sdk, @corp/create-shell-app
@@ -138,7 +138,7 @@ GitHub Packages
 2. middleware.ts:
      a. /setup  → if shell_config.setup_complete: return 404
      b. all other routes: check NextAuth.js session cookie
-        - No session → redirect /api/auth/signin (Okta)
+        - No session → redirect /api/auth/signin (OIDC provider)
         - Session valid → check route RBAC
           - Unauthorized → 403 page
           - Authorized → continue
@@ -207,14 +207,14 @@ interface ChildAppManifest {
 
 ## 6. Authentication & Session Architecture
 
-### 6.1 Flow (Okta OIDC + PKCE via NextAuth.js v5)
+### 6.1 Flow (OIDC + PKCE via NextAuth.js v5)
 
 ```
-User → middleware (no session) → NextAuth redirect to Okta
-  → Okta login → callback /api/auth/callback/okta
+User → middleware (no session) → NextAuth redirect to OIDC provider
+  → OIDC login → callback /api/auth/callback/oidc
   → NextAuth jwt() callback:
       1. Extract groups[] from ID token
-      2. DB: map Okta groups → shell roles  (idp_group_role_mappings)
+      2. DB: map IDP groups → shell roles  (idp_group_role_mappings)
       3. DB: get subscription tier          (user_subscriptions)
       4. New user? JIT-provision:
            INSERT users
@@ -237,7 +237,7 @@ User → middleware (no session) → NextAuth redirect to Okta
 ### 6.3 Token Refresh & Logout
 
 - **Refresh:** NextAuth.js handles silently; user is never redirected while session is valid.
-- **Logout:** `signOut()` → clears local cookie → Okta RP-Initiated Logout (`/v1/logout`) ends Okta session.
+- **Logout:** `signOut()` → clears local cookie → OIDC RP-Initiated Logout ends the provider session.
 
 ### 6.4 Future IDP Extensibility
 
@@ -268,8 +268,8 @@ Layer 3 — Server Component    (layout, menu render)
 
 ### 7.2 Role Model
 
-- Roles are **slugs** defined in the shell DB (e.g. `finance_manager`), not Okta group names.
-- Okta groups → shell roles are mapped in `idp_group_role_mappings` table.
+- Roles are **slugs** defined in the shell DB (e.g. `finance_manager`), not IDP group names.
+- IDP groups → shell roles are mapped in `idp_group_role_mappings` table.
 - Mapping applied in NextAuth.js `jwt()` callback on **every login** (groups refreshed each session).
 - `super_admin` is a system role: `isSystem = true`, cannot be deleted or renamed.
 - Users may hold multiple roles; effective access = union of all role permissions.
@@ -355,13 +355,13 @@ Admin Panel → Application Registry:
 | `users` | JIT-provisioned user records (email, idpSource, idpSubject, isActive) |
 | `roles` | Role definitions (slug, displayName, isSystem) |
 | `user_roles` | Many-to-many: users ↔ roles |
-| `idp_group_role_mappings` | Okta group name → shell role slug |
+| `idp_group_role_mappings` | IDP group name → shell role slug |
 | `subscription_tiers` | Tier definitions (id, displayName, level, upgradeCta, upgradeUrl) |
 | `user_subscriptions` | User → tier assignment with optional expiry |
 | `menu_sections` | Top-level nav groupings (label, icon, sortOrder) |
 | `menu_items` | Nav leaf items (route, requiredRoles[], requiredSubLevel, badge) |
 | `app_registry` | Registered child apps (remoteUrl, routePrefix, healthCheckUrl) |
-| `shell_config` | Single-row: branding, Okta domain, setup_complete flag |
+| `shell_config` | Single-row: branding, OIDC issuer, setup_complete flag |
 | `auth_events` | Login/logout/failure events (viewer UI in v2) |
 
 ### 9.3 Migrations
@@ -383,13 +383,13 @@ const db = new sst.aws.Aurora("ShellDb", {
   vpc,
 });
 
-const secret = new sst.aws.Secret("OktaClientSecret");
+const secret = new sst.aws.Secret("OidcClientSecret");
 
 const shell = new sst.aws.Nextjs("Shell", {
   path: "shell/",
   environment: {
     DATABASE_URL: db.secretArn,          // resolved at runtime from Secrets Manager
-    OKTA_CLIENT_SECRET: secret.value,
+    OIDC_CLIENT_SECRET: secret.value,
   },
   domain: { name: "app.corp.com", dns: sst.aws.dns() },
 });
@@ -413,8 +413,8 @@ const childApp = new sst.aws.StaticSite("ChildApp", {
 
 | Secret | Storage | Consumed By |
 |--------|---------|------------|
-| `OKTA_CLIENT_SECRET` | Secrets Manager | Lambda (NextAuth.js) |
-| `OKTA_CLIENT_ID` | Secrets Manager | Lambda (NextAuth.js) |
+| `OIDC_CLIENT_SECRET` | Secrets Manager | Lambda (NextAuth.js) |
+| `OIDC_CLIENT_ID` | Secrets Manager | Lambda (NextAuth.js) |
 | `DATABASE_URL` | Secrets Manager | Lambda (Drizzle ORM) |
 | `NEXTAUTH_SECRET` | Secrets Manager | Lambda (NextAuth.js JWT encryption) |
 | `WEBHOOK_SECRET` | Secrets Manager | Lambda (HMAC-SHA256 webhook validation) |
@@ -477,7 +477,7 @@ npm publish --access restricted  (NODE_AUTH_TOKEN = GITHUB_TOKEN)
 | Secret leakage | All secrets in Secrets Manager; zero secrets in source or git history |
 | XSS | Shadcn/ui + React; no `dangerouslySetInnerHTML`; CSP header via CloudFront |
 | Child app crash | React ErrorBoundary per child app mount; shell unaffected |
-| OIDC misconfiguration | Setup wizard validates Okta discovery endpoint before proceeding |
+| OIDC misconfiguration | Setup wizard validates the OIDC discovery endpoint before proceeding |
 | Lockout prevention | `super_admin` role is system-owned; cannot be deleted or self-revoked via wizard |
 
 ---
@@ -509,8 +509,8 @@ middleware.ts:
 Wizard state: React local state only (not persisted until Step 4 "Launch")
 
 Step 1 — Branding:   POST /api/setup/upload-logo → S3 presigned PUT
-Step 2 — Okta:       GET /api/setup/validate-okta → pings /.well-known/openid-configuration
-Step 3 — Super Admin: triggers full Okta OIDC login inline; verifies returned email matches input
+Step 2 — OIDC:       GET /api/setup/validate-oidc → pings /.well-known/openid-configuration
+Step 3 — Super Admin: triggers full OIDC login inline; verifies returned email matches input
 Step 4 — Launch:     POST /api/setup/complete →
                        INSERT shell_config
                        INSERT subscription_tiers (free/standard/enterprise defaults)

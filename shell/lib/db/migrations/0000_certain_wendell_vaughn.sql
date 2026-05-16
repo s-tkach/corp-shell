@@ -63,8 +63,8 @@ CREATE TABLE "shell_config" (
 	"app_name" text NOT NULL,
 	"logo_url" text,
 	"primary_color" text,
-	"okta_domain" text,
-	"okta_client_id" text,
+	"oidc_issuer" text,
+	"oidc_client_id" text,
 	"setup_complete" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

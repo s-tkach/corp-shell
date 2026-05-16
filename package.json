@@ -5,7 +5,7 @@
   "scripts": {
     "typecheck": "pnpm --filter shell typecheck",
     "lint": "pnpm --filter shell lint",
-    "drizzle-kit": "drizzle-kit"
+    "drizzle-kit": "node --env-file=shell/.env.local node_modules/drizzle-kit/bin.cjs"
   },
   "engines": {
     "node": ">=20.0.0 <21.0.0",

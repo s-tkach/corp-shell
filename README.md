@@ -1,14 +1,14 @@
 # Corporate Application Shell
 
-A host web application that serves as the single entry point for all internal corporate tools. Provides SSO via Okta OIDC, role- and subscription-gated navigation, micro-frontend hosting via Module Federation, and a self-contained admin panel — all deployed serverlessly on AWS via SST v3.
+A host web application that serves as the single entry point for all internal corporate tools. Provides SSO via OIDC, role- and subscription-gated navigation, micro-frontend hosting via Module Federation, and a self-contained admin panel — all deployed serverlessly on AWS via SST v3.
 
 ## What it does
 
-- **Single sign-on** — Okta OIDC (PKCE); extensible to any future OIDC provider without code changes
+- **Single sign-on** — OIDC (PKCE); any OIDC-compliant provider supported without code changes
 - **Data-driven navigation** — left sidebar populated entirely from the database, filtered per user's roles and subscription tier
 - **Micro-frontend hosting** — child apps deploy independently to S3/CloudFront and register themselves via the Admin Panel; live within 60 seconds, no shell redeploy
 - **Admin Panel** — manage menus, roles, users, child apps, subscriptions, SSO config, and branding without engineering involvement
-- **First-run wizard** — captures branding, Okta connection, and the initial super-admin account before the shell goes live
+- **First-run wizard** — captures branding, OIDC connection, and the initial super-admin account before the shell goes live
 
 ## Stack
 
@@ -17,7 +17,7 @@ A host web application that serves as the single entry point for all internal co
 | Shell framework | Next.js 15 (App Router) |
 | UI | Shadcn/ui + Tailwind CSS v4 |
 | Module Federation | `@module-federation/nextjs-mf` |
-| Auth | NextAuth.js v5 + Okta OIDC |
+| Auth | NextAuth.js v5 + OIDC |
 | ORM | Drizzle ORM |
 | Database | Aurora Serverless v2 (PostgreSQL) |
 | Compute | AWS Lambda via SST v3 |
@@ -61,7 +61,7 @@ aws-corp-shell-app/
 - pnpm 9.x+
 - Docker (for local PostgreSQL)
 - AWS CLI + credentials configured
-- An Okta application registered (Web, OIDC, Authorization Code + PKCE)
+- An OIDC application registered (Web, Authorization Code + PKCE)
 
 #### Install Node 20 via nvm
 
@@ -103,10 +103,10 @@ Create `shell/.env.local` (gitignored — never commit):
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<openssl rand -base64 32>
 
-# Okta OIDC
-OKTA_CLIENT_ID=<from Okta app>
-OKTA_CLIENT_SECRET=<from Okta app>
-OKTA_ISSUER=https://<your-okta-domain>/oauth2/default
+# OIDC
+OIDC_CLIENT_ID=<from your OIDC provider>
+OIDC_CLIENT_SECRET=<from your OIDC provider>
+OIDC_ISSUER=https://<your-oidc-issuer>/oauth2/default
 
 # Database
 DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
@@ -115,7 +115,7 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
 WEBHOOK_SECRET=<openssl rand -base64 32>
 ```
 
-Okta redirect URI to register: `http://localhost:3000/api/auth/callback/okta`
+OIDC redirect URI to register: `http://localhost:3000/api/auth/callback/oidc`
 
 ### Run database migrations
 
@@ -129,7 +129,7 @@ pnpm drizzle-kit migrate
 pnpm --filter shell dev
 ```
 
-Shell runs at `http://localhost:3000`. On first visit you are redirected to `/setup` — complete the 4-step wizard (branding → Okta → super-admin → launch). After completion `/setup` returns 404 permanently.
+Shell runs at `http://localhost:3000`. On first visit you are redirected to `/setup` — complete the 4-step wizard (branding → OIDC → super-admin → launch). After completion `/setup` returns 404 permanently.
 
 ### Common commands
 
@@ -152,7 +152,7 @@ npx sst deploy --stage prod
 
 1. Run `npx sst deploy --stage prod`
 2. Visit your domain — you are redirected to `/setup`
-3. Complete the 4-step wizard: branding → Okta connection → super-admin → launch
+3. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
 4. `/setup` returns 404 permanently after completion
 
 ## Onboarding a child app
@@ -182,8 +182,8 @@ All secrets are stored in AWS Secrets Manager — never in source files or `.env
 
 | Secret | Purpose |
 |--------|---------|
-| `OKTA_CLIENT_SECRET` | Okta OIDC |
-| `OKTA_CLIENT_ID` | Okta OIDC |
+| `OIDC_CLIENT_SECRET` | OIDC provider |
+| `OIDC_CLIENT_ID` | OIDC provider |
 | `DATABASE_URL` | Aurora connection |
 | `NEXTAUTH_SECRET` | JWT cookie encryption |
 | `WEBHOOK_SECRET` | Subscription webhook HMAC-SHA256 |

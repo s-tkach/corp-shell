@@ -120,8 +120,8 @@ export const shellConfig = pgTable("shell_config", {
   appName: text("app_name").notNull(),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color"),
-  oktaDomain: text("okta_domain"),
-  oktaClientId: text("okta_client_id"),
+  oidcIssuer: text("oidc_issuer"),
+  oidcClientId: text("oidc_client_id"),
   setupComplete: boolean("setup_complete").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

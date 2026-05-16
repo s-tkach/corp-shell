@@ -5,7 +5,7 @@ const sections = [
   { href: "/admin/menu", title: "Menu Manager", description: "CRUD and reorder nav sections and items" },
   { href: "/admin/roles", title: "Role Manager", description: "Manage roles and IDP group mappings" },
   { href: "/admin/users", title: "User Manager", description: "View users, assign roles and subscriptions" },
-  { href: "/admin/sso", title: "SSO Status", description: "Okta connection health" },
+  { href: "/admin/sso", title: "SSO Status", description: "OIDC connection health" },
   { href: "/admin/apps", title: "Application Registry", description: "Register and manage child apps" },
   { href: "/admin/subscriptions", title: "Subscription Tiers", description: "Manage tiers and upgrade prompts" },
   { href: "/admin/branding", title: "Theme & Branding", description: "App name, logo, and brand color" },

@@ -26,16 +26,28 @@ export async function GET(request: NextRequest) {
   // Clear the local session cookie
   await signOut({ redirect: false });
 
-  const oktaDomain = process.env["OKTA_DOMAIN"];
+  const oidcIssuer = process.env["OIDC_ISSUER"];
   const origin = request.nextUrl.origin;
 
-  if (idToken && oktaDomain) {
-    const logoutUrl = new URL(
-      `https://${oktaDomain}/oauth2/default/v1/logout`
-    );
-    logoutUrl.searchParams.set("id_token_hint", idToken);
-    logoutUrl.searchParams.set("post_logout_redirect_uri", origin);
-    return NextResponse.redirect(logoutUrl.toString());
+  if (idToken && oidcIssuer) {
+    try {
+      const discoveryRes = await fetch(
+        `${oidcIssuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (discoveryRes.ok) {
+        const discovery = (await discoveryRes.json()) as Record<string, unknown>;
+        const endSessionEndpoint = discovery["end_session_endpoint"];
+        if (typeof endSessionEndpoint === "string") {
+          const logoutUrl = new URL(endSessionEndpoint);
+          logoutUrl.searchParams.set("id_token_hint", idToken);
+          logoutUrl.searchParams.set("post_logout_redirect_uri", origin);
+          return NextResponse.redirect(logoutUrl.toString());
+        }
+      }
+    } catch {
+      // fall through to local redirect
+    }
   }
 
   return NextResponse.redirect(origin);

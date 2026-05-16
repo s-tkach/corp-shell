@@ -25,19 +25,21 @@ export default $config({
       vpc,
     });
 
-    const oktaClientSecret = new sst.Secret("OktaClientSecret");
-    const oktaClientId = new sst.Secret("OktaClientId");
+    const oidcClientSecret = new sst.Secret("OidcClientSecret");
+    const oidcClientId = new sst.Secret("OidcClientId");
+    const oidcIssuer = new sst.Secret("OidcIssuer");
     const nextAuthSecret = new sst.Secret("NextAuthSecret");
     const webhookSecret = new sst.Secret("WebhookSecret");
 
     const shell = new sst.aws.Nextjs("Shell", {
       path: "shell/",
       tracing: "active",
-      link: [db, oktaClientSecret, oktaClientId, nextAuthSecret, webhookSecret],
+      link: [db, oidcClientSecret, oidcClientId, oidcIssuer, nextAuthSecret, webhookSecret],
       environment: {
         DATABASE_URL: db.secretArn,
-        OKTA_CLIENT_SECRET: oktaClientSecret.value,
-        OKTA_CLIENT_ID: oktaClientId.value,
+        OIDC_CLIENT_SECRET: oidcClientSecret.value,
+        OIDC_CLIENT_ID: oidcClientId.value,
+        OIDC_ISSUER: oidcIssuer.value,
         NEXTAUTH_SECRET: nextAuthSecret.value,
         WEBHOOK_SECRET: webhookSecret.value,
       },

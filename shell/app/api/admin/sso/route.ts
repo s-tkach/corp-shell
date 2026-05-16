@@ -12,30 +12,29 @@ export async function GET() {
 
   const rows = await db.select().from(shellConfig).limit(1);
   const config = rows[0];
-  if (!config?.oktaDomain) {
-    return NextResponse.json({ connected: false, error: "No Okta domain configured" });
+  if (!config?.oidcIssuer) {
+    return NextResponse.json({ connected: false, error: "No OIDC issuer configured" });
   }
 
-  const domain = config.oktaDomain;
-  const clientId = config.oktaClientId;
+  const issuer = config.oidcIssuer;
+  const clientId = config.oidcClientId;
+  const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
 
   try {
-    const res = await fetch(`https://${domain}/.well-known/openid-configuration`, {
-      next: { revalidate: 0 },
-    });
+    const res = await fetch(discoveryUrl, { next: { revalidate: 0 } });
     if (res.ok) {
-      return NextResponse.json({ connected: true, domain, clientId });
+      return NextResponse.json({ connected: true, issuer, clientId });
     }
     return NextResponse.json({
       connected: false,
-      domain,
+      issuer,
       clientId,
-      error: `HTTP ${res.status} from Okta discovery endpoint`,
+      error: `HTTP ${res.status} from OIDC discovery endpoint`,
     });
   } catch (e) {
     return NextResponse.json({
       connected: false,
-      domain,
+      issuer,
       clientId,
       error: e instanceof Error ? e.message : "Network error",
     });

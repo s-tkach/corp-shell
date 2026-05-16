@@ -225,7 +225,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
             <DialogTitle>Add IDP Group Mapping</DialogTitle>
           </DialogHeader>
           <div className="space-y-1">
-            <Label>Okta Group Name</Label>
+            <Label>IDP Group Name</Label>
             <Input value={mappingGroup} onChange={(e) => setMappingGroup(e.target.value)} placeholder="Corp-Admins" />
           </div>
           <DialogFooter>

@@ -23,7 +23,7 @@
 | M1 | Monorepo & Infrastructure Scaffold | Deployable empty shell on AWS |
 | M2 | Database Schema & Migrations | All tables live; Drizzle migrations running |
 | M3 | First-Run Setup Wizard | Shell becomes operational via wizard |
-| M4 | Authentication & Session | Okta OIDC login/logout/JIT provisioning |
+| M4 | Authentication & Session | OIDC login/logout/JIT provisioning |
 | M5 | RBAC & Middleware | Role-gated routes enforced end-to-end |
 | M6 | Navigation Shell & Menu System | Data-driven sidebar, header, theme toggle |
 | M7 | Admin Panel | All 7 admin sections fully functional |
@@ -119,29 +119,29 @@
 - [x] Logo upload: `POST /api/setup/upload-logo` → generates S3 presigned PUT URL → client uploads directly to S3
 - [x] **Acceptance:** Logo uploads to S3; preview renders in wizard; step 1 → step 2 navigation works
 
-#### M3-3: Wizard Step 2 — Okta Connection
-- [x] Fields: Okta domain, Client ID, Client Secret
-- [x] On "Test Connection": `GET /api/setup/validate-okta?domain={domain}` → server pings `https://{domain}/.well-known/openid-configuration`
+#### M3-3: Wizard Step 2 — OIDC Connection
+- [x] Fields: Issuer URL, Client ID, Client Secret
+- [x] On "Test Connection": `GET /api/setup/validate-oidc?issuer={issuer}` → server pings `{issuer}/.well-known/openid-configuration`
 - [x] Inline success ("Connected ✓") or error with exact failure message
 - [x] Wizard does not allow proceeding until connection is valid
 - [x] **Acceptance:** Valid domain shows success; invalid domain shows specific error; step cannot advance until valid
 
 #### M3-4: Wizard Step 3 — Super Admin verification
-- [x] Input: Okta email address for the super admin
-- [x] "Verify via Okta Login" button: triggers NextAuth.js Okta sign-in inline (uses credentials entered in Step 2)
+- [x] Input: email address for the super admin
+- [x] "Verify via OIDC Login" button: triggers NextAuth.js OIDC sign-in inline (uses credentials entered in Step 2)
 - [x] On callback: verify that the authenticated email matches the input; show mismatch error if not
-- [x] **Acceptance:** Correct Okta user verified; mismatch shows error and allows retry; no session persisted until Step 4 launch
+- [x] **Acceptance:** Correct user verified; mismatch shows error and allows retry; no session persisted until Step 4 launch
 
 #### M3-5: Wizard Step 4 — Review & Launch
 - [x] Summary card displaying all inputs from Steps 1–3
 - [x] "Launch Shell" button: `POST /api/setup/complete` atomically writes:
-  - `shell_config` row (branding, Okta domain, `setup_complete = true`)
+  - `shell_config` row (branding, OIDC issuer, `setup_complete = true`)
   - Default `subscription_tiers` (free level 0, standard level 1, enterprise level 2)
   - Default `roles` (super_admin `isSystem=true`, admin)
-  - `users` row for super admin (idpSource=okta, idpSubject from verified session)
+  - `users` row for super admin (idpSource=oidc, idpSubject from verified session)
   - `user_roles` (super_admin → super admin user)
   - `user_subscriptions` (enterprise tier, no expiry)
-  - Stores Okta Client Secret to Secrets Manager (not in DB)
+  - Stores OIDC Client Secret to Secrets Manager (not in DB)
 - [x] Redirects to `/dashboard` on success
 - [x] **Acceptance:** All DB writes succeed atomically; `/setup` returns 404 after completion; `/dashboard` loads
 
@@ -149,20 +149,20 @@
 
 ## M4 — Authentication & Session
 
-**Goal:** Okta OIDC login/logout works end-to-end; JIT provisioning creates user records on first login; session is embedded in an httpOnly JWT cookie.
+**Goal:** OIDC login/logout works end-to-end; JIT provisioning creates user records on first login; session is embedded in an httpOnly JWT cookie.
 
 ### Tasks
 
 #### M4-1: Install and configure NextAuth.js v5
 - [x] `pnpm --filter shell add next-auth@beta`
-- [x] Create `shell/lib/auth.ts`: configure Okta provider reading `OKTA_DOMAIN`, `OKTA_CLIENT_ID`, `OKTA_CLIENT_SECRET` from Secrets Manager (resolved at Lambda start)
+- [x] Create `shell/lib/auth.ts`: configure OIDC provider reading `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` from Secrets Manager (resolved at Lambda start)
 - [x] Wire `GET/POST /api/auth/[...nextauth]` route handler
 - [x] Set `NEXTAUTH_SECRET` (Secrets Manager) for JWT encryption
-- [x] **Acceptance:** Visiting a protected route redirects to Okta; successful login returns to shell
+- [x] **Acceptance:** Visiting a protected route redirects to the OIDC provider; successful login returns to shell
 
 #### M4-2: JWT callback — group mapping & subscription resolution
 - [x] In NextAuth.js `jwt()` callback:
-  1. Extract `groups[]` from Okta ID token
+  1. Extract `groups[]` from OIDC ID token
   2. Query `idp_group_role_mappings` → resolve shell role slugs
   3. Query `user_subscriptions` → get tier and level
   4. Embed `{ userId, roles, subscriptionTier, subscriptionLevel }` in JWT payload
@@ -170,7 +170,7 @@
 
 #### M4-3: JIT user provisioning
 - [x] In `jwt()` callback, if user email not found in `users` table:
-  - `INSERT users` (email, displayName, idpSource='okta', idpSubject)
+  - `INSERT users` (email, displayName, idpSource='oidc', idpSubject)
   - `INSERT user_roles` for each mapped role
   - `INSERT user_subscriptions` (free tier)
   - `INSERT auth_events` (LOGIN + JIT_PROVISION)
@@ -178,14 +178,14 @@
 - [x] **Acceptance:** First login creates user record; subsequent logins update `lastLoginAt`; no duplicate rows
 
 #### M4-4: Logout — RP-Initiated Logout
-- [x] `signOut()` handler: clear local session cookie + redirect to Okta `/v1/logout?id_token_hint=...&post_logout_redirect_uri=...`
+- [x] `signOut()` handler: clear local session cookie + redirect to OIDC RP-Initiated Logout endpoint
 - [x] Write `auth_events` (LOGOUT) before clearing session
-- [x] **Acceptance:** Logging out clears the cookie and ends the Okta session (verified by attempting to access a protected resource immediately after)
+- [x] **Acceptance:** Logging out clears the cookie and ends the OIDC provider session (verified by attempting to access a protected resource immediately after)
 
 #### M4-5: Auth failure handling
 - [x] `/app/(auth)/error/page.tsx`: display human-readable message for NextAuth.js error codes (`OAuthCallbackError`, `AccessDenied`, etc.)
 - [x] Write `auth_events` (FAILURE) for any callback error
-- [x] **Acceptance:** Simulated Okta error shows friendly error page; failure event written to DB
+- [x] **Acceptance:** Simulated OIDC error shows friendly error page; failure event written to DB
 
 ---
 
@@ -200,7 +200,7 @@
   - No session → redirect to `/api/auth/signin`
   - Session valid → continue
 - [x] Apply to all routes except `/api/auth/**`, `/(auth)/**`, `/_next/**`, `/favicon.ico`
-- [x] **Acceptance:** Unauthenticated request to `/dashboard` redirects to Okta; authenticated request passes through
+- [x] **Acceptance:** Unauthenticated request to `/dashboard` redirects to the OIDC provider; authenticated request passes through
 
 #### M5-2: Admin route guard
 - [x] Middleware: for routes matching `/admin/**` and `/api/admin/**`, assert `session.roles` includes `super_admin` or `admin`
@@ -275,9 +275,9 @@
 
 #### M7-3: Role Manager
 - [x] CRUD for roles (cannot delete or rename `super_admin`)
-- [x] IDP Mapping editor: add/remove Okta group → shell role mappings in `idp_group_role_mappings`
+- [x] IDP Mapping editor: add/remove IDP group → shell role mappings in `idp_group_role_mappings`
 - [x] "Users with this role" count displayed per role
-- [x] **Acceptance:** New role created; Okta group mapped; mapping visible in `idp_group_role_mappings`
+- [x] **Acceptance:** New role created; IDP group mapped; mapping visible in `idp_group_role_mappings`
 
 #### M7-4: User Manager
 - [x] Paginated table of all `users` (email, displayName, roles, subscriptionTier, lastLoginAt, isActive)
@@ -287,7 +287,7 @@
 - [x] **Acceptance:** Role assignment takes effect on user's next login; deactivated user cannot log in
 
 #### M7-5: SSO Status
-- [x] Read-only display of `shell_config.oktaDomain` and `OKTA_CLIENT_ID` (non-secret)
+- [x] Read-only display of `shell_config.oidcIssuer` and `OIDC_CLIENT_ID` (non-secret)
 - [x] Live reachability check: server pings `https://{domain}/.well-known/openid-configuration` on page load
 - [x] Displays "Connected ✓" or error detail
 - [x] **Acceptance:** Connected state shows correctly; simulated bad domain shows error detail

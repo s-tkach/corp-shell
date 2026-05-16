@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import Okta from "next-auth/providers/okta";
 import { db } from "@/lib/db/client";
 import {
   users,
@@ -15,11 +14,14 @@ import { eq, inArray } from "drizzle-orm";
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env["NEXTAUTH_SECRET"],
   providers: [
-    Okta({
-      clientId: process.env["OKTA_CLIENT_ID"]!,
-      clientSecret: process.env["OKTA_CLIENT_SECRET"]!,
-      issuer: `https://${process.env["OKTA_DOMAIN"]}/oauth2/default`,
-    }),
+    {
+      id: "oidc",
+      name: "OIDC",
+      type: "oidc",
+      issuer: process.env["OIDC_ISSUER"]!,
+      clientId: process.env["OIDC_CLIENT_ID"]!,
+      clientSecret: process.env["OIDC_CLIENT_SECRET"]!,
+    },
   ],
   callbacks: {
     async jwt({ token, account, profile, trigger }) {
@@ -33,8 +35,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = token.email ?? "";
         const sub = token.sub ?? "";
 
-        // Resolve groups from Okta profile (custom claim)
-        const oktaGroups: string[] = Array.isArray(
+        // Resolve groups from OIDC profile (custom claim)
+        const idpGroups: string[] = Array.isArray(
           (profile as Record<string, unknown>)["groups"]
         )
           ? ((profile as Record<string, unknown>)["groups"] as string[])
@@ -42,12 +44,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Resolve role slugs from group mappings
         let roleSlugs: string[] = [];
-        if (oktaGroups.length > 0) {
+        if (idpGroups.length > 0) {
           const mappings = await db
             .select({ slug: roles.slug })
             .from(idpGroupRoleMappings)
             .innerJoin(roles, eq(idpGroupRoleMappings.roleId, roles.id))
-            .where(inArray(idpGroupRoleMappings.idpGroupName, oktaGroups));
+            .where(inArray(idpGroupRoleMappings.idpGroupName, idpGroups));
           roleSlugs = [...new Set(mappings.map((m) => m.slug))];
         }
 
@@ -67,7 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .values({
               email,
               displayName: (token.name as string | null) ?? email,
-              idpSource: "okta",
+              idpSource: "oidc",
               idpSubject: sub,
             })
             .returning({ id: users.id });
