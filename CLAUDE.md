@@ -59,29 +59,40 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 
 ## Commands
 
-> Fill these in once the tech stack is confirmed in `specs/ARCHITECTURE.md`.
-
 ```bash
 # Install dependencies
-# TBD
+pnpm install
 
-# Run development server
-# TBD
+# Run development server (shell app)
+pnpm --filter shell dev
 
 # Run tests
-# TBD
+# TBD (M-tests milestone)
 
 # Run linter
-# TBD
+pnpm lint
+
+# Typecheck
+pnpm typecheck
 
 # Build for production
-# TBD
+pnpm --filter shell build
+
+# Deploy to AWS (requires AWS credentials + SST)
+npx sst deploy --stage dev
+npx sst deploy --stage prod
 ```
 
 ---
 
 ## Current Status
 
-**Phase: Implementation** — All specs approved. Begin with M1 (Monorepo & Infrastructure Scaffold) per `specs/ROADMAP.md`.
+**Phase: Implementation** — M1 complete. Next: M2 (Database Schema & Migrations).
 
-Next step: Execute tasks in milestone order. Do not skip ahead. Update this file's Commands section once the stack is confirmed in M1.
+### Stack (confirmed in M1)
+- Next.js 16 (App Router) in `shell/`
+- pnpm workspaces — packages: `shell`, `packages/*`, `stacks`
+- Shadcn/ui + Tailwind CSS v4
+- SST v3 (Ion) in `sst.config.ts`
+- GitHub Actions CI/CD in `.github/workflows/deploy-shell.yml`
+- ESLint (flat config) + TypeScript strict mode + `noUncheckedIndexedAccess`

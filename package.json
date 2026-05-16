@@ -1,0 +1,20 @@
+{
+  "name": "aws-corp-shell-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "pnpm --filter shell typecheck",
+    "lint": "pnpm --filter shell lint"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "sst": "^4.14.1",
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
