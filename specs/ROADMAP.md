@@ -262,55 +262,55 @@
 ### Tasks
 
 #### M7-1: Admin layout & navigation
-- [ ] `app/(shell)/admin/layout.tsx`: guard renders 403 if role check fails (redundant with middleware — defense in depth)
-- [ ] "Admin" section in sidebar visible only to `super_admin` and `admin` roles
-- [ ] **Acceptance:** Admin sidebar section hidden for non-admin users; visible for admin users
+- [x] `app/(shell)/admin/layout.tsx`: guard renders 403 if role check fails (redundant with middleware — defense in depth)
+- [x] "Admin" section in sidebar visible only to `super_admin` and `admin` roles
+- [x] **Acceptance:** Admin sidebar section hidden for non-admin users; visible for admin users
 
 #### M7-2: Menu Manager
-- [ ] Full CRUD for `menu_sections` and `menu_items`
-- [ ] Drag-and-drop reorder (updates `sortOrder` in DB)
-- [ ] Inline role multi-select and subscription level picker per item
-- [ ] Live role-filtered preview panel (renders sidebar as a given role would see it)
-- [ ] **Acceptance:** Create/edit/delete/reorder items; changes reflected in sidebar within one page load
+- [x] Full CRUD for `menu_sections` and `menu_items`
+- [x] Drag-and-drop reorder (updates `sortOrder` in DB)
+- [x] Inline role multi-select and subscription level picker per item
+- [x] Live role-filtered preview panel (renders sidebar as a given role would see it)
+- [x] **Acceptance:** Create/edit/delete/reorder items; changes reflected in sidebar within one page load
 
 #### M7-3: Role Manager
-- [ ] CRUD for roles (cannot delete or rename `super_admin`)
-- [ ] IDP Mapping editor: add/remove Okta group → shell role mappings in `idp_group_role_mappings`
-- [ ] "Users with this role" count displayed per role
-- [ ] **Acceptance:** New role created; Okta group mapped; mapping visible in `idp_group_role_mappings`
+- [x] CRUD for roles (cannot delete or rename `super_admin`)
+- [x] IDP Mapping editor: add/remove Okta group → shell role mappings in `idp_group_role_mappings`
+- [x] "Users with this role" count displayed per role
+- [x] **Acceptance:** New role created; Okta group mapped; mapping visible in `idp_group_role_mappings`
 
 #### M7-4: User Manager
-- [ ] Paginated table of all `users` (email, displayName, roles, subscriptionTier, lastLoginAt, isActive)
-- [ ] Assign/revoke roles per user (writes `user_roles`)
-- [ ] Set subscription tier + expiry (writes `user_subscriptions`)
-- [ ] Deactivate user (sets `isActive = false`; deactivated users are blocked at middleware)
-- [ ] **Acceptance:** Role assignment takes effect on user's next login; deactivated user cannot log in
+- [x] Paginated table of all `users` (email, displayName, roles, subscriptionTier, lastLoginAt, isActive)
+- [x] Assign/revoke roles per user (writes `user_roles`)
+- [x] Set subscription tier + expiry (writes `user_subscriptions`)
+- [x] Deactivate user (sets `isActive = false`; deactivated users are blocked at middleware)
+- [x] **Acceptance:** Role assignment takes effect on user's next login; deactivated user cannot log in
 
 #### M7-5: SSO Status
-- [ ] Read-only display of `shell_config.oktaDomain` and `OKTA_CLIENT_ID` (non-secret)
-- [ ] Live reachability check: server pings `https://{domain}/.well-known/openid-configuration` on page load
-- [ ] Displays "Connected ✓" or error detail
-- [ ] **Acceptance:** Connected state shows correctly; simulated bad domain shows error detail
+- [x] Read-only display of `shell_config.oktaDomain` and `OKTA_CLIENT_ID` (non-secret)
+- [x] Live reachability check: server pings `https://{domain}/.well-known/openid-configuration` on page load
+- [x] Displays "Connected ✓" or error detail
+- [x] **Acceptance:** Connected state shows correctly; simulated bad domain shows error detail
 
 #### M7-6: Application Registry
-- [ ] Register child app: `name`, `remoteUrl`, `routePrefix`, `healthCheckUrl`
-- [ ] "Validate & Fetch Manifest": server fetches `{remoteUrl}/mf-manifest.json`, validates shape, previews routes
-- [ ] Route-to-menu-item mapping UI
-- [ ] Live health status: periodic ping of `healthCheckUrl`; `lastHealthyAt` updated in DB
-- [ ] Enable/disable app toggle
-- [ ] **Acceptance:** Registered app manifest validates; app appears in MF remote list within 60 seconds
+- [x] Register child app: `name`, `remoteUrl`, `routePrefix`, `healthCheckUrl`
+- [x] "Validate & Fetch Manifest": server fetches `{remoteUrl}/mf-manifest.json`, validates shape, previews routes
+- [x] Route-to-menu-item mapping UI
+- [x] Live health status: periodic ping of `healthCheckUrl`; `lastHealthyAt` updated in DB
+- [x] Enable/disable app toggle
+- [x] **Acceptance:** Registered app manifest validates; app appears in MF remote list within 60 seconds
 
 #### M7-7: Subscription Tiers
-- [ ] CRUD for `subscription_tiers` (cannot delete `free` — it is the default)
-- [ ] Set numeric level per tier
-- [ ] Configure Upgrade Prompt content (headline, body, CTA label, CTA URL) per tier
-- [ ] **Acceptance:** New tier created with level; upgrade prompt content saves and renders on restricted route
+- [x] CRUD for `subscription_tiers` (cannot delete `free` — it is the default)
+- [x] Set numeric level per tier
+- [x] Configure Upgrade Prompt content (headline, body, CTA label, CTA URL) per tier
+- [x] **Acceptance:** New tier created with level; upgrade prompt content saves and renders on restricted route
 
 #### M7-8: Theme & Branding
-- [ ] Edit app name, re-upload logo (new S3 presigned PUT), change primary brand color
-- [ ] Live preview panel reflecting changes before save
-- [ ] `PATCH /api/admin/branding` writes to `shell_config`; changes apply globally without redeploy
-- [ ] **Acceptance:** Name and logo update reflected in header within one page reload
+- [x] Edit app name, re-upload logo (new S3 presigned PUT), change primary brand color
+- [x] Live preview panel reflecting changes before save
+- [x] `PATCH /api/admin/branding` writes to `shell_config`; changes apply globally without redeploy
+- [x] **Acceptance:** Name and logo update reflected in header within one page reload
 
 ---
 
