@@ -32,6 +32,7 @@ export default $config({
 
     const shell = new sst.aws.Nextjs("Shell", {
       path: "shell/",
+      tracing: "active",
       link: [db, oktaClientSecret, oktaClientId, nextAuthSecret, webhookSecret],
       environment: {
         DATABASE_URL: db.secretArn,

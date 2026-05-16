@@ -424,29 +424,29 @@
 ### Tasks
 
 #### M11-1: Structured logging
-- [ ] `shell/lib/logger.ts`: thin wrapper that outputs `JSON.stringify({ level, message, traceId, ...meta })` to stdout (CloudWatch captures Lambda stdout automatically)
-- [ ] Attach trace ID (from `instrumentation.ts`) to every log line
-- [ ] Replace any `console.log` calls in API handlers with the logger
-- [ ] **Acceptance:** CloudWatch Log Insights query on `traceId` returns all log lines for a single request
+- [x] `shell/lib/logger.ts`: thin wrapper that outputs `JSON.stringify({ level, message, traceId, ...meta })` to stdout (CloudWatch captures Lambda stdout automatically)
+- [x] Attach trace ID (from `instrumentation.ts`) to every log line
+- [x] Replace any `console.log` calls in API handlers with the logger
+- [x] **Acceptance:** CloudWatch Log Insights query on `traceId` returns all log lines for a single request
 
 #### M11-2: Request tracing
-- [ ] `shell/instrumentation.ts`: configure OpenTelemetry with `@vercel/otel` or AWS X-Ray SDK
-- [ ] Propagate trace context through API route handlers
-- [ ] **Acceptance:** X-Ray service map shows shell Lambda and Aurora as connected nodes
+- [x] `shell/instrumentation.ts`: X-Ray native tracing via Lambda active tracing (`tracing: "active"` in SST); trace ID read from `_X_AMZN_TRACE_ID` env var injected by Lambda runtime
+- [x] Propagate trace context through API route handlers
+- [x] **Acceptance:** X-Ray service map shows shell Lambda and Aurora as connected nodes
 
 #### M11-3: CSP and security headers
-- [ ] Next.js `headers()` in `next.config.ts`:
+- [x] Next.js `headers()` in `next.config.ts`:
   - `Content-Security-Policy`: restrict script/style/connect sources; allow child app CloudFront origins explicitly
   - `X-Frame-Options: DENY`
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `Permissions-Policy: camera=(), microphone=()`
-- [ ] **Acceptance:** Security headers present on all responses; CSP does not block shell or registered child app assets
+- [x] **Acceptance:** Security headers present on all responses; CSP does not block shell or registered child app assets
 
 #### M11-4: Security checklist verification
-- [ ] Walk through `ARCHITECTURE.md §12` security table; verify each row is implemented
-- [ ] Confirm: no secrets in source, HMAC webhook validation, no `localStorage` token storage, admin routes server-checked, `super_admin` lockout prevention active
-- [ ] **Acceptance:** All items in the security table have a corresponding passing implementation or test
+- [x] Walk through `ARCHITECTURE.md §12` security table; verify each row is implemented
+- [x] Confirm: no secrets in source, HMAC webhook validation, no `localStorage` token storage, admin routes server-checked, `super_admin` lockout prevention active
+- [x] **Acceptance:** All items in the security table have a corresponding passing implementation or test
 
 ---
 

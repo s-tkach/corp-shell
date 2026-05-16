@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { db } from "@/lib/db/client";
 import {
   shellConfig,
@@ -138,6 +139,6 @@ async function maybeStoreSecret(name: string, value: string) {
     await client.send(new PutSecretValueCommand({ SecretId: secretArn, SecretString: value }));
   } catch {
     // Non-fatal in dev; log and continue
-    console.error(`Could not store secret ${name} to Secrets Manager`);
+    logger.error("Could not store secret to Secrets Manager", { name });
   }
 }
