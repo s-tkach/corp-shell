@@ -44,7 +44,7 @@
 #### M1-1: Initialize pnpm monorepo
 - [x] `pnpm init` at repo root; configure `pnpm-workspace.yaml` with `packages: [shell, packages/*]`
 - [x] Add root `package.json` with `engines.node`, `engines.pnpm`, and shared dev dependencies (`typescript`, `eslint`, `prettier`)
-- [x] Add `.nvmrc` / `.node-version` pinned to Node 20 LTS
+- [x] Add `.nvmrc` / `.node-version` pinned to Node 22 LTS
 - [x] **Acceptance:** `pnpm install` completes; workspace packages resolve correctly
 
 #### M1-2: Scaffold Next.js 15 shell app

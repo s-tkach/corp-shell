@@ -53,17 +53,17 @@ aws-corp-shell-app/
 
 ### Prerequisites
 
-- Node 20 LTS (enforced — `package.json` rejects other major versions)
+- Node 22 LTS (enforced — `package.json` rejects other major versions)
 - pnpm 9.x+
 - Docker (for local PostgreSQL)
 - AWS CLI + credentials configured
 - An OIDC application registered (Web, Authorization Code + PKCE)
 
-#### Install Node 20 via nvm
+#### Install Node 22 via nvm
 
 ```bash
-nvm install 20
-nvm use 20
+nvm install 22
+nvm use 22
 ```
 
 #### Install AWS CLI (macOS)
