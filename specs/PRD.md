@@ -10,7 +10,7 @@
 | Version | Change |
 |---------|--------|
 | 1.0 | Initial draft |
-| 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; Aurora replaces DynamoDB; SST v3 deployment |
+| 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; Aurora replaces DynamoDB; AWS Amplify deployment |
 | 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry; first-run setup wizard added for branding/naming |
 
 ---
@@ -41,7 +41,7 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | G4 | Admin panel covering menus, roles, users, apps, subscriptions, SSO status, and branding |
 | G5 | First-run setup wizard to configure app name, logo, brand color, and initial super-admin |
 | G6 | Shell SDK + CLI published to GitHub Packages for child app teams |
-| G7 | All infrastructure (shell + child apps) on a single AWS account, managed by SST v3 |
+| G7 | All infrastructure (shell + child apps) on a single AWS account, managed via AWS Amplify |
 | G8 | Cost-effective at ≤1,000 concurrent users; target <$50/month per 100 active users |
 | G9 | Fork-and-extend from `satnaing/shadcn-admin` — not built from scratch |
 
@@ -300,7 +300,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Shell Framework | Next.js 15 (App Router) | SSR for layout/auth, API routes replace separate backend, native Lambda support via SST |
+| Shell Framework | Next.js 15 (App Router) | SSR for layout/auth, API routes replace separate backend |
 | UI Components | Shadcn/ui + Tailwind CSS v4 | Per requirements; headless, accessible |
 | Module Federation | `@module-federation/nextjs-mf` | Proven Next.js + MF; maintained by MF core team |
 | Authentication | NextAuth.js v5 (Auth.js) | First-class Next.js + OIDC; session in httpOnly cookie |
@@ -308,11 +308,10 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | ORM | Drizzle ORM | Type-safe; serverless-safe (no persistent connection pool) |
 | Database | Amazon Aurora Serverless v2 (PostgreSQL) | Scales to zero in dev; SQL for relational admin queries; single DB for all shell data |
 | CDN / Static | AWS CloudFront + S3 | Shell SPA assets + child app remoteEntry.js files |
-| Compute | AWS Lambda via SST v3 | Serverless Next.js; scales to zero; no EC2/ECS |
+| Compute | AWS Amplify (manually configured) | Hosts Next.js app; managed outside the repo |
 | DNS | Amazon Route 53 | Custom domain, SSL, health checks |
 | Secrets | AWS Secrets Manager | OIDC client secret, webhook HMAC secret, DB credentials |
-| IaC | SST v3 (Ion) | Deploys Next.js on Lambda + CloudFront + S3 + Route 53 in one config file |
-| CI/CD | GitHub Actions | Shell and each child app deploy independently |
+| CI/CD | GitHub Actions | Child apps deploy independently; shell deployed via Amplify |
 | Package Registry | GitHub Packages | `@corp/shell-sdk` and `@corp/create-shell-app` |
 
 ### 8.2 System Architecture
@@ -375,11 +374,10 @@ Secrets Manager              (OIDC_CLIENT_SECRET, WEBHOOK_SECRET, DB_URL)
 Aurora Serverless v2         (private subnet, VPC)
 ```
 
-### 8.3 SST v3 Project Structure
+### 8.3 Project Structure
 
 ```
 /
-├── sst.config.ts          # SST Ion config — defines all AWS resources
 ├── shell/                 # Next.js shell app (fork of satnaing/shadcn-admin)
 │   ├── app/
 │   │   ├── layout.tsx           # Root layout (server): auth, menu, sidebar
@@ -414,11 +412,9 @@ Aurora Serverless v2         (private subnet, VPC)
 │   │   ├── db/                  # Drizzle ORM client + schema
 │   │   └── mf/                  # Module Federation remote loader
 │   └── middleware.ts            # Auth + role guard for all protected routes
-├── packages/
-│   ├── shell-sdk/               # @corp/shell-sdk (published to GitHub Packages)
-│   └── create-shell-app/        # @corp/create-shell-app CLI
-└── stacks/
-    └── child-app-stack.ts       # Reusable SST stack for child app S3+CloudFront
+└── packages/
+    ├── shell-sdk/               # @corp/shell-sdk (published to GitHub Packages)
+    └── create-shell-app/        # @corp/create-shell-app CLI
 ```
 
 ### 8.4 Authentication Flow (OIDC via NextAuth.js v5)
@@ -451,7 +447,7 @@ Aurora Serverless v2         (private subnet, VPC)
 ### 8.5 First-Run Wizard Flow
 
 ```
-Deploy shell to AWS (SST deploy)
+Deploy shell to AWS (Amplify)
   ↓
 User visits app.corp.com
   ↓
@@ -644,7 +640,7 @@ export const authEvents = pgTable('auth_events', {
 | Service | Configuration | Est. Monthly (prod) |
 |---------|--------------|---------------------|
 | Aurora Serverless v2 | 0.5–2 ACUs, auto-pause in dev/staging | $15–40 |
-| Lambda (Next.js via SST) | ~5M req/mo, 128MB, ~200ms avg | ~$5 |
+| AWS Amplify (Next.js hosting) | ~5M req/mo, SSR compute | ~$5–15 |
 | CloudFront + S3 (shell) | ~100GB transfer/mo | ~$10 |
 | CloudFront + S3 (per child app) | ~10GB/mo each | ~$3/app |
 | Route 53 | 1 hosted zone | ~$0.50 |
@@ -669,7 +665,6 @@ Dev/staging: near zero — Aurora pauses to 0 ACUs, Lambda scales to zero.
 | | Admin Panel pages (all 7 sections) |
 | | First-run setup wizard |
 | | Shell SDK + CLI (GitHub Packages) |
-| | SST v3 deployment config |
 
 **Migration path (Vite → Next.js):**
 1. Scaffold fresh Next.js 15 project (Tailwind v4, Shadcn/ui)
@@ -681,8 +676,8 @@ Dev/staging: near zero — Aurora pauses to 0 ACUs, Lambda scales to zero.
 ## 10. User Flows
 
 ### 10.1 First-Time Deployment
-1. Engineer runs `npx sst deploy --stage prod`
-2. SST provisions CloudFront, Lambda, S3, Route 53, Aurora, Secrets Manager
+1. Engineer deploys shell via AWS Amplify (manually configured)
+2. Amplify provisions hosting; Aurora, Secrets Manager, and Route 53 configured separately
 3. Engineer visits `app.corp.com` → redirected to `/setup`
 4. Completes 4-step wizard (branding → OIDC → super admin → launch)
 5. Shell is live; `/setup` returns 404 permanently

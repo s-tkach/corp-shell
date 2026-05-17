@@ -42,7 +42,7 @@
 ### Tasks
 
 #### M1-1: Initialize pnpm monorepo
-- [x] `pnpm init` at repo root; configure `pnpm-workspace.yaml` with `packages: [shell, packages/*, stacks]`
+- [x] `pnpm init` at repo root; configure `pnpm-workspace.yaml` with `packages: [shell, packages/*]`
 - [x] Add root `package.json` with `engines.node`, `engines.pnpm`, and shared dev dependencies (`typescript`, `eslint`, `prettier`)
 - [x] Add `.nvmrc` / `.node-version` pinned to Node 20 LTS
 - [x] **Acceptance:** `pnpm install` completes; workspace packages resolve correctly
@@ -61,17 +61,11 @@
 - [x] Add `pnpm typecheck` and `pnpm lint` scripts to root
 - [x] **Acceptance:** `pnpm typecheck` and `pnpm lint` both pass with zero errors on the scaffold
 
-#### M1-4: Configure SST v3
-- [x] `pnpm add -D sst` at root; `npx sst init`
-- [x] Define `sst.config.ts`: VPC, Aurora Serverless v2 cluster, Secrets Manager secrets (placeholders), `sst.aws.Nextjs` pointing to `shell/`
-- [x] Configure `dev` / `staging` / `prod` stages with appropriate Aurora ACU settings
-- [x] **Acceptance:** `npx sst deploy --stage dev` completes; CloudFront URL returns Next.js 404 (no pages yet)
-
-#### M1-5: Configure GitHub Actions — shell pipeline
-- [x] `.github/workflows/deploy-shell.yml`: trigger on push to `main` affecting `shell/**` or `sst.config.ts`
-- [x] Steps: `pnpm install` → `pnpm typecheck` → `pnpm lint` → `npx sst deploy --stage prod`
-- [x] Add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` to repo secrets
-- [x] **Acceptance:** Push to `main` triggers pipeline; pipeline passes end-to-end
+#### M1-4: Configure AWS Amplify hosting
+- [x] Shell hosted on AWS Amplify (manually configured, outside repo)
+- [x] Aurora Serverless v2, Secrets Manager, and Route 53 provisioned separately
+- [x] Environment variables (OIDC, DB, NextAuth secrets) set in Amplify console
+- [x] **Acceptance:** Amplify build succeeds; CloudFront URL returns Next.js app
 
 ---
 
@@ -95,7 +89,7 @@
 #### M2-3: Apply initial migration
 - [x] Run `pnpm drizzle-kit migrate` against the dev Aurora instance
 - [x] Verify all tables and constraints exist via `psql` or Drizzle Studio
-- [x] Add migration step to the shell GitHub Actions pipeline (runs before `sst deploy`)
+- [x] Add migration step to run before Amplify deploys
 - [x] **Acceptance:** All 11 tables present in dev DB; pipeline applies migrations automatically on deploy
 
 ---
@@ -430,7 +424,7 @@
 - [x] **Acceptance:** CloudWatch Log Insights query on `traceId` returns all log lines for a single request
 
 #### M11-2: Request tracing
-- [x] `shell/instrumentation.ts`: X-Ray native tracing via Lambda active tracing (`tracing: "active"` in SST); trace ID read from `_X_AMZN_TRACE_ID` env var injected by Lambda runtime
+- [x] `shell/instrumentation.ts`: X-Ray native tracing; trace ID read from `_X_AMZN_TRACE_ID` env var injected by the Lambda runtime (Amplify-managed)
 - [x] Propagate trace context through API route handlers
 - [x] **Acceptance:** X-Ray service map shows shell Lambda and Aurora as connected nodes
 
@@ -500,7 +494,7 @@ Before marking v1 as released, confirm:
 |---------|-----------|
 | iFrame integration mode (CSP + postMessage auth) | M8 complete |
 | Audit log Admin Panel viewer | M11 auth_events table |
-| Subdomain multi-tenant routing | New SST stack per tenant |
+| Subdomain multi-tenant routing | New Amplify app per tenant (or CloudFront routing rules) |
 | Self-serve billing (Stripe/Chargebee) | M10 webhook endpoint |
 | Dynamic IDP registration via Admin Panel | M4 auth config |
 | Organization-level subscription management | M10 complete |

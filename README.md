@@ -31,7 +31,6 @@ A host web application that serves as the single entry point for all internal co
 
 ```
 aws-corp-shell-app/
-├── sst.config.ts              # All AWS resource definitions
 ├── shell/                     # Next.js 15 application
 │   ├── app/
 │   │   ├── (auth)/            # Login, callback, error routes
@@ -49,8 +48,6 @@ aws-corp-shell-app/
 ├── packages/
 │   ├── shell-sdk/             # @corp/shell-sdk — published to GitHub Packages
 │   └── create-shell-app/      # @corp/create-shell-app CLI
-└── stacks/
-    └── child-app-stack.ts     # Reusable SST stack for child app S3+CloudFront
 ```
 
 ## Getting started
@@ -143,14 +140,12 @@ pnpm typecheck
 # Build shell for production
 pnpm --filter shell build
 
-# Deploy to AWS
-npx sst deploy --stage dev
-npx sst deploy --stage prod
+# Deploy to AWS — via AWS Amplify (manually configured, not in repo)
 ```
 
 ## First-time deployment
 
-1. Run `npx sst deploy --stage prod`
+1. Deploy shell via AWS Amplify (manually configured)
 2. Visit your domain — you are redirected to `/setup`
 3. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
 4. `/setup` returns 404 permanently after completion

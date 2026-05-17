@@ -81,9 +81,7 @@ pnpm typecheck
 # Build for production
 pnpm --filter shell build
 
-# Deploy to AWS (requires AWS credentials + SST)
-npx sst deploy --stage dev
-npx sst deploy --stage prod
+# Deploy to AWS — managed via AWS Amplify (manually configured, not in repo)
 ```
 
 ---
@@ -94,8 +92,8 @@ npx sst deploy --stage prod
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `shell/`
-- pnpm workspaces — packages: `shell`, `packages/*`, `stacks`
+- pnpm workspaces — packages: `shell`, `packages/*`
 - Shadcn/ui + Tailwind CSS v4
-- SST v3 (Ion) in `sst.config.ts`
-- GitHub Actions CI/CD in `.github/workflows/deploy-shell.yml`
+- AWS Amplify (manually configured, outside repo)
+- GitHub Actions CI/CD for SDK/CLI publish workflows
 - ESLint (flat config) + TypeScript strict mode + `noUncheckedIndexedAccess`

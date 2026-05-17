@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The Corporate Application Shell is a **Next.js 15 monorepo** deployed serverlessly on AWS via SST v3. It acts as a host for independently deployed micro-frontends (Module Federation), provides SSO via OIDC, and exposes an admin panel for all runtime configuration. There is no separate backend service — Next.js API routes serve as the API layer.
+The Corporate Application Shell is a **Next.js 15 monorepo** deployed on AWS via Amplify (manually configured). It acts as a host for independently deployed micro-frontends (Module Federation), provides SSO via OIDC, and exposes an admin panel for all runtime configuration. There is no separate backend service — Next.js API routes serve as the API layer.
 
 ---
 
@@ -16,7 +16,6 @@ The Corporate Application Shell is a **Next.js 15 monorepo** deployed serverless
 
 ```
 aws-corp-shell-app/                  ← monorepo root
-├── sst.config.ts                    # SST Ion — all AWS resource definitions
 ├── package.json                     # Workspace root (pnpm workspaces)
 ├── shell/                           # Next.js 15 application
 │   ├── app/
@@ -67,8 +66,6 @@ aws-corp-shell-app/                  ← monorepo root
 │       ├── src/
 │       │   └── index.ts             # npx scaffolder entry
 │       └── template/                # Child app project template
-└── stacks/
-    └── child-app-stack.ts           # Reusable SST stack: S3 + CloudFront per child app
 ```
 
 ---
@@ -84,12 +81,11 @@ aws-corp-shell-app/                  ← monorepo root
 | Client state | Zustand | 4.x | Shell UI state only (sidebar collapse, theme) |
 | ORM | Drizzle ORM | latest | Type-safe; no persistent connection pool |
 | Database | Aurora Serverless v2 (PostgreSQL) | 15.x | Scales to zero in dev; single DB for all shell data |
-| Compute | AWS Lambda via SST v3 | — | Serverless Next.js; no EC2/ECS |
+| Compute | AWS Amplify | — | Hosts Next.js app; manually configured outside repo |
 | CDN / Static | AWS CloudFront + S3 | — | Shell assets + child app remoteEntry files |
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
 | Secrets | AWS Secrets Manager | — | OIDC client secret, webhook HMAC key, DB URL |
-| IaC | SST v3 (Ion / Pulumi) | 3.x | Single `sst.config.ts` defines all resources |
-| CI/CD | GitHub Actions | — | Shell and child apps deploy independently |
+| CI/CD | GitHub Actions | — | Child apps deploy independently; shell via Amplify |
 | Package registry | GitHub Packages | — | `@corp/shell-sdk`, `@corp/create-shell-app` |
 | Package manager | pnpm workspaces | 9.x | Monorepo; shared lockfile |
 
@@ -346,7 +342,7 @@ Admin Panel → Application Registry:
 
 - **Engine:** Aurora Serverless v2 (PostgreSQL 15), private VPC subnet.
 - **Connection:** Drizzle ORM with `@neondatabase/serverless` or `postgres` (non-pooling) driver — safe for Lambda cold starts, no persistent connection pool.
-- **Credentials:** `DATABASE_URL` stored in Secrets Manager; injected as Lambda env var by SST.
+- **Credentials:** `DATABASE_URL` stored in Secrets Manager; injected as an Amplify environment variable.
 
 ### 9.2 Schema Overview
 
@@ -366,79 +362,38 @@ Admin Panel → Application Registry:
 
 ### 9.3 Migrations
 
-Managed by Drizzle Kit. Migration files live in `shell/lib/db/migrations/`. Applied as part of the SST deploy pipeline before Lambda traffic shifts.
+Managed by Drizzle Kit. Migration files live in `shell/lib/db/migrations/`. Applied manually or as part of the CI pipeline before traffic shifts.
 
 ---
 
-## 10. Infrastructure (SST v3 / Ion)
+## 10. Infrastructure (AWS Amplify)
 
-### 10.1 Resource Map
+The shell is hosted on AWS Amplify (manually configured outside the repo). Amplify manages the Next.js compute, CloudFront CDN, and custom domain. Aurora Serverless v2, Secrets Manager, and Route 53 are provisioned separately.
 
-```typescript
-// sst.config.ts (logical structure)
-
-const db = new sst.aws.Aurora("ShellDb", {
-  engine: "postgresql",
-  serverless: true,
-  vpc,
-});
-
-const secret = new sst.aws.Secret("OidcClientSecret");
-
-const shell = new sst.aws.Nextjs("Shell", {
-  path: "shell/",
-  environment: {
-    DATABASE_URL: db.secretArn,          // resolved at runtime from Secrets Manager
-    OIDC_CLIENT_SECRET: secret.value,
-  },
-  domain: { name: "app.corp.com", dns: sst.aws.dns() },
-});
-
-// Reusable stack for each child app (stacks/child-app-stack.ts):
-const childApp = new sst.aws.StaticSite("ChildApp", {
-  path: "s3://corp-child-apps/{app-name}/",
-  cdn: true,
-});
-```
-
-### 10.2 Environments
-
-| Environment | Aurora | Lambda | Notes |
-|-------------|--------|--------|-------|
-| `dev` | Paused (0 ACU) | Scales to zero | Near-zero cost |
-| `staging` | 0.5 ACU min | Active | Pre-prod smoke testing |
-| `prod` | 0.5–2 ACU | Active | Auto-scales to demand |
-
-### 10.3 Secrets
+### 10.1 Secrets
 
 | Secret | Storage | Consumed By |
 |--------|---------|------------|
-| `OIDC_CLIENT_SECRET` | Secrets Manager | Lambda (NextAuth.js) |
-| `OIDC_CLIENT_ID` | Secrets Manager | Lambda (NextAuth.js) |
-| `DATABASE_URL` | Secrets Manager | Lambda (Drizzle ORM) |
-| `NEXTAUTH_SECRET` | Secrets Manager | Lambda (NextAuth.js JWT encryption) |
-| `WEBHOOK_SECRET` | Secrets Manager | Lambda (HMAC-SHA256 webhook validation) |
+| `OIDC_CLIENT_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js) |
+| `OIDC_CLIENT_ID` | Secrets Manager / Amplify env | Next.js (NextAuth.js) |
+| `DATABASE_URL` | Secrets Manager / Amplify env | Next.js (Drizzle ORM) |
+| `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js JWT encryption) |
+| `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
 
-All injected into Lambda env by SST at deploy time — never in source files or `.env` committed to git.
+All secrets configured in Amplify environment variables — never in source files or `.env` committed to git.
 
 ---
 
 ## 11. CI/CD
 
-### 11.1 Shell Pipeline (GitHub Actions)
+### 11.1 Shell Pipeline
+
+Shell deployment is handled by **AWS Amplify** (connected to the `main` branch). Amplify automatically builds and deploys on push. Database migrations are run manually or via a separate CI step before deploying:
 
 ```
-on: push to main (shell/** or sst.config.ts changed)
+pnpm drizzle-kit migrate   (apply pending migrations)
   ↓
-pnpm install
-  ↓
-pnpm typecheck + pnpm lint
-  ↓
-pnpm test
-  ↓
-pnpm drizzle-kit migrate (apply pending migrations to target stage)
-  ↓
-npx sst deploy --stage prod
+Amplify auto-deploys on push to main
 ```
 
 ### 11.2 Child App Pipeline (scaffolded by CLI)
@@ -535,7 +490,7 @@ Step 4 — Launch:     POST /api/setup/complete →
 | Single AWS account | One account | Simplified IAM, networking, and cost tracking for v1 |
 | Fork over build from scratch | `satnaing/shadcn-admin` | Sidebar, header, Shadcn wiring already done; focus on domain logic |
 | GitHub Packages over npm | GitHub Packages | Org-private packages; GITHUB_TOKEN auth in Actions without extra secrets |
-| SST v3 (Ion) over CDK/SAM | SST | First-class Next.js support; single config file; dev/prod parity |
+| AWS Amplify over CDK/SAM | Amplify | First-class Next.js support; managed hosting; no IaC config in repo |
 
 ---
 
