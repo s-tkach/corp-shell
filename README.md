@@ -1,6 +1,6 @@
 # Corporate Application Shell
 
-A host web application that serves as the single entry point for all internal corporate tools. Provides SSO via OIDC, role- and subscription-gated navigation, micro-frontend hosting via Module Federation, and a self-contained admin panel — all deployed serverlessly on AWS via SST v3.
+A host web application that serves as the single entry point for all internal corporate tools. Provides SSO via OIDC, role- and subscription-gated navigation, micro-frontend hosting via Module Federation, and a self-contained admin panel — all deployed on AWS via Amplify.
 
 ## What it does
 

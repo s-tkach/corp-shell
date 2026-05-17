@@ -237,9 +237,9 @@ Scaffolds:
 All child apps share the **same AWS account** as the shell. Each app gets:
 - A dedicated S3 bucket prefix: `s3://corp-child-apps/{app-name}/`
 - A dedicated CloudFront distribution origin path pointing to that prefix
-- A CloudFront URL returned by SST after deploy: `https://{distro-id}.cloudfront.net`
+- A CloudFront URL after deploy: `https://{distro-id}.cloudfront.net`
 
-This URL is what the admin enters in the Application Registry as the `remoteUrl`. The SST config for child apps is templated in the scaffold and requires only the app name to be changed.
+This URL is what the admin enters in the Application Registry as the `remoteUrl`. The scaffold is pre-configured for S3/CloudFront deployment and requires only the app name to be changed.
 
 #### FR-INT-7: Error Isolation
 Every child app's `AppEntry` is wrapped in a React Error Boundary. Crash or unreachable remote → graceful error view for that route only. Rest of shell unaffected.
@@ -364,7 +364,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
                              │  auth_events (v2 viewer)        │
                              └────────────────────────────────┘
 
-AWS Account (single, managed by SST v3)
+AWS Account (single)
 ───────────────────────────────────────
 CloudFront ──→ Lambda@Edge   (shell SSR + API)
 CloudFront ──→ S3            (shell static assets)
