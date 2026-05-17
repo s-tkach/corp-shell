@@ -45,10 +45,9 @@ export function BrandingClient({ config }: Props) {
         body: JSON.stringify({ fileName: file.name, contentType: file.type }),
       });
       if (!res.ok) { setError("Failed to get upload URL"); return; }
-      const { uploadUrl, key } = await res.json() as { uploadUrl: string; key: string };
+      const { uploadUrl, publicUrl } = await res.json() as { uploadUrl: string; publicUrl: string };
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      const cdnUrl = `${process.env["NEXT_PUBLIC_CDN_URL"] ?? ""}/${key}`;
-      setLogoUrl(cdnUrl);
+      setLogoUrl(publicUrl);
       setPreviewLogoUrl(URL.createObjectURL(file));
     } finally {
       setUploading(false);

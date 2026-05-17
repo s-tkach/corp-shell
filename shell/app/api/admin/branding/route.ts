@@ -55,12 +55,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AWS_S3_BUCKET not configured" }, { status: 500 });
   }
 
-  const s3 = new S3Client({ region: process.env["AWS_REGION"] ?? "eu-central-1" });
+  const region = process.env["AWS_REGION"] ?? "eu-central-1";
+  const s3 = new S3Client({ region });
   const key = `logos/${Date.now()}-${body.fileName}`;
-  const url = await getSignedUrl(
+  const uploadUrl = await getSignedUrl(
     s3,
     new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: body.contentType }),
     { expiresIn: 300 }
   );
-  return NextResponse.json({ uploadUrl: url, key });
+  const cdnBase = process.env["LOGO_CDN_BASE"];
+  const publicUrl = cdnBase
+    ? `${cdnBase}/${key}`
+    : `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  return NextResponse.json({ uploadUrl, publicUrl });
 }

@@ -21,7 +21,7 @@ const cspDirectives = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${RUM_SCRIPT_ORIGIN} ${CHILD_APP_ORIGINS.join(" ")}`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: https://*.amazonaws.com`,
+  `img-src 'self' data: blob: https://*.amazonaws.com https://*.cloudfront.net`,
   `connect-src 'self' ${RUM_DATA_ORIGIN} ${S3_ORIGINS.join(" ")} ${CHILD_APP_ORIGINS.join(" ")}`,
   `font-src 'self'`,
   `frame-src 'none'`,
@@ -52,6 +52,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.cloudfront.net",
       },
     ],
   },
