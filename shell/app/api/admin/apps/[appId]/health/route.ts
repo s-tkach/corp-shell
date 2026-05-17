@@ -8,11 +8,8 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ appId: string }> }
 ) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const { appId } = await params;
   const rows = await db.select().from(appRegistry).where(eq(appRegistry.id, appId)).limit(1);
   const app = rows[0];

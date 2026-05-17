@@ -30,7 +30,7 @@ interface Item {
   route: string;
   icon: string | null;
   badge: string | null;
-  requiredRoles: unknown;
+  requiredRoles: string[];
   requiredSubLevel: number;
   sortOrder: number;
 }
@@ -108,14 +108,16 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to update section"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to update section"); return; }
     } else {
       const res = await fetch("/api/admin/menu/sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to create section"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to create section"); return; }
     }
     setSectionDialog({ open: false, editing: null });
     refresh();
@@ -157,7 +159,7 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
       label: item.label,
       route: item.route,
       icon: item.icon ?? "",
-      requiredRoles: (item.requiredRoles as string[]).join(", "),
+      requiredRoles: item.requiredRoles.join(", "),
       requiredSubLevel: String(item.requiredSubLevel),
     });
     setItemDialog({ open: true, editing: item });
@@ -183,14 +185,16 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to update item"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to update item"); return; }
     } else {
       const res = await fetch("/api/admin/menu/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to create item"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to create item"); return; }
     }
     setItemDialog({ open: false, editing: null });
     refresh();
@@ -269,7 +273,7 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{item.label}</span>
                       <span className="text-xs text-muted-foreground">{item.route}</span>
-                      {(item.requiredRoles as string[]).map((r) => (
+                      {item.requiredRoles.map((r) => (
                         <Badge key={r} variant="outline" className="text-xs">{r}</Badge>
                       ))}
                       {item.requiredSubLevel > 0 && (

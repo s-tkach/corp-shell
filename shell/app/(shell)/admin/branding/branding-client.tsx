@@ -44,8 +44,9 @@ export function BrandingClient({ config }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName: file.name, contentType: file.type }),
       });
-      if (!res.ok) { setError("Failed to get upload URL"); return; }
-      const { uploadUrl, publicUrl } = await res.json() as { uploadUrl: string; publicUrl: string };
+      const urlData = await res.json() as { uploadUrl?: string; publicUrl?: string; error?: string };
+      if (!res.ok) { setError(urlData.error ?? "Failed to get upload URL"); return; }
+      const { uploadUrl, publicUrl } = urlData as { uploadUrl: string; publicUrl: string };
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       setLogoUrl(publicUrl);
       setPreviewLogoUrl(URL.createObjectURL(file));
@@ -62,7 +63,8 @@ export function BrandingClient({ config }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ appName, primaryColor, logoUrl: logoUrl || undefined }),
     });
-    if (!res.ok) { setError("Failed to save branding"); return; }
+    const data = await res.json() as { error?: string };
+    if (!res.ok) { setError(data.error ?? "Failed to save branding"); return; }
     setSaved(true);
     refresh();
   }

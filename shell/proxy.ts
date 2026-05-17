@@ -2,10 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { menuItems, shellConfig } from "@/lib/db/schema";
+import { ADMIN_ROLES } from "@/lib/roles";
 import { eq } from "drizzle-orm";
 
 const ADMIN_ROUTES = ["/admin", "/api/admin"];
-const ADMIN_ROLES = new Set(["super_admin", "admin"]);
 
 async function getSetupComplete(): Promise<boolean> {
   const rows = await db
@@ -51,11 +51,6 @@ export async function proxy(request: NextRequest) {
   // Setup is complete — /setup is now inaccessible
   if (pathname === "/setup") {
     return new NextResponse(null, { status: 404 });
-  }
-
-  // Auth group routes are public (login, error pages)
-  if (pathname.startsWith("/(auth)")) {
-    return NextResponse.next();
   }
 
   const session = await auth();

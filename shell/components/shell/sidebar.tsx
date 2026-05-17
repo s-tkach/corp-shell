@@ -2,23 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ChevronLeft,
-  Settings,
-  LayoutDashboard,
-  Palette,
-  Menu,
-  Shield,
-  Users,
-  KeyRound,
-  AppWindow,
-  CreditCard,
-} from "lucide-react";
+import { ChevronLeft, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useShellStore } from "@/lib/store/shell-store";
+import { ADMIN_ROLES } from "@/lib/roles";
+import { ADMIN_ROUTES } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 
 interface SidebarProps {
@@ -26,19 +17,6 @@ interface SidebarProps {
   appName: string;
   userRoles: string[];
 }
-
-const ADMIN_ROLES = new Set(["super_admin", "admin"]);
-
-const ADMIN_SUB_ROUTES = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/branding", label: "Branding", icon: Palette },
-  { href: "/admin/menu", label: "Menu", icon: Menu },
-  { href: "/admin/roles", label: "Roles", icon: Shield },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/sso", label: "SSO", icon: KeyRound },
-  { href: "/admin/apps", label: "Apps", icon: AppWindow },
-  { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
-] as const;
 
 export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
   const pathname = usePathname();
@@ -144,7 +122,7 @@ export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
             </Link>
             {!sidebarCollapsed && pathname.startsWith("/admin") && (
               <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
-                {ADMIN_SUB_ROUTES.map(({ href, label, icon: Icon }) => {
+                {ADMIN_ROUTES.map(({ href, label, icon: Icon }) => {
                   const active =
                     href === "/admin" ? pathname === "/admin" : pathname === href;
                   return (
@@ -173,7 +151,9 @@ export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
             sidebarCollapsed && "justify-center"
           )}
         >
-          {!sidebarCollapsed && <span>v1.0.0</span>}
+          {!sidebarCollapsed && process.env.NEXT_PUBLIC_APP_VERSION && (
+              <span>{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+            )}
         </div>
       </div>
     </aside>

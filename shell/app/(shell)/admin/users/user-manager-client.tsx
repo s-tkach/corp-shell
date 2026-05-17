@@ -60,6 +60,8 @@ interface Props {
   users: User[];
   allRoles: Role[];
   allTiers: Tier[];
+  page: number;
+  hasMore: boolean;
 }
 
 interface EditForm {
@@ -69,7 +71,7 @@ interface EditForm {
   expiresAt: string;
 }
 
-export function UserManagerClient({ users: initialUsers, allRoles, allTiers }: Props) {
+export function UserManagerClient({ users: initialUsers, allRoles, allTiers, page, hasMore }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editDialog, setEditDialog] = useState<{ open: boolean; user: User | null }>({ open: false, user: null });
@@ -109,7 +111,8 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers }: P
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) { setError("Failed to update user"); return; }
+    const data = await res.json() as { error?: string };
+    if (!res.ok) { setError(data.error ?? "Failed to update user"); return; }
     setEditDialog({ open: false, user: null });
     refresh();
   }
@@ -185,6 +188,28 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers }: P
           </TableBody>
         </Table>
       </Card>
+
+      {(page > 1 || hasMore) && (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1 || isPending}
+            onClick={() => startTransition(() => { router.push(`?page=${page - 1}`); })}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">Page {page}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasMore || isPending}
+            onClick={() => startTransition(() => { router.push(`?page=${page + 1}`); })}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       <Dialog open={editDialog.open} onOpenChange={(o) => setEditDialog((s) => ({ ...s, open: o }))}>
         <DialogContent>

@@ -8,21 +8,15 @@ import { revalidateTag } from "next/cache";
 import { eq } from "drizzle-orm";
 
 export async function GET() {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const rows = await db.select().from(shellConfig).limit(1);
   return NextResponse.json(rows[0] ?? null);
 }
 
 export async function PATCH(req: NextRequest) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const body = await req.json() as Partial<{
     appName: string;
     logoUrl: string;
@@ -43,21 +37,22 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
 
   const body = await req.json() as { fileName: string; contentType: string };
+  if (!body.fileName || !body.contentType?.startsWith("image/")) {
+    return NextResponse.json({ error: "fileName and an image contentType are required" }, { status: 400 });
+  }
   const bucket = process.env["AWS_S3_BUCKET"];
   if (!bucket) {
     return NextResponse.json({ error: "AWS_S3_BUCKET not configured" }, { status: 500 });
   }
 
+  const sanitized = body.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const region = process.env["AWS_REGION"] ?? "eu-central-1";
   const s3 = new S3Client({ region });
-  const key = `logos/${Date.now()}-${body.fileName}`;
+  const key = `logos/${Date.now()}-${sanitized}`;
   const uploadUrl = await getSignedUrl(
     s3,
     new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: body.contentType }),

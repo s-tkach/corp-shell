@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ADMIN_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 
 interface HeaderProps {
@@ -25,25 +26,14 @@ interface HeaderProps {
   userRoles: string[];
 }
 
-const ADMIN_ROUTE_LABELS: Record<string, string> = {
-  "/admin": "Admin",
-  "/admin/branding": "Branding",
-  "/admin/menu": "Menu",
-  "/admin/roles": "Roles",
-  "/admin/users": "Users",
-  "/admin/sso": "SSO",
-  "/admin/apps": "Apps",
-  "/admin/subscriptions": "Subscriptions",
-};
-
 function buildBreadcrumbs(
   pathname: string,
   menu: MenuSection[]
 ): { label: string; href: string }[] {
   if (pathname.startsWith("/admin")) {
     const crumbs: { label: string; href: string }[] = [{ label: "Admin", href: "/admin" }];
-    if (pathname !== "/admin" && ADMIN_ROUTE_LABELS[pathname]) {
-      crumbs.push({ label: ADMIN_ROUTE_LABELS[pathname]!, href: pathname });
+    if (pathname !== "/admin" && ADMIN_ROUTE_LABEL_MAP[pathname]) {
+      crumbs.push({ label: ADMIN_ROUTE_LABEL_MAP[pathname]!, href: pathname });
     }
     return crumbs;
   }

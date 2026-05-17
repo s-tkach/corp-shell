@@ -9,11 +9,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ sectionId: string }> }
 ) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const { sectionId } = await params;
   const body = await req.json() as Partial<{ label: string; icon: string; sortOrder: number }>;
   const [row] = await db
@@ -29,11 +26,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ sectionId: string }> }
 ) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const { sectionId } = await params;
   await db.delete(menuSections).where(eq(menuSections.id, sectionId));
   revalidateTag("menu", {});

@@ -8,11 +8,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ tierId: string }> }
 ) {
-  try {
-    await requireRoles(["super_admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin"]);
+  if (authError) return authError;
   const { tierId } = await params;
   const body = await req.json() as Partial<{
     displayName: string;
@@ -34,11 +31,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ tierId: string }> }
 ) {
-  try {
-    await requireRoles(["super_admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin"]);
+  if (authError) return authError;
   const { tierId } = await params;
   const deleted = await db
     .delete(subscriptionTiers)

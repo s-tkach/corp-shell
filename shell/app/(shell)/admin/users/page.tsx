@@ -3,7 +3,17 @@ import { users, userRoles, roles, userSubscriptions, subscriptionTiers } from "@
 import { asc, desc, eq } from "drizzle-orm";
 import { UserManagerClient } from "./user-manager-client";
 
-export default async function UserManagerPage() {
+const PAGE_SIZE = 20;
+
+export default async function UserManagerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam ?? 1));
+  const offset = (page - 1) * PAGE_SIZE;
+
   const userRows = await db
     .select({
       id: users.id,
@@ -15,7 +25,8 @@ export default async function UserManagerPage() {
     })
     .from(users)
     .orderBy(desc(users.createdAt))
-    .limit(50);
+    .limit(PAGE_SIZE)
+    .offset(offset);
 
   const enriched = await Promise.all(
     userRows.map(async (u) => {
@@ -53,5 +64,13 @@ export default async function UserManagerPage() {
     .from(subscriptionTiers)
     .orderBy(asc(subscriptionTiers.level));
 
-  return <UserManagerClient users={enriched} allRoles={allRoles} allTiers={allTiers} />;
+  return (
+    <UserManagerClient
+      users={enriched}
+      allRoles={allRoles}
+      allTiers={allTiers}
+      page={page}
+      hasMore={userRows.length === PAGE_SIZE}
+    />
+  );
 }

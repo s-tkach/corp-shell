@@ -101,14 +101,16 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to update tier"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to update tier"); return; }
     } else {
       const res = await fetch("/api/admin/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to create tier"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to create tier"); return; }
     }
     setDialog({ open: false, editing: null });
     refresh();

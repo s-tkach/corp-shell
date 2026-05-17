@@ -70,14 +70,16 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: roleForm.displayName }),
       });
-      if (!res.ok) { setError("Failed to update role"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to update role"); return; }
     } else {
       const res = await fetch("/api/admin/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(roleForm),
       });
-      if (!res.ok) { setError("Failed to create role"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to create role"); return; }
     }
     setRoleDialog({ open: false, editing: null });
     refresh();
@@ -101,7 +103,8 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idpGroupName: mappingGroup.trim() }),
     });
-    if (!res.ok) { setError("Failed to add mapping"); return; }
+    const data = await res.json() as { error?: string };
+    if (!res.ok) { setError(data.error ?? "Failed to add mapping"); return; }
     setMappingGroup("");
     setMappingDialog({ open: false, roleId: null });
     refresh();

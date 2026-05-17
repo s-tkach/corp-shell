@@ -4,11 +4,8 @@ import { shellConfig } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 
 export async function GET() {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
 
   const rows = await db.select().from(shellConfig).limit(1);
   const config = rows[0];

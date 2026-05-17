@@ -5,11 +5,8 @@ import { requireRoles } from "@/lib/auth-guard";
 import { asc, desc, eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
 
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));

@@ -5,21 +5,15 @@ import { requireRoles } from "@/lib/auth-guard";
 import { asc } from "drizzle-orm";
 
 export async function GET() {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const rows = await db.select().from(subscriptionTiers).orderBy(asc(subscriptionTiers.level));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireRoles(["super_admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin"]);
+  if (authError) return authError;
   const body = await req.json() as {
     slug: string;
     displayName: string;

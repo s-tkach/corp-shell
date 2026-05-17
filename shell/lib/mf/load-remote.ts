@@ -1,15 +1,19 @@
 "use client";
 
+interface ModuleFederationContainer {
+  init: (shareScope: Record<string, unknown>) => Promise<void>;
+  get: (module: string) => Promise<() => RemoteModule>;
+}
+
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+    __webpack_share_scopes__?: { default: Record<string, unknown> };
+    [containerId: string]: ModuleFederationContainer | undefined;
   }
 }
 
 export interface RemoteModule {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  AppEntry: React.ComponentType<any>;
+  AppEntry: React.ComponentType<Record<string, unknown>>;
 }
 
 function loadScript(url: string): Promise<void> {
@@ -33,20 +37,13 @@ export async function loadRemoteModule(
 ): Promise<RemoteModule> {
   await loadScript(remoteEntryUrl);
 
-  const container = window[remoteName] as
-    | {
-        init: (shareScope: unknown) => Promise<void>;
-        get: (module: string) => Promise<() => RemoteModule>;
-      }
-    | undefined;
+  const container = window[remoteName];
 
   if (!container) {
     throw new Error(`Remote container "${remoteName}" not found after loading ${remoteEntryUrl}`);
   }
 
-  // Initialize the container with the host's share scope
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await container.init((globalThis as any).__webpack_share_scopes__?.default ?? {});
+  await container.init(window.__webpack_share_scopes__?.default ?? {});
 
   const factory = await container.get("./AppEntry");
   return factory();

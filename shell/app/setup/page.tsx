@@ -429,6 +429,7 @@ function Step4({
         const body = (await res.json()) as { error: string };
         throw new Error(body.error ?? "Launch failed");
       }
+      clearSetupStorage();
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -493,12 +494,42 @@ const DEFAULT_DATA: WizardData = {
   superAdminEmail: "",
 };
 
+const STORAGE_KEY = "shell_setup_wizard";
+
+function readStorage(): { step: number; data: WizardData } | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as { step: number; data: WizardData }) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSetupStorage() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
 export default function SetupPage() {
-  const [step, setStep] = useState(1);
-  const [data, setData] = useState<WizardData>(DEFAULT_DATA);
+  const [step, setStep] = useState<number>(() => readStorage()?.step ?? 1);
+  const [data, setData] = useState<WizardData>(() => readStorage()?.data ?? DEFAULT_DATA);
+
+  function persist(nextStep: number, nextData: WizardData) {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step: nextStep, data: nextData }));
+    } catch { /* ignore quota errors */ }
+  }
 
   function patch(update: Partial<WizardData>) {
-    setData((d) => ({ ...d, ...update }));
+    setData((d) => {
+      const next = { ...d, ...update };
+      persist(step, next);
+      return next;
+    });
+  }
+
+  function goToStep(next: number) {
+    setStep(next);
+    persist(next, data);
   }
 
   return (
@@ -514,25 +545,25 @@ export default function SetupPage() {
 
       <Card>
         {step === 1 && (
-          <Step1 data={data} onChange={patch} onNext={() => setStep(2)} />
+          <Step1 data={data} onChange={patch} onNext={() => goToStep(2)} />
         )}
         {step === 2 && (
           <Step2
             data={data}
             onChange={patch}
-            onNext={() => setStep(3)}
-            onBack={() => setStep(1)}
+            onNext={() => goToStep(3)}
+            onBack={() => goToStep(1)}
           />
         )}
         {step === 3 && (
           <Step3
             data={data}
             onChange={patch}
-            onNext={() => setStep(4)}
-            onBack={() => setStep(2)}
+            onNext={() => goToStep(4)}
+            onBack={() => goToStep(2)}
           />
         )}
-        {step === 4 && <Step4 data={data} onBack={() => setStep(3)} />}
+        {step === 4 && <Step4 data={data} onBack={() => goToStep(3)} />}
       </Card>
 
       <p className="mt-4 text-center text-xs text-muted-foreground">

@@ -96,14 +96,16 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to update app"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to update app"); return; }
     } else {
       const res = await fetch("/api/admin/apps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setError("Failed to register app"); return; }
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setError(data.error ?? "Failed to register app"); return; }
     }
     setDialog({ open: false, editing: null });
     refresh();

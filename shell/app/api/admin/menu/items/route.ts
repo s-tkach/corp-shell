@@ -6,21 +6,15 @@ import { asc } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 
 export async function GET() {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const rows = await db.select().from(menuItems).orderBy(asc(menuItems.sortOrder));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireRoles(["super_admin", "admin"]);
-  } catch (r) {
-    return r as Response;
-  }
+  const authError = await requireRoles(["super_admin", "admin"]);
+  if (authError) return authError;
   const body = await req.json() as {
     sectionId: string;
     label: string;

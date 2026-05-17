@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-
-const ADMIN_ROLES = new Set(["super_admin", "admin"]);
+import { ADMIN_ROLES } from "@/lib/roles";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
