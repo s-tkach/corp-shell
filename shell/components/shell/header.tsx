@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Moon, Sun, LogOut, User } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -24,10 +25,29 @@ interface HeaderProps {
   userRoles: string[];
 }
 
+const ADMIN_ROUTE_LABELS: Record<string, string> = {
+  "/admin": "Admin",
+  "/admin/branding": "Branding",
+  "/admin/menu": "Menu",
+  "/admin/roles": "Roles",
+  "/admin/users": "Users",
+  "/admin/sso": "SSO",
+  "/admin/apps": "Apps",
+  "/admin/subscriptions": "Subscriptions",
+};
+
 function buildBreadcrumbs(
   pathname: string,
   menu: MenuSection[]
 ): { label: string; href: string }[] {
+  if (pathname.startsWith("/admin")) {
+    const crumbs: { label: string; href: string }[] = [{ label: "Admin", href: "/admin" }];
+    if (pathname !== "/admin" && ADMIN_ROUTE_LABELS[pathname]) {
+      crumbs.push({ label: ADMIN_ROUTE_LABELS[pathname]!, href: pathname });
+    }
+    return crumbs;
+  }
+
   const allItems = menu.flatMap((s) => s.items);
   const match = allItems
     .filter((item) => pathname === item.route || pathname.startsWith(item.route + "/"))
@@ -67,14 +87,21 @@ export function Header({ menu, appName, logoUrl, userName, userEmail, userRoles 
       </div>
 
       <nav className="flex items-center gap-1 text-sm text-muted-foreground flex-1 min-w-0">
-        {breadcrumbs.map((crumb, i) => (
-          <span key={crumb.href} className="flex items-center gap-1">
-            {i > 0 && <span className="select-none">/</span>}
-            <span className={i === breadcrumbs.length - 1 ? "text-foreground font-medium" : ""}>
-              {crumb.label}
+        {breadcrumbs.map((crumb, i) => {
+          const isLast = i === breadcrumbs.length - 1;
+          return (
+            <span key={crumb.href} className="flex items-center gap-1">
+              {i > 0 && <span className="select-none">/</span>}
+              {isLast ? (
+                <span className="text-foreground font-medium">{crumb.label}</span>
+              ) : (
+                <Link href={crumb.href} className="hover:text-foreground transition-colors">
+                  {crumb.label}
+                </Link>
+              )}
             </span>
-          </span>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="flex items-center gap-2 flex-shrink-0">

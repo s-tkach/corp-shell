@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, Settings } from "lucide-react";
+import {
+  ChevronLeft,
+  Settings,
+  LayoutDashboard,
+  Palette,
+  Menu,
+  Shield,
+  Users,
+  KeyRound,
+  AppWindow,
+  CreditCard,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +28,17 @@ interface SidebarProps {
 }
 
 const ADMIN_ROLES = new Set(["super_admin", "admin"]);
+
+const ADMIN_SUB_ROUTES = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/branding", label: "Branding", icon: Palette },
+  { href: "/admin/menu", label: "Menu", icon: Menu },
+  { href: "/admin/roles", label: "Roles", icon: Shield },
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/sso", label: "SSO", icon: KeyRound },
+  { href: "/admin/apps", label: "Apps", icon: AppWindow },
+  { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+] as const;
 
 export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
   const pathname = usePathname();
@@ -106,19 +128,44 @@ export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
       <Separator className="bg-sidebar-border" />
       <div className="p-2 space-y-1">
         {userRoles.some((r) => ADMIN_ROLES.has(r)) && (
-          <Link
-            href="/admin"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              pathname.startsWith("/admin")
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+          <>
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/admin")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Admin" : undefined}
+            >
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Admin</span>}
+            </Link>
+            {!sidebarCollapsed && pathname.startsWith("/admin") && (
+              <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
+                {ADMIN_SUB_ROUTES.map(({ href, label, icon: Icon }) => {
+                  const active =
+                    href === "/admin" ? pathname === "/admin" : pathname === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                        active
+                          ? "font-medium text-sidebar-primary-foreground bg-sidebar-primary"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
             )}
-            title={sidebarCollapsed ? "Admin" : undefined}
-          >
-            <Settings className="h-4 w-4 flex-shrink-0" />
-            {!sidebarCollapsed && <span>Admin</span>}
-          </Link>
+          </>
         )}
         <div
           className={cn(
