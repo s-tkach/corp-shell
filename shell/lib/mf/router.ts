@@ -1,7 +1,7 @@
 import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { unstable_cacheLife as cacheLife } from "next/cache";
+import { cacheLife } from "next/cache";
 
 export interface RegisteredApp {
   id: string;
