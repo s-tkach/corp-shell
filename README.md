@@ -29,7 +29,7 @@ A host web application that serves as the single entry point for all internal co
 ## Repository structure
 
 ```
-aws-corp-shell-app/
+corp-shell/
 ├── shell/                     # Next.js 15 application
 │   ├── app/
 │   │   ├── (auth)/            # Login, callback, error routes

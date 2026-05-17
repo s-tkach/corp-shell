@@ -1,5 +1,5 @@
 {
-  "name": "aws-corp-shell-app",
+  "name": "corp-shell",
   "version": "1.0.0",
   "private": true,
   "scripts": {

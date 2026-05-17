@@ -15,7 +15,7 @@ The Corporate Application Shell is a **Next.js 15 monorepo** deployed on AWS via
 ## 2. Repository Structure
 
 ```
-aws-corp-shell-app/                  ← monorepo root
+corp-shell/                          ← monorepo root
 ├── package.json                     # Workspace root (pnpm workspaces)
 ├── shell/                           # Next.js 15 application
 │   ├── app/

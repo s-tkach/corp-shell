@@ -1,4 +1,4 @@
-# aws-corp-shell-app
+# corp-shell
 
 ## Spec-Driven Development (SDD) Workflow
 
