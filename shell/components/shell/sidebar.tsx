@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,9 +13,12 @@ import type { MenuSection } from "@/app/api/menu/route";
 interface SidebarProps {
   menu: MenuSection[];
   appName: string;
+  userRoles: string[];
 }
 
-export function Sidebar({ menu, appName }: SidebarProps) {
+const ADMIN_ROLES = new Set(["super_admin", "admin"]);
+
+export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
 
@@ -101,7 +104,22 @@ export function Sidebar({ menu, appName }: SidebarProps) {
       </ScrollArea>
 
       <Separator className="bg-sidebar-border" />
-      <div className="p-2">
+      <div className="p-2 space-y-1">
+        {userRoles.some((r) => ADMIN_ROLES.has(r)) && (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              pathname.startsWith("/admin")
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+            )}
+            title={sidebarCollapsed ? "Admin" : undefined}
+          >
+            <Settings className="h-4 w-4 flex-shrink-0" />
+            {!sidebarCollapsed && <span>Admin</span>}
+          </Link>
+        )}
         <div
           className={cn(
             "flex items-center gap-3 px-3 py-2 text-xs text-sidebar-foreground/60",

@@ -119,6 +119,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .update(users)
             .set({ lastLoginAt: new Date() })
             .where(eq(users.id, userId));
+
+          // Merge DB-assigned roles with any IDP group roles
+          const dbRoleRows = await db
+            .select({ slug: roles.slug })
+            .from(userRoles)
+            .innerJoin(roles, eq(userRoles.roleId, roles.id))
+            .where(eq(userRoles.userId, userId));
+          roleSlugs = [...new Set([...roleSlugs, ...dbRoleRows.map((r) => r.slug)])];
         }
 
         // Log LOGIN event

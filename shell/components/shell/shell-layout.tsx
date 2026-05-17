@@ -35,7 +35,7 @@ export function ShellLayoutClient({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar menu={menu} appName={appName} />
+      <Sidebar menu={menu} appName={appName} userRoles={userRoles} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           menu={menu}
