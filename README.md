@@ -99,23 +99,23 @@ Create `shell/.env.local` (gitignored — never commit):
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<openssl rand -base64 32>
 
-# OIDC
-OIDC_CLIENT_ID=<from your OIDC provider>
-OIDC_CLIENT_SECRET=<from your OIDC provider>
-OIDC_ISSUER=https://<your-oidc-issuer>/oauth2/default
-
 # Database
 DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
 
 # Webhook (any random string locally)
 WEBHOOK_SECRET=<openssl rand -base64 32>
 
-# AWS / S3 (required for logo uploads)
+# AWS KMS — required for encrypting/decrypting the OIDC client secret stored in shell_config
 AWS_REGION=eu-central-1
+KMS_KEY_ID=<your-kms-key-id>
+
+# AWS / S3 (required for logo uploads)
 AWS_S3_BUCKET=<your-s3-bucket-name>
 # LOGO_CDN_BASE=https://<cloudfront-dist>.cloudfront.net  # optional — omit to serve logos directly from S3
 # AWS credentials are NOT set here. Run `aws configure` once; the SDK reads ~/.aws/credentials automatically.
 ```
+
+> **OIDC credentials are not env vars.** The setup wizard (Step 2) collects the issuer URL, client ID, and client secret. On "Launch", the client secret is KMS-encrypted and all three values are written to the `shell_config` database row. `lib/auth.ts` reads them from the DB at startup.
 
 OIDC redirect URI to register: `http://localhost:3000/api/auth/callback/oidc`
 
@@ -179,17 +179,18 @@ import {
 
 ## Secrets
 
-All secrets are stored in AWS Secrets Manager — never in source files or `.env` committed to git.
+Secrets are stored in AWS Secrets Manager or KMS-encrypted in the database — never in source files or `.env` committed to git.
 
-| Secret | Purpose |
-|--------|---------|
-| `OIDC_CLIENT_SECRET` | OIDC provider |
-| `OIDC_CLIENT_ID` | OIDC provider |
-| `DATABASE_URL` | Aurora connection |
-| `NEXTAUTH_SECRET` | JWT cookie encryption |
-| `WEBHOOK_SECRET` | Subscription webhook HMAC-SHA256 |
-| `AWS_S3_BUCKET` | S3 bucket for logo uploads |
-| `LOGO_CDN_BASE` | CloudFront base URL for logo delivery — optional, omit to serve from S3 directly |
+| Secret | Storage | Purpose |
+|--------|---------|---------|
+| OIDC issuer + client ID | `shell_config` DB row (plaintext) | Read by `lib/auth.ts` at startup |
+| OIDC client secret | `shell_config.oidcClientSecret` (KMS-encrypted) | Decrypted at runtime via `lib/kms.ts` |
+| `KMS_KEY_ID` | Amplify env / Secrets Manager | AWS KMS key used to encrypt/decrypt OIDC client secret |
+| `DATABASE_URL` | Secrets Manager / Amplify env | Aurora connection |
+| `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | JWT cookie encryption |
+| `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Subscription webhook HMAC-SHA256 |
+| `AWS_S3_BUCKET` | Amplify env | S3 bucket for logo uploads |
+| `LOGO_CDN_BASE` | Amplify env (optional) | CloudFront base URL for logo delivery — omit to serve from S3 directly |
 
 ## Specs
 

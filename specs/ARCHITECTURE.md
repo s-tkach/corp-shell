@@ -84,7 +84,7 @@ aws-corp-shell-app/                  ← monorepo root
 | Compute | AWS Amplify | — | Hosts Next.js app; manually configured outside repo |
 | CDN / Static | AWS CloudFront + S3 | — | Shell assets + child app remoteEntry files |
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
-| Secrets | AWS Secrets Manager | — | OIDC client secret, webhook HMAC key, DB URL |
+| Secrets | AWS Secrets Manager + AWS KMS | — | Webhook HMAC key, DB URL (Secrets Manager); OIDC client secret KMS-encrypted in DB |
 | CI/CD | GitHub Actions | — | Child apps deploy independently; shell via Amplify |
 | Package registry | GitHub Packages | — | `@corp/shell-sdk`, `@corp/create-shell-app` |
 | Package manager | pnpm workspaces | 9.x | Monorepo; shared lockfile |
@@ -121,7 +121,9 @@ OIDC Provider (any OIDC-compliant issuer)
   Authorization Server + groups claim + RP-Initiated Logout
 
 AWS Secrets Manager
-  OIDC_CLIENT_SECRET, WEBHOOK_SECRET, DATABASE_URL
+  WEBHOOK_SECRET, DATABASE_URL
+AWS KMS
+  Encrypts OIDC client secret stored in shell_config DB row
 
 GitHub Packages
   @corp/shell-sdk, @corp/create-shell-app
@@ -239,8 +241,8 @@ User → middleware (no session) → NextAuth redirect to OIDC provider
 
 Adding Azure AD or Google Workspace requires:
 1. Add a new NextAuth.js provider entry in `lib/auth.ts`
-2. Add `IDP_CLIENT_ID` / `IDP_CLIENT_SECRET` env vars (Secrets Manager)
-3. No structural code changes
+2. Store the new provider's client ID and KMS-encrypted client secret in `shell_config` (or a new `idp_config` table for multi-provider support)
+3. No structural code changes to the auth flow
 
 ---
 
@@ -357,7 +359,7 @@ Admin Panel → Application Registry:
 | `menu_sections` | Top-level nav groupings (label, icon, sortOrder) |
 | `menu_items` | Nav leaf items (route, requiredRoles[], requiredSubLevel, badge) |
 | `app_registry` | Registered child apps (remoteUrl, routePrefix, healthCheckUrl) |
-| `shell_config` | Single-row: branding, OIDC issuer, setup_complete flag |
+| `shell_config` | Single-row: branding, OIDC issuer + client ID + KMS-encrypted client secret, setup_complete flag |
 | `auth_events` | Login/logout/failure events (viewer UI in v2) |
 
 ### 9.3 Migrations
@@ -374,13 +376,14 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 
 | Secret | Storage | Consumed By |
 |--------|---------|------------|
-| `OIDC_CLIENT_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js) |
-| `OIDC_CLIENT_ID` | Secrets Manager / Amplify env | Next.js (NextAuth.js) |
+| OIDC issuer + client ID | `shell_config` DB row (plaintext) | `lib/auth.ts` (`getOidcConfig()`) |
+| OIDC client secret | `shell_config.oidcClientSecret` (KMS-encrypted ciphertext) | `lib/auth.ts` via `kmsDecrypt()` |
+| `KMS_KEY_ID` | Amplify env | `lib/kms.ts` (encrypt/decrypt OIDC client secret) |
 | `DATABASE_URL` | Secrets Manager / Amplify env | Next.js (Drizzle ORM) |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js JWT encryption) |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
 | `LOGO_BUCKET` | Amplify env | Next.js (`/api/admin/branding` S3 presigned PUT) |
-| `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, SecretsManagerClient region) |
+| `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, KMSClient region) |
 
 All secrets configured in Amplify environment variables — never in source files or `.env` committed to git.
 
@@ -451,7 +454,7 @@ npm publish --access restricted  (NODE_AUTH_TOKEN = GITHUB_TOKEN)
 | CSRF | NextAuth.js built-in CSRF token on all state-mutating API routes |
 | Admin route bypass | Server-side role check in every API handler + middleware — no client-only guard |
 | Webhook forgery | HMAC-SHA256 with `WEBHOOK_SECRET` from Secrets Manager; constant-time compare |
-| Secret leakage | All secrets in Secrets Manager; zero secrets in source or git history |
+| Secret leakage | Secrets in Secrets Manager or KMS-encrypted in DB; zero secrets in source or git history |
 | XSS | Shadcn/ui + React; no `dangerouslySetInnerHTML`; CSP header via CloudFront |
 | Child app crash | React ErrorBoundary per child app mount; shell unaffected |
 | OIDC misconfiguration | Setup wizard validates the OIDC discovery endpoint before proceeding |

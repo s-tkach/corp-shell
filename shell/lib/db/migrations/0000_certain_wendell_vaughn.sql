@@ -65,6 +65,7 @@ CREATE TABLE "shell_config" (
 	"primary_color" text,
 	"oidc_issuer" text,
 	"oidc_client_id" text,
+	"oidc_client_secret" text,
 	"setup_complete" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

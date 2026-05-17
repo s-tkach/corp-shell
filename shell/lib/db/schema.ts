@@ -122,6 +122,7 @@ export const shellConfig = pgTable("shell_config", {
   primaryColor: text("primary_color"),
   oidcIssuer: text("oidc_issuer"),
   oidcClientId: text("oidc_client_id"),
+  oidcClientSecret: text("oidc_client_secret"),
   setupComplete: boolean("setup_complete").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -99,12 +99,13 @@ The person who completes the **first-run wizard** immediately after the shell is
 
 **FR-AUTH-1:** The shell authenticates via **OIDC (authorization code + PKCE)**. NextAuth.js v5 handles the full flow via a generic OIDC provider.
 
-**OIDC configuration (set during wizard, stored in Secrets Manager):**
-```
-OIDC_ISSUER=https://<your-oidc-issuer>
-OIDC_CLIENT_ID=<from your OIDC provider>
-OIDC_CLIENT_SECRET=<from your OIDC provider>
-```
+**OIDC configuration (set during wizard, stored in the `shell_config` DB row):**
+
+- `oidcIssuer` — OIDC issuer URL
+- `oidcClientId` — client ID (plaintext)
+- `oidcClientSecret` — client secret, KMS-encrypted at rest; decrypted at runtime via `kmsDecrypt()`
+
+The setup wizard collects these values in Step 2. On "Launch", the client secret is encrypted with AWS KMS (`KMS_KEY_ID` env var) and all three values are written to the `shell_config` table. No OIDC credentials are stored as environment variables.
 
 **OIDC app registration requirements (documented for the admin):**
 - Application type: Web, OIDC
@@ -310,7 +311,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | CDN / Static | AWS CloudFront + S3 | Shell SPA assets + child app remoteEntry.js files |
 | Compute | AWS Amplify (manually configured) | Hosts Next.js app; managed outside the repo |
 | DNS | Amazon Route 53 | Custom domain, SSL, health checks |
-| Secrets | AWS Secrets Manager | OIDC client secret, webhook HMAC secret, DB credentials |
+| Secrets | AWS Secrets Manager + AWS KMS | Webhook HMAC secret, DB credentials (Secrets Manager); OIDC client secret KMS-encrypted in DB |
 | CI/CD | GitHub Actions | Child apps deploy independently; shell deployed via Amplify |
 | Package Registry | GitHub Packages | `@corp/shell-sdk` and `@corp/create-shell-app` |
 
@@ -370,7 +371,8 @@ CloudFront ──→ S3            (shell static assets)
 CloudFront ──→ S3 prefix     (child app A: remoteEntry.js + assets)
 CloudFront ──→ S3 prefix     (child app B: remoteEntry.js + assets)
 Route 53   ──→ CloudFront    (app.corp.com + SSL)
-Secrets Manager              (OIDC_CLIENT_SECRET, WEBHOOK_SECRET, DB_URL)
+Secrets Manager              (WEBHOOK_SECRET, DATABASE_URL)
+KMS                          (encrypts OIDC client secret stored in shell_config DB row)
 Aurora Serverless v2         (private subnet, VPC)
 ```
 
@@ -621,8 +623,10 @@ export const shellConfig = pgTable('shell_config', {
   primaryColor: text('primary_color').default('#0f172a'),
   setupComplete: boolean('setup_complete').default(false),
   updatedAt:    timestamp('updated_at').defaultNow(),
-  // OIDC config stored in Secrets Manager; only non-secret fields here:
-  oidcIssuer:   text('oidc_issuer'),
+  // OIDC config — issuer and clientId are plaintext; clientSecret is KMS-encrypted
+  oidcIssuer:        text('oidc_issuer'),
+  oidcClientId:      text('oidc_client_id'),
+  oidcClientSecret:  text('oidc_client_secret'),  // KMS-encrypted ciphertext
 });
 
 export const authEvents = pgTable('auth_events', {

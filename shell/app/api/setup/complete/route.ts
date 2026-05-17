@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { logger } from "@/lib/logger";
+import { resetAuth } from "@/lib/auth";
+import { kmsEncrypt } from "@/lib/kms";
 import { db } from "@/lib/db/client";
 import {
   shellConfig,
@@ -41,9 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
   }
 
-  // Store OIDC client secret to Secrets Manager (if configured)
-  // In dev without SST this is a no-op. In prod the secret is stored securely.
-  await maybeStoreSecret("OIDC_CLIENT_SECRET", oidcClientSecret);
+  const encryptedSecret = await kmsEncrypt(oidcClientSecret.trim());
 
   // Atomic write — Drizzle wraps this in a transaction
   await db.transaction(async (tx) => {
@@ -54,6 +53,7 @@ export async function POST(request: Request) {
       primaryColor: primaryColor || "#0f172a",
       oidcIssuer: oidcIssuer.trim(),
       oidcClientId: oidcClientId.trim(),
+      oidcClientSecret: encryptedSecret,
       setupComplete: true,
     });
 
@@ -113,6 +113,8 @@ export async function POST(request: Request) {
     });
   });
 
+  resetAuth();
+
   // Set setup_complete cookie so proxy.ts stops redirecting to /setup
   const response = NextResponse.json({ ok: true });
   response.cookies.set("shell_setup_complete", "1", {
@@ -126,18 +128,3 @@ export async function POST(request: Request) {
   return response;
 }
 
-async function maybeStoreSecret(name: string, value: string) {
-  const secretArn = process.env[`${name}_ARN`];
-  if (!secretArn) return; // dev environment — skip
-
-  try {
-    const { SecretsManagerClient, PutSecretValueCommand } = await import(
-      "@aws-sdk/client-secrets-manager"
-    );
-    const client = new SecretsManagerClient({ region: process.env["AWS_REGION"] ?? "eu-central-1" });
-    await client.send(new PutSecretValueCommand({ SecretId: secretArn, SecretString: value }));
-  } catch {
-    // Non-fatal in dev; log and continue
-    logger.error("Could not store secret to Secrets Manager", { name });
-  }
-}

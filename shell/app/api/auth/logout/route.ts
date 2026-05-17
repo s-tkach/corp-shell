@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth, signOut } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { authEvents } from "@/lib/db/schema";
+import { authEvents, shellConfig } from "@/lib/db/schema";
 import { getToken } from "next-auth/jwt";
 
 export async function GET(request: NextRequest) {
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
   // Clear the local session cookie
   await signOut({ redirect: false });
 
-  const oidcIssuer = process.env["OIDC_ISSUER"];
+  const configRows = await db.select({ oidcIssuer: shellConfig.oidcIssuer }).from(shellConfig).limit(1);
+  const oidcIssuer = configRows[0]?.oidcIssuer ?? null;
   const origin = request.nextUrl.origin;
 
   if (idToken && oidcIssuer) {
