@@ -12,7 +12,7 @@
  * Acceptance criteria (NFRs from M12-3):
  *   - Zero HTTP 5xx errors
  *   - P99 API response < 500ms
- *   - Aurora stays within 2 ACU (monitor via CloudWatch during run)
+ *   - PostgreSQL stays within 2 ACU (monitor via CloudWatch during run)
  *   - Lambda concurrency headroom > 20% (monitor via CloudWatch during run)
  */
 

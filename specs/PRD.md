@@ -10,7 +10,7 @@
 | Version | Change |
 |---------|--------|
 | 1.0 | Initial draft |
-| 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; Aurora replaces DynamoDB; AWS Amplify deployment |
+| 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; PostgreSQL replaces DynamoDB; AWS Amplify deployment |
 | 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry; first-run setup wizard added for branding/naming |
 
 ---
@@ -307,7 +307,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | Authentication | NextAuth.js v5 (Auth.js) | First-class Next.js + OIDC; session in httpOnly cookie |
 | State | Zustand | Lightweight; shell state is simple |
 | ORM | Drizzle ORM | Type-safe; serverless-safe (no persistent connection pool) |
-| Database | Amazon Aurora Serverless v2 (PostgreSQL) | Scales to zero in dev; SQL for relational admin queries; single DB for all shell data |
+| Database | PostgreSQL | Scales to zero in dev; SQL for relational admin queries; single DB for all shell data |
 | CDN / Static | AWS CloudFront + S3 | Shell SPA assets + child app remoteEntry.js files |
 | Compute | AWS Amplify (manually configured) | Hosts Next.js app; managed outside the repo |
 | DNS | Amazon Route 53 | Custom domain, SSL, health checks |
@@ -353,8 +353,8 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
                                               │ Drizzle ORM
                                               ▼
                              ┌────────────────────────────────┐
-                             │  Aurora Serverless v2           │
-                             │  PostgreSQL (VPC private)       │
+                             │  PostgreSQL                     │
+                             │  (VPC private)                  │
                              │                                 │
                              │  users             roles        │
                              │  user_roles        user_subs    │
@@ -373,7 +373,7 @@ CloudFront ──→ S3 prefix     (child app B: remoteEntry.js + assets)
 Route 53   ──→ CloudFront    (app.corp.com + SSL)
 Secrets Manager              (WEBHOOK_SECRET, DATABASE_URL)
 KMS                          (encrypts OIDC client secret stored in shell_config DB row)
-Aurora Serverless v2         (private subnet, VPC)
+PostgreSQL                   (private subnet, VPC)
 ```
 
 ### 8.3 Project Structure
@@ -643,7 +643,7 @@ export const authEvents = pgTable('auth_events', {
 
 | Service | Configuration | Est. Monthly (prod) |
 |---------|--------------|---------------------|
-| Aurora Serverless v2 | 0.5–2 ACUs, auto-pause in dev/staging | $15–40 |
+| PostgreSQL | 0.5–2 ACUs, auto-pause in dev/staging | $15–40 |
 | AWS Amplify (Next.js hosting) | ~5M req/mo, SSR compute | ~$5–15 |
 | CloudFront + S3 (shell) | ~100GB transfer/mo | ~$10 |
 | CloudFront + S3 (per child app) | ~10GB/mo each | ~$3/app |
@@ -651,7 +651,7 @@ export const authEvents = pgTable('auth_events', {
 | Secrets Manager | ~5 secrets | ~$2 |
 | **Total — shell + 3 child apps** | | **~$75–100/mo prod** |
 
-Dev/staging: near zero — Aurora pauses to 0 ACUs, Lambda scales to zero.
+Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 
 ---
 
@@ -662,7 +662,7 @@ Dev/staging: near zero — Aurora pauses to 0 ACUs, Lambda scales to zero.
 | What it provides (free) | What we build on top |
 |------------------------|---------------------|
 | Sidebar with collapse, keyboard shortcuts, mobile drawer | NextAuth.js v5 + OIDC |
-| Top header with breadcrumbs and user menu | Drizzle ORM + Aurora schema + migrations |
+| Top header with breadcrumbs and user menu | Drizzle ORM + PostgreSQL schema + migrations |
 | All Shadcn/ui components styled with Tailwind v4 | Data-driven menu (DB replaces hardcoded nav) |
 | Dark/light mode with persistence | RBAC middleware (`middleware.ts`) |
 | Clean TypeScript folder structure | Module Federation host config |
@@ -681,7 +681,7 @@ Dev/staging: near zero — Aurora pauses to 0 ACUs, Lambda scales to zero.
 
 ### 10.1 First-Time Deployment
 1. Engineer deploys shell via AWS Amplify (manually configured)
-2. Amplify provisions hosting; Aurora, Secrets Manager, and Route 53 configured separately
+2. Amplify provisions hosting; PostgreSQL, Secrets Manager, and Route 53 configured separately
 3. Engineer visits `app.corp.com` → redirected to `/setup`
 4. Completes 4-step wizard (branding → OIDC → super admin → launch)
 5. Shell is live; `/setup` returns 404 permanently
@@ -738,7 +738,7 @@ All open questions are resolved. No outstanding items.
 | Child app integration mode | Module Federation (primary); iFrame in v2 |
 | SSO provider | Generic OIDC; any OIDC-compliant IDP supported |
 | Subscription management | Admin-managed v1; payment webhook endpoint stubbed for v2 |
-| Concurrent users | ≤1,000 → Aurora Serverless v2 On-Demand, Lambda, no Redis |
+| Concurrent users | ≤1,000 → PostgreSQL On-Demand, Lambda, no Redis |
 | First OIDC IDP | Generic OIDC provider — NextAuth.js generic OIDC provider used; issuer/client ID from wizard |
 | AWS account structure | Single account for shell + all child apps |
 | npm registry | GitHub Packages — `@corp/shell-sdk`, `@corp/create-shell-app` |

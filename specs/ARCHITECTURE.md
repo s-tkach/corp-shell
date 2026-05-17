@@ -80,7 +80,7 @@ aws-corp-shell-app/                  ← monorepo root
 | Authentication | NextAuth.js (Auth.js) | v5 | Generic OIDC; httpOnly JWT session cookie |
 | Client state | Zustand | 4.x | Shell UI state only (sidebar collapse, theme) |
 | ORM | Drizzle ORM | latest | Type-safe; no persistent connection pool |
-| Database | Aurora Serverless v2 (PostgreSQL) | 15.x | Scales to zero in dev; single DB for all shell data |
+| Database | PostgreSQL | 15.x | Scales to zero in dev; single DB for all shell data |
 | Compute | AWS Amplify | — | Hosts Next.js app; manually configured outside repo |
 | CDN / Static | AWS CloudFront + S3 | — | Shell assets + child app remoteEntry files |
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
@@ -106,7 +106,7 @@ Route 53 ──→ CloudFront (shell distribution)
                 │      │
                 │      │  Drizzle ORM / pg (private VPC)
                 │      ▼
-                │    Aurora Serverless v2 (PostgreSQL)
+                │    PostgreSQL
                 │
                 └──→ S3 (shell static assets: _next/static/*)
 
@@ -342,7 +342,7 @@ Admin Panel → Application Registry:
 
 ### 9.1 Engine & Connection
 
-- **Engine:** Aurora Serverless v2 (PostgreSQL 15), private VPC subnet.
+- **Engine:** PostgreSQL 15, private VPC subnet.
 - **Connection:** Drizzle ORM with `@neondatabase/serverless` or `postgres` (non-pooling) driver — safe for Lambda cold starts, no persistent connection pool.
 - **Credentials:** `DATABASE_URL` stored in Secrets Manager; injected as an Amplify environment variable.
 
@@ -370,7 +370,7 @@ Managed by Drizzle Kit. Migration files live in `shell/lib/db/migrations/`. Appl
 
 ## 10. Infrastructure (AWS Amplify)
 
-The shell is hosted on AWS Amplify (manually configured outside the repo). Amplify manages the Next.js compute, CloudFront CDN, and custom domain. Aurora Serverless v2, Secrets Manager, and Route 53 are provisioned separately.
+The shell is hosted on AWS Amplify (manually configured outside the repo). Amplify manages the Next.js compute, CloudFront CDN, and custom domain. PostgreSQL, Secrets Manager, and Route 53 are provisioned separately.
 
 ### 10.1 Secrets
 
@@ -511,7 +511,7 @@ Step 4 — Launch:     POST /api/setup/complete →
 | No separate backend | Next.js API routes | Reduces operational surface; Lambda scales to zero |
 | No Redis / session store | Stateless JWT cookie | ≤1,000 users; Lambda ephemeral; no sticky sessions needed |
 | Module Federation over iFrame | MF (v1) | Shared React context, SDK hooks, and design tokens; iFrame in v2 |
-| Aurora Serverless v2 over DynamoDB | Aurora (PostgreSQL) | RBAC, menu, and admin queries are relational; Drizzle ORM type safety |
+| PostgreSQL over DynamoDB | PostgreSQL | RBAC, menu, and admin queries are relational; Drizzle ORM type safety |
 | Single AWS account | One account | Simplified IAM, networking, and cost tracking for v1 |
 | Fork over build from scratch | `satnaing/shadcn-admin` | Sidebar, header, Shadcn wiring already done; focus on domain logic |
 | GitHub Packages over npm | GitHub Packages | Org-private packages; GITHUB_TOKEN auth in Actions without extra secrets |

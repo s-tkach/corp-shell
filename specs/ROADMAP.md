@@ -63,7 +63,7 @@
 
 #### M1-4: Configure AWS Amplify hosting
 - [x] Shell hosted on AWS Amplify (manually configured, outside repo)
-- [x] Aurora Serverless v2, Secrets Manager, and Route 53 provisioned separately
+- [x] PostgreSQL, Secrets Manager, and Route 53 provisioned separately
 - [x] Environment variables (OIDC, DB, NextAuth secrets) set in Amplify console
 - [x] **Acceptance:** Amplify build succeeds; CloudFront URL returns Next.js app
 
@@ -87,7 +87,7 @@
 - [x] **Acceptance:** `pnpm drizzle-kit generate` produces a single coherent migration; no type errors in schema file
 
 #### M2-3: Apply initial migration
-- [x] Run `pnpm drizzle-kit migrate` against the dev Aurora instance
+- [x] Run `pnpm drizzle-kit migrate` against the dev PostgreSQL instance
 - [x] Verify all tables and constraints exist via `psql` or Drizzle Studio
 - [x] Add migration step to run before Amplify deploys
 - [x] **Acceptance:** All 11 tables present in dev DB; pipeline applies migrations automatically on deploy
@@ -426,7 +426,7 @@
 #### M11-2: Request tracing
 - [x] `shell/instrumentation.ts`: X-Ray native tracing; trace ID read from `_X_AMZN_TRACE_ID` env var injected by the Lambda runtime (Amplify-managed)
 - [x] Propagate trace context through API route handlers
-- [x] **Acceptance:** X-Ray service map shows shell Lambda and Aurora as connected nodes
+- [x] **Acceptance:** X-Ray service map shows shell Lambda and PostgreSQL as connected nodes
 
 #### M11-3: CSP and security headers
 - [x] Next.js `headers()` in `next.config.ts`:
@@ -463,8 +463,8 @@
 
 #### M12-3: Load test at 1,000 concurrent sessions
 - [x] Run k6 or Artillery load test: 1,000 virtual users, authenticated sessions, mixed navigation and API calls
-- [x] Monitor Aurora ACU scaling, Lambda concurrency, and CloudFront cache hit rate
-- [x] **Acceptance:** Zero 5xx errors; P99 API response < 500ms; Aurora stays within 2 ACU; Lambda concurrency headroom > 20%
+- [x] Monitor PostgreSQL ACU scaling, Lambda concurrency, and CloudFront cache hit rate
+- [x] **Acceptance:** Zero 5xx errors; P99 API response < 500ms; PostgreSQL stays within 2 ACU; Lambda concurrency headroom > 20%
 
 #### M12-4: Availability smoke test
 - [x] Route 53 health check configured for `app.corp.com`
@@ -481,7 +481,7 @@ Before marking v1 as released, confirm:
 - [ ] `/setup` returns 404 in production
 - [ ] `super_admin` account verified and secured
 - [ ] All secrets in Secrets Manager; zero secrets in git or Lambda env vars (only ARN references)
-- [ ] CloudWatch alarms configured for error rate, Aurora ACU, and Lambda throttling
+- [ ] CloudWatch alarms configured for error rate, PostgreSQL ACU, and Lambda throttling
 - [ ] `@corp/shell-sdk` v1.0.0 published to GitHub Packages
 - [ ] At least one child app successfully onboarded end-to-end (< 2 hours)
 - [ ] Cost Explorer tag `project=corp-shell` shows < $100/month in production
@@ -498,6 +498,21 @@ Before marking v1 as released, confirm:
 | Self-serve billing (Stripe/Chargebee) | M10 webhook endpoint |
 | Dynamic IDP registration via Admin Panel | M4 auth config |
 | Organization-level subscription management | M10 complete |
+
+---
+
+## Platform Portability (v2 Candidate)
+
+These tasks decouple the two AWS-specific integration points so the shell can run on Vercel or any non-AWS platform without code forks. They are not required for v1 but are low-risk and have clear scopes.
+
+| Task | Description | Effort |
+|------|-------------|--------|
+| **PP-1** | Remove unused `@aws-sdk/client-secrets-manager` from `shell/package.json` — it is never imported in code | Trivial |
+| **PP-2** | Extract `shell/lib/kms.ts` into `shell/lib/secret-cipher.ts` with a `CIPHER_PROVIDER` env var toggle: `aws-kms` (default, existing behaviour) or `local` (Node.js `crypto` AES-256-GCM with `CIPHER_KEY`) | Small |
+| **PP-3** | Extract duplicated S3 presign logic from `/api/setup/upload-logo` and `/api/admin/branding` into `shell/lib/file-storage.ts` with a `FILE_STORAGE_PROVIDER` toggle: `s3` (default) or `s3-compatible` (`AWS_ENDPOINT_URL`) or `local` | Small |
+| **PP-4** | Update `shell/lib/logger.ts` to read a generic `TRACE_ID` env var before falling back to `_X_AMZN_TRACE_ID` — zero functional change on AWS, enables trace correlation on other platforms | Trivial |
+
+See `specs/ARCHITECTURE.md §10.3` for the full portability design including required env vars and Vercel deployment instructions.
 
 ---
 

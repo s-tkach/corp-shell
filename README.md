@@ -19,7 +19,7 @@ A host web application that serves as the single entry point for all internal co
 | Module Federation | `@module-federation/nextjs-mf` |
 | Auth | NextAuth.js v5 + OIDC |
 | ORM | Drizzle ORM |
-| Database | Aurora Serverless v2 (PostgreSQL) |
+| Database | PostgreSQL |
 | Hosting | AWS Amplify |
 | CDN / Static | AWS CloudFront + S3 |
 | CI/CD | GitHub Actions |
@@ -186,7 +186,7 @@ Secrets are stored in AWS Secrets Manager or KMS-encrypted in the database — n
 | OIDC issuer + client ID | `shell_config` DB row (plaintext) | Read by `lib/auth.ts` at startup |
 | OIDC client secret | `shell_config.oidcClientSecret` (KMS-encrypted) | Decrypted at runtime via `lib/kms.ts` |
 | `KMS_KEY_ID` | Amplify env / Secrets Manager | AWS KMS key used to encrypt/decrypt OIDC client secret |
-| `DATABASE_URL` | Secrets Manager / Amplify env | Aurora connection |
+| `DATABASE_URL` | Secrets Manager / Amplify env | PostgreSQL connection |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | JWT cookie encryption |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Subscription webhook HMAC-SHA256 |
 | `AWS_S3_BUCKET` | Amplify env | S3 bucket for logo uploads |
