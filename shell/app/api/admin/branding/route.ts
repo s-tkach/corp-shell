@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest) {
     appName: string;
     logoUrl: string;
     primaryColor: string;
+    colorOverrides: Record<string, string>;
   }>;
   const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;

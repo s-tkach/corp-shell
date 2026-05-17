@@ -25,6 +25,10 @@ interface WizardData {
   appName: string;
   logoUrl: string;
   primaryColor: string;
+  backgroundColor: string;
+  sidebarColor: string;
+  accentColor: string;
+  destructiveColor: string;
   // Step 2
   oidcIssuer: string;
   oidcClientId: string;
@@ -195,21 +199,36 @@ function Step1({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="primaryColor">Primary Brand Color</Label>
-          <div className="flex items-center gap-3">
-            <input
-              id="primaryColor"
-              type="color"
-              value={data.primaryColor}
-              onChange={(e) => onChange({ primaryColor: e.target.value })}
-              className="h-10 w-10 cursor-pointer rounded border"
-            />
-            <Input
-              value={data.primaryColor}
-              onChange={(e) => onChange({ primaryColor: e.target.value })}
-              className="w-32 font-mono"
-              maxLength={7}
-            />
+          <Label>Brand Colors</Label>
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                { label: "Primary", field: "primaryColor", id: "primaryColor" },
+                { label: "Background", field: "backgroundColor", id: "backgroundColor" },
+                { label: "Sidebar", field: "sidebarColor", id: "sidebarColor" },
+                { label: "Accent", field: "accentColor", id: "accentColor" },
+                { label: "Destructive", field: "destructiveColor", id: "destructiveColor" },
+              ] as { label: string; field: keyof WizardData; id: string }[]
+            ).map(({ label, field, id }) => (
+              <div key={id} className="space-y-1">
+                <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id={id}
+                    type="color"
+                    value={data[field] as string}
+                    onChange={(e) => onChange({ [field]: e.target.value })}
+                    className="h-9 w-9 cursor-pointer rounded border"
+                  />
+                  <Input
+                    value={data[field] as string}
+                    onChange={(e) => onChange({ [field]: e.target.value })}
+                    className="w-28 font-mono text-sm"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </CardContent>
@@ -440,7 +459,11 @@ function Step4({
   const rows: [string, string][] = [
     ["App Name", data.appName],
     ["Logo", data.logoUrl || "(none)"],
-    ["Brand Color", data.primaryColor],
+    ["Primary Color", data.primaryColor],
+    ["Background Color", data.backgroundColor],
+    ["Sidebar Color", data.sidebarColor],
+    ["Accent Color", data.accentColor],
+    ["Destructive Color", data.destructiveColor],
     ["OIDC Issuer", data.oidcIssuer],
     ["Client ID", data.oidcClientId],
     ["Client Secret", "••••••••"],
@@ -488,6 +511,10 @@ const DEFAULT_DATA: WizardData = {
   appName: "",
   logoUrl: "",
   primaryColor: "#0f172a",
+  backgroundColor: "#ffffff",
+  sidebarColor: "#f8fafc",
+  accentColor: "#f1f5f9",
+  destructiveColor: "#ef4444",
   oidcIssuer: "",
   oidcClientId: "",
   oidcClientSecret: "",

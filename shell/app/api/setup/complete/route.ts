@@ -16,6 +16,10 @@ interface SetupPayload {
   appName: string;
   logoUrl: string;
   primaryColor: string;
+  backgroundColor: string;
+  sidebarColor: string;
+  accentColor: string;
+  destructiveColor: string;
   oidcIssuer: string;
   oidcClientId: string;
   oidcClientSecret: string;
@@ -25,8 +29,11 @@ interface SetupPayload {
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<SetupPayload>;
 
-  const { appName, logoUrl, primaryColor, oidcIssuer, oidcClientId, oidcClientSecret, superAdminEmail } =
-    body;
+  const {
+    appName, logoUrl, primaryColor,
+    backgroundColor, sidebarColor, accentColor, destructiveColor,
+    oidcIssuer, oidcClientId, oidcClientSecret, superAdminEmail,
+  } = body;
 
   if (!appName?.trim() || !oidcIssuer?.trim() || !oidcClientId?.trim() || !oidcClientSecret?.trim() || !superAdminEmail?.trim()) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -51,6 +58,12 @@ export async function POST(request: Request) {
       appName: appName.trim(),
       logoUrl: logoUrl || null,
       primaryColor: primaryColor || "#0f172a",
+      colorOverrides: {
+        "--background": backgroundColor || "#ffffff",
+        "--sidebar-background": sidebarColor || "#f8fafc",
+        "--accent": accentColor || "#f1f5f9",
+        "--destructive": destructiveColor || "#ef4444",
+      },
       oidcIssuer: oidcIssuer.trim(),
       oidcClientId: oidcClientId.trim(),
       oidcClientSecret: encryptedSecret,

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, Settings } from "lucide-react";
@@ -15,10 +16,11 @@ import type { MenuSection } from "@/app/api/menu/route";
 interface SidebarProps {
   menu: MenuSection[];
   appName: string;
+  logoUrl: string | null;
   userRoles: string[];
 }
 
-export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
 
@@ -40,8 +42,17 @@ export function Sidebar({ menu, appName, userRoles }: SidebarProps) {
       )}
     >
       <div className="flex h-14 items-center justify-between px-4 border-b border-sidebar-border">
-        {!sidebarCollapsed && (
-          <span className="font-semibold text-sidebar-foreground truncate">{appName}</span>
+        {sidebarCollapsed ? (
+          logoUrl && (
+            <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0 mx-auto" />
+          )
+        ) : (
+          <div className="flex items-center gap-2 min-w-0">
+            {logoUrl && (
+              <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0" />
+            )}
+            <span className="font-semibold text-sidebar-foreground truncate">{appName}</span>
+          </div>
         )}
         <Button
           variant="ghost"

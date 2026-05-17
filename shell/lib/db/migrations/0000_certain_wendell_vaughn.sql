@@ -63,6 +63,7 @@ CREATE TABLE "shell_config" (
 	"app_name" text NOT NULL,
 	"logo_url" text,
 	"primary_color" text,
+	"color_overrides" jsonb,
 	"oidc_issuer" text,
 	"oidc_client_id" text,
 	"oidc_client_secret" text,

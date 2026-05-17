@@ -120,6 +120,7 @@ export const shellConfig = pgTable("shell_config", {
   appName: text("app_name").notNull(),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color"),
+  colorOverrides: jsonb("color_overrides").$type<Record<string, string>>(),
   oidcIssuer: text("oidc_issuer"),
   oidcClientId: text("oidc_client_id"),
   oidcClientSecret: text("oidc_client_secret"),

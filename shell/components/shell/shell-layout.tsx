@@ -35,12 +35,11 @@ export function ShellLayoutClient({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar menu={menu} appName={appName} userRoles={userRoles} />
+      <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           menu={menu}
           appName={appName}
-          logoUrl={logoUrl}
           userName={userName}
           userEmail={userEmail}
           userRoles={userRoles}

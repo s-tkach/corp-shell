@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Moon, Sun, LogOut, User } from "lucide-react";
@@ -20,7 +19,6 @@ import type { MenuSection } from "@/app/api/menu/route";
 interface HeaderProps {
   menu: MenuSection[];
   appName: string;
-  logoUrl: string | null;
   userName: string;
   userEmail: string;
   userRoles: string[];
@@ -52,7 +50,7 @@ function buildBreadcrumbs(
   return crumbs;
 }
 
-export function Header({ menu, appName, logoUrl, userName, userEmail, userRoles }: HeaderProps) {
+export function Header({ menu, appName, userName, userEmail, userRoles }: HeaderProps) {
   const pathname = usePathname();
   const { setTheme } = useTheme();
 
@@ -69,13 +67,6 @@ export function Header({ menu, appName, logoUrl, userName, userEmail, userRoles 
 
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-4">
-      <div className="flex items-center gap-2 min-w-0">
-        {logoUrl && (
-          <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0" />
-        )}
-        <span className="font-semibold text-sm truncate hidden sm:block">{appName}</span>
-      </div>
-
       <nav className="flex items-center gap-1 text-sm text-muted-foreground flex-1 min-w-0">
         {breadcrumbs.map((crumb, i) => {
           const isLast = i === breadcrumbs.length - 1;
