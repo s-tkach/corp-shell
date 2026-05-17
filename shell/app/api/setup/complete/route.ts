@@ -134,7 +134,7 @@ async function maybeStoreSecret(name: string, value: string) {
     const { SecretsManagerClient, PutSecretValueCommand } = await import(
       "@aws-sdk/client-secrets-manager"
     );
-    const client = new SecretsManagerClient({ region: process.env["AWS_REGION"] ?? "us-east-1" });
+    const client = new SecretsManagerClient({ region: process.env["AWS_REGION"] ?? "eu-central-1" });
     await client.send(new PutSecretValueCommand({ SecretId: secretArn, SecretString: value }));
   } catch {
     // Non-fatal in dev; log and continue

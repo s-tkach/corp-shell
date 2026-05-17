@@ -50,12 +50,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json() as { fileName: string; contentType: string };
-  const bucket = process.env["LOGO_BUCKET"];
+  const bucket = process.env["AWS_S3_BUCKET"];
   if (!bucket) {
-    return NextResponse.json({ error: "LOGO_BUCKET not configured" }, { status: 500 });
+    return NextResponse.json({ error: "AWS_S3_BUCKET not configured" }, { status: 500 });
   }
 
-  const s3 = new S3Client({});
+  const s3 = new S3Client({ region: process.env["AWS_REGION"] ?? "eu-central-1" });
   const key = `logos/${Date.now()}-${body.fileName}`;
   const url = await getSignedUrl(
     s3,

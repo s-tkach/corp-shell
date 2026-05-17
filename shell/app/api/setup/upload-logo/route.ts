@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
-// S3 logo upload uses presigned PUTs. The bucket and region come from env vars
-// set by SST at deploy time.
-const BUCKET = process.env["LOGO_S3_BUCKET"];
-const REGION = process.env["AWS_REGION"] ?? "us-east-1";
+const BUCKET = process.env["AWS_S3_BUCKET"];
+const REGION = process.env["AWS_REGION"] ?? "eu-central-1";
 const CDN_BASE = process.env["LOGO_CDN_BASE"]; // e.g. https://d123.cloudfront.net
 
 export async function POST(request: Request) {
   if (!BUCKET) {
-    return NextResponse.json({ error: "LOGO_S3_BUCKET not configured" }, { status: 503 });
+    return NextResponse.json({ error: "AWS_S3_BUCKET not configured" }, { status: 503 });
   }
 
   const body = (await request.json()) as { filename?: string; contentType?: string };

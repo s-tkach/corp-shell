@@ -379,8 +379,30 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 | `DATABASE_URL` | Secrets Manager / Amplify env | Next.js (Drizzle ORM) |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js JWT encryption) |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
+| `LOGO_BUCKET` | Amplify env | Next.js (`/api/admin/branding` S3 presigned PUT) |
+| `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, SecretsManagerClient region) |
 
 All secrets configured in Amplify environment variables — never in source files or `.env` committed to git.
+
+### 10.2 S3 Logo Bucket
+
+A dedicated S3 bucket stores uploaded logo images. The shell generates a presigned PUT URL server-side (`POST /api/admin/branding`) and the browser uploads directly to S3.
+
+**Required setup:**
+1. Create an S3 bucket (e.g. `corp-shell-logos-<account-id>`).
+2. Block all public access on the bucket.
+3. Attach a bucket policy granting the Amplify execution role `s3:PutObject` on `logos/*`.
+4. Set `LOGO_BUCKET=<bucket-name>` as an Amplify environment variable.
+5. For local dev, add the following to `shell/.env.local` (not committed):
+   ```
+   LOGO_BUCKET=<bucket-name>
+   AWS_REGION=<region>
+   AWS_ACCESS_KEY_ID=<key-id>
+   AWS_SECRET_ACCESS_KEY=<secret>
+   ```
+   The IAM user/role used locally must have `s3:PutObject` on `<bucket-name>/logos/*`.
+
+The `logoUrl` stored in `shell_config` should be the public CloudFront URL (not the direct S3 URL) so the logo is served via CDN.
 
 ---
 

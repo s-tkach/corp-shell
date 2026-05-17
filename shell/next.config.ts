@@ -9,14 +9,20 @@ const CHILD_APP_ORIGINS = (process.env.CHILD_APP_ORIGINS ?? "")
 const RUM_SCRIPT_ORIGIN = "https://client.rum.us-east-1.amazonaws.com";
 const RUM_DATA_ORIGIN = "https://dataplane.rum.us-east-1.amazonaws.com";
 
+const AWS_REGION = process.env.AWS_REGION ?? "us-east-1";
+const S3_ORIGINS = [
+  "https://*.s3.amazonaws.com",
+  `https://*.s3.${AWS_REGION}.amazonaws.com`,
+];
+
 const isDev = process.env.NODE_ENV === "development";
 
 const cspDirectives = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${RUM_SCRIPT_ORIGIN} ${CHILD_APP_ORIGINS.join(" ")}`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: https://*.amazonaws.com`,
-  `connect-src 'self' ${RUM_DATA_ORIGIN} ${CHILD_APP_ORIGINS.join(" ")}`,
+  `img-src 'self' data: blob: https://*.amazonaws.com`,
+  `connect-src 'self' ${RUM_DATA_ORIGIN} ${S3_ORIGINS.join(" ")} ${CHILD_APP_ORIGINS.join(" ")}`,
   `font-src 'self'`,
   `frame-src 'none'`,
   `object-src 'none'`,

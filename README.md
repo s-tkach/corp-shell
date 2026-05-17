@@ -20,9 +20,8 @@ A host web application that serves as the single entry point for all internal co
 | Auth | NextAuth.js v5 + OIDC |
 | ORM | Drizzle ORM |
 | Database | Aurora Serverless v2 (PostgreSQL) |
-| Compute | AWS Lambda via SST v3 |
+| Hosting | AWS Amplify |
 | CDN / Static | AWS CloudFront + S3 |
-| IaC | SST v3 (Ion) |
 | CI/CD | GitHub Actions |
 | Package registry | GitHub Packages |
 | Package manager | pnpm workspaces |
@@ -110,6 +109,12 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
 
 # Webhook (any random string locally)
 WEBHOOK_SECRET=<openssl rand -base64 32>
+
+# AWS / S3 (required for logo uploads)
+AWS_REGION=eu-central-1
+AWS_S3_BUCKET=<your-s3-bucket-name>
+# LOGO_CDN_BASE=https://<cloudfront-dist>.cloudfront.net  # optional — omit to serve logos directly from S3
+# AWS credentials are NOT set here. Run `aws configure` once; the SDK reads ~/.aws/credentials automatically.
 ```
 
 OIDC redirect URI to register: `http://localhost:3000/api/auth/callback/oidc`
@@ -145,10 +150,11 @@ pnpm --filter shell build
 
 ## First-time deployment
 
-1. Deploy shell via AWS Amplify (manually configured)
-2. Visit your domain — you are redirected to `/setup`
-3. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
-4. `/setup` returns 404 permanently after completion
+1. Create an S3 bucket and set `AWS_S3_BUCKET` (and optionally `LOGO_CDN_BASE`) in Amplify environment variables
+2. Deploy shell via AWS Amplify (manually configured)
+3. Visit your domain — you are redirected to `/setup`
+4. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
+5. `/setup` returns 404 permanently after completion
 
 ## Onboarding a child app
 
@@ -182,6 +188,8 @@ All secrets are stored in AWS Secrets Manager — never in source files or `.env
 | `DATABASE_URL` | Aurora connection |
 | `NEXTAUTH_SECRET` | JWT cookie encryption |
 | `WEBHOOK_SECRET` | Subscription webhook HMAC-SHA256 |
+| `AWS_S3_BUCKET` | S3 bucket for logo uploads |
+| `LOGO_CDN_BASE` | CloudFront base URL for logo delivery — optional, omit to serve from S3 directly |
 
 ## Specs
 
