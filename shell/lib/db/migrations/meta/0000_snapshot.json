@@ -425,11 +425,19 @@
           "primaryKey": false,
           "notNull": false
         },
-        "primary_color": {
-          "name": "primary_color",
-          "type": "text",
+        "color_overrides": {
+          "name": "color_overrides",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": null
+        },
+        "color_overrides_dark": {
+          "name": "color_overrides_dark",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": null
         },
         "oidc_issuer": {
           "name": "oidc_issuer",

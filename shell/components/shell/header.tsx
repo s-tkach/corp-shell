@@ -50,7 +50,7 @@ function buildBreadcrumbs(
   return crumbs;
 }
 
-export function Header({ menu, appName, userName, userEmail, userRoles }: HeaderProps) {
+export function Header({ menu, userName, userEmail, userRoles }: HeaderProps) {
   const pathname = usePathname();
   const { setTheme } = useTheme();
 

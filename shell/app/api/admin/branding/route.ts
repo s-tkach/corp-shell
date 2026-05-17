@@ -20,8 +20,8 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json() as Partial<{
     appName: string;
     logoUrl: string;
-    primaryColor: string;
     colorOverrides: Record<string, string>;
+    colorOverridesDark: Record<string, string>;
   }>;
   const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;

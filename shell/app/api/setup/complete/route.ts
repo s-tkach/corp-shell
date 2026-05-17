@@ -57,8 +57,8 @@ export async function POST(request: Request) {
     await tx.insert(shellConfig).values({
       appName: appName.trim(),
       logoUrl: logoUrl || null,
-      primaryColor: primaryColor || "#0f172a",
       colorOverrides: {
+        "--primary": primaryColor || "#0f172a",
         "--background": backgroundColor || "#ffffff",
         "--sidebar-background": sidebarColor || "#f8fafc",
         "--accent": accentColor || "#f1f5f9",

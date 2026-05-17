@@ -48,6 +48,10 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 ### Roadmap Tracking
 - After implementing any M1–M12 roadmap feature (or set of tasks), mark all completed tasks as `[x]` in `specs/ROADMAP.md` and update the **Current Status** section in `CLAUDE.md` to reflect the new milestone.
 
+### Database
+- The database is in development — it can be recreated at any time.
+- When changing the schema, update the existing migration files in place. Do not generate new migration files.
+
 ### Git
 - Commit only when explicitly asked.
 - Commit messages: concise, present tense, describe *why* not *what*.
