@@ -21,6 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       issuer: process.env["OIDC_ISSUER"]!,
       clientId: process.env["OIDC_CLIENT_ID"]!,
       clientSecret: process.env["OIDC_CLIENT_SECRET"]!,
+      style: { logo: "" },
     },
   ],
   callbacks: {

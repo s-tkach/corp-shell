@@ -21,7 +21,7 @@ const cspDirectives = [
   `frame-src 'none'`,
   `object-src 'none'`,
   `base-uri 'self'`,
-  `form-action 'self'`,
+  `form-action 'self'${isDev ? " https:" : ""}`,
   `frame-ancestors 'none'`,
   ...(!isDev ? [`upgrade-insecure-requests`] : []),
 ].join("; ");
