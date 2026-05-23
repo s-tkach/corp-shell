@@ -30,7 +30,8 @@ A host web application that serves as the single entry point for all internal co
 
 ```
 corp-shell/
-├── shell/                     # Next.js 16 application
+├── src/
+│   └── shell/                 # Next.js 16 application
 │   ├── app/
 │   │   ├── (auth)/            # Login, callback, error routes
 │   │   ├── (shell)/           # Protected routes
@@ -75,10 +76,10 @@ docker compose up -d
 ### 3. Configure environment
 
 ```bash
-cp shell/.env.local.example shell/.env.local
+cp src/shell/.env.local.example src/shell/.env.local
 ```
 
-Edit `shell/.env.local` and set:
+Edit `src/shell/.env.local` and set:
 
 ```bash
 NEXTAUTH_SECRET=$(openssl rand -base64 32)
@@ -87,7 +88,7 @@ ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 Leave `ENCRYPTION_PROVIDER=local`, `STORAGE_PROVIDER=local`, and `DATABASE_URL` as-is.
 
-> **No AWS credentials needed.** The local provider encrypts the OIDC client secret with AES-256-GCM instead of KMS, and stores logo uploads to `shell/public/uploads/logos/` instead of S3.
+> **No AWS credentials needed.** The local provider encrypts the OIDC client secret with AES-256-GCM instead of KMS, and stores logo uploads to `src/shell/public/uploads/logos/` instead of S3.
 
 ### 4. Run database migrations
 

@@ -95,8 +95,8 @@ pnpm --filter shell build
 **Phase: Complete** — All milestones implemented. See [`CHANGELOG.md`](../CHANGELOG.md) for the full milestone list and `specs/ROADMAP.md` Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
 
 ### Stack (confirmed in M1)
-- Next.js 16 (App Router) in `shell/`
-- pnpm workspaces — packages: `shell`, `packages/*`
+- Next.js 16 (App Router) in `src/shell/`
+- pnpm workspaces — packages: `src/shell`, `packages/*`
 - Shadcn/ui + Tailwind CSS v4
 - AWS Amplify (manually configured, outside repo)
 - GitHub Actions CI/CD for SDK/CLI publish workflows

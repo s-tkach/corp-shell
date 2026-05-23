@@ -408,7 +408,8 @@ PostgreSQL                   (private subnet, VPC)
 
 ```
 /
-├── shell/                 # Next.js shell app (fork of satnaing/shadcn-admin)
+├── src/
+│   └── shell/             # Next.js shell app (fork of satnaing/shadcn-admin)
 │   ├── app/
 │   │   ├── layout.tsx           # Root layout (server): auth, menu, sidebar
 │   │   ├── (auth)/              # Login, callback, error routes
@@ -766,7 +767,7 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 ### 10.6 Local / Self-Hosted First Deployment
 1. `git clone <repo>`
 2. `docker compose up -d` — starts PostgreSQL on localhost:5432
-3. Copy `.env.local.example` → `shell/.env.local`; fill in `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` (two `openssl rand -hex 32` calls); no AWS credentials needed
+3. Copy `.env.local.example` → `src/shell/.env.local`; fill in `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` (two `openssl rand -hex 32` calls); no AWS credentials needed
 4. `pnpm install && pnpm --filter shell dev`
 5. Navigate to `http://localhost:3000` → redirected to `/setup`
 6. Complete wizard: logo stored to `public/uploads/`; OIDC config encrypted with AES-256-GCM

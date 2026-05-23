@@ -18,7 +18,8 @@ The Corporate Application Shell is a **Next.js 15 monorepo** deployed on AWS via
 ```
 corp-shell/                          ← monorepo root
 ├── package.json                     # Workspace root (pnpm workspaces)
-├── shell/                           # Next.js 15 application
+├── src/
+│   └── shell/                       # Next.js 15 application
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout (Server Component): auth, menu, sidebar
 │   │   ├── (auth)/                  # /login, /api/auth/callback, /error
@@ -137,7 +138,7 @@ GitHub Packages
   @corp/shell-sdk, @corp/create-shell-app
 ```
 
-**Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `shell/.env.local`.
+**Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `src/shell/.env.local`.
 
 ### 4.2 Request Lifecycle
 
@@ -376,7 +377,7 @@ Admin Panel → Application Registry:
 
 ### 9.3 Migrations
 
-Managed by Drizzle Kit. Migration files live in `shell/lib/db/migrations/`. Applied manually or as part of the CI pipeline before traffic shifts.
+Managed by Drizzle Kit. Migration files live in `src/shell/lib/db/migrations/`. Applied manually or as part of the CI pipeline before traffic shifts.
 
 ---
 
@@ -401,7 +402,7 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 | `LOGO_CDN_BASE` | Amplify env / optional | CDN base URL for S3-stored logos; omit for local dev |
 | `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, KMSClient region); not required when using local providers |
 
-All secrets configured in Amplify environment variables — never in source files or `.env` committed to git. For local dev, values go in `shell/.env.local` (gitignored).
+All secrets configured in Amplify environment variables — never in source files or `.env` committed to git. For local dev, values go in `src/shell/.env.local` (gitignored).
 
 ### 10.2 S3 Logo Bucket
 
@@ -412,7 +413,7 @@ A dedicated S3 bucket stores uploaded logo images. The shell generates a presign
 2. Block all public access on the bucket.
 3. Attach a bucket policy granting the Amplify execution role `s3:PutObject` on `logos/*`.
 4. Set `LOGO_BUCKET=<bucket-name>` as an Amplify environment variable.
-5. For local dev, add the following to `shell/.env.local` (not committed):
+5. For local dev, add the following to `src/shell/.env.local` (not committed):
    ```
    LOGO_BUCKET=<bucket-name>
    AWS_REGION=<region>

@@ -6,7 +6,7 @@
     "typecheck": "pnpm --filter shell typecheck",
     "lint": "pnpm --filter shell lint",
     "test": "pnpm --filter shell test",
-    "drizzle-kit": "node --env-file=shell/.env.local node_modules/drizzle-kit/bin.cjs"
+    "drizzle-kit": "node --env-file=src/shell/.env.local node_modules/drizzle-kit/bin.cjs"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0",

@@ -1,5 +1,5 @@
 packages:
-  - shell
+  - src/shell
   - packages/*
 
 ignoredBuiltDependencies:

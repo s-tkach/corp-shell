@@ -58,4 +58,4 @@ coverage/
 .netlify
 
 # Local logo uploads (local storage provider)
-shell/public/uploads/logos/
+src/shell/public/uploads/logos/

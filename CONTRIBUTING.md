@@ -28,8 +28,8 @@
 
 4. **Configure environment**
    ```bash
-   cp shell/.env.local.example shell/.env.local
-   # Edit shell/.env.local:
+   cp src/shell/.env.local.example src/shell/.env.local
+   # Edit src/shell/.env.local:
    #   - Set NEXTAUTH_SECRET (openssl rand -base64 32)
    #   - Set ENCRYPTION_KEY (openssl rand -hex 32)
    #   - Leave ENCRYPTION_PROVIDER=local and STORAGE_PROVIDER=local
