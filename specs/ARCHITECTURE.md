@@ -1,8 +1,9 @@
 # Architecture Design: Corporate Application Shell
-**Version:** 1.0  
-**Status:** Draft  
-**Date:** 2026-05-16  
-**PRD Reference:** `specs/PRD.md` v1.2
+**Version:** 1.1  
+**Status:** Updated  
+**Date:** 2026-05-23  
+**PRD Reference:** `specs/PRD.md` v1.3  
+**Changelog:** Added §10.3 (local dev prerequisites), §17 (CryptoProvider abstraction), §18 (StorageProvider abstraction), §19 (OSS repo infrastructure); updated §3, §4.1, §10.1, §10.2, §12, §14.
 
 ---
 
@@ -89,7 +90,9 @@ corp-shell/                          ← monorepo root
 | Compute | AWS Amplify | — | Hosts Next.js app; manually configured outside repo |
 | CDN / Static | AWS CloudFront + S3 | — | Shell assets + child app remoteEntry files |
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
-| Secrets | AWS Secrets Manager + AWS KMS | — | Webhook HMAC key, DB URL (Secrets Manager); OIDC client secret KMS-encrypted in DB |
+| Secrets | AWS Secrets Manager + AWS KMS | — | Webhook HMAC key, DB URL (Secrets Manager for production / plain env vars for local); OIDC client secret encrypted in DB via configurable crypto provider (KMS in prod, AES-256-GCM locally via `ENCRYPTION_PROVIDER` env var) |
+| File storage | S3 or local disk | — | Logo uploads; `STORAGE_PROVIDER=s3\|local`; defaults to `local` when `AWS_S3_BUCKET` is absent |
+| Unit/integration tests | Vitest | latest | `crypto.ts`, `auth.ts`, `middleware.ts`, setup-complete route |
 | CI/CD | GitHub Actions | — | Child apps deploy independently; shell via Amplify |
 | Package registry | GitHub Packages | — | `@corp/shell-sdk`, `@corp/create-shell-app` |
 | Package manager | pnpm workspaces | 9.x | Monorepo; shared lockfile |
@@ -133,6 +136,8 @@ AWS KMS
 GitHub Packages
   @corp/shell-sdk, @corp/create-shell-app
 ```
+
+**Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `shell/.env.local`.
 
 ### 4.2 Request Lifecycle
 
@@ -384,16 +389,20 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 | Secret | Storage | Consumed By |
 |--------|---------|------------|
 | OIDC issuer + client ID | `shell_config` DB row (plaintext) | `lib/auth.ts` (`getOidcConfig()`) |
-| OIDC client secret | `shell_config.oidcClientSecret` (KMS-encrypted ciphertext) | `lib/auth.ts` via `kmsDecrypt()` |
-| `KMS_KEY_ID` | Amplify env | `lib/kms.ts` (encrypt/decrypt OIDC client secret) |
-| `DATABASE_URL` | Secrets Manager / Amplify env | Next.js (Drizzle ORM) |
-| `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js JWT encryption) |
+| OIDC client secret | `shell_config.oidcClientSecret` (encrypted ciphertext) | `lib/auth.ts` via `decrypt()` from `lib/crypto.ts` (provider selected by `ENCRYPTION_PROVIDER`) |
+| `ENCRYPTION_PROVIDER` | Env var | `lib/crypto.ts` — `kms` uses `KMS_KEY_ID`; `local` uses `ENCRYPTION_KEY`; defaults to `local` when `KMS_KEY_ID` is absent |
+| `ENCRYPTION_KEY` | `.env.local` / Amplify env | `lib/crypto.ts` local provider (64 hex chars = 32 bytes; required when `ENCRYPTION_PROVIDER=local`) |
+| `KMS_KEY_ID` | Amplify env | `lib/kms.ts` / `lib/crypto.ts` KMS provider (required when `ENCRYPTION_PROVIDER=kms`) |
+| `DATABASE_URL` | Secrets Manager / Amplify env / `.env.local` | Next.js (Drizzle ORM); plain env var for local dev, Secrets Manager optional for Amplify production |
+| `NEXTAUTH_SECRET` | Secrets Manager / Amplify env / `.env.local` | Next.js (NextAuth.js JWT encryption); plain env var for local dev, Secrets Manager optional for Amplify production |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
 | `SHELL_NOTIFY_SECRET` | Secrets Manager / Amplify env | Next.js (`/api/internal/notifications` HMAC-SHA256 validation) |
-| `LOGO_BUCKET` | Amplify env | Next.js (`/api/admin/branding` S3 presigned PUT) |
-| `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, KMSClient region) |
+| `AWS_S3_BUCKET` | Amplify env / optional | `lib/storage.ts` S3 provider; if absent, local disk provider is used automatically |
+| `STORAGE_PROVIDER` | Env var / optional | `lib/storage.ts` — `s3` or `local`; defaults to `local` when `AWS_S3_BUCKET` is absent |
+| `LOGO_CDN_BASE` | Amplify env / optional | CDN base URL for S3-stored logos; omit for local dev |
+| `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, KMSClient region); not required when using local providers |
 
-All secrets configured in Amplify environment variables — never in source files or `.env` committed to git.
+All secrets configured in Amplify environment variables — never in source files or `.env` committed to git. For local dev, values go in `shell/.env.local` (gitignored).
 
 ### 10.2 S3 Logo Bucket
 
@@ -414,6 +423,21 @@ A dedicated S3 bucket stores uploaded logo images. The shell generates a presign
    The IAM user/role used locally must have `s3:PutObject` on `<bucket-name>/logos/*`.
 
 The `logoUrl` stored in `shell_config` should be the public CloudFront URL (not the direct S3 URL) so the logo is served via CDN.
+
+**Local / self-hosted alternative:** Set `STORAGE_PROVIDER=local` (or omit `AWS_S3_BUCKET`). The upload route writes files to `public/uploads/logos/<filename>` on the Next.js server and returns a relative URL. No S3 bucket or presigned URL is involved. `public/uploads/` is `.gitignore`d; `public/uploads/.gitkeep` preserves the directory in the repo.
+
+### 10.3 Local Development Prerequisites
+
+The following are sufficient to run the shell without any AWS account:
+
+| Prerequisite | Why | How |
+|---|---|---|
+| Docker / Docker Compose | Local PostgreSQL | `docker compose up -d` (docker-compose.yml at repo root) |
+| `NEXTAUTH_SECRET` | NextAuth.js JWT encryption | `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | Local AES-256-GCM for OIDC client secret | `openssl rand -hex 32` |
+| OIDC provider (any) | Authentication | Any OIDC-compliant issuer; Okta, Keycloak, Auth0, or a local OIDC mock |
+
+AWS env vars (`AWS_REGION`, `KMS_KEY_ID`, `AWS_S3_BUCKET`) are all optional. Omitting them activates the local providers automatically.
 
 ---
 
@@ -463,6 +487,7 @@ npm publish --access restricted  (NODE_AUTH_TOKEN = GITHUB_TOKEN)
 | Admin route bypass | Server-side role check in every API handler + middleware — no client-only guard |
 | Webhook forgery | HMAC-SHA256 with `WEBHOOK_SECRET` from Secrets Manager; constant-time compare |
 | Secret leakage | Secrets in Secrets Manager or KMS-encrypted in DB; zero secrets in source or git history |
+| Crypto provider fallback | Local AES-256-GCM provider uses `randomBytes(16)` per-value IV; output prefixed `local:<iv>:<ct>:<tag>` to distinguish from KMS blobs; key rotation requires re-encryption of stored secrets |
 | XSS | Shadcn/ui + React; no `dangerouslySetInnerHTML`; CSP header via CloudFront |
 | Child app crash | React ErrorBoundary per child app mount; shell unaffected |
 | OIDC misconfiguration | Setup wizard validates the OIDC discovery endpoint before proceeding |
@@ -496,7 +521,7 @@ middleware.ts:
 
 Wizard state: React local state only (not persisted until Step 4 "Launch")
 
-Step 1 — Branding:   POST /api/setup/upload-logo → S3 presigned PUT
+Step 1 — Branding:   POST /api/setup/upload-logo → StorageProvider (S3 presigned PUT when STORAGE_PROVIDER=s3; direct multipart POST to local disk when STORAGE_PROVIDER=local)
 Step 2 — OIDC:       GET /api/setup/validate-oidc → pings /.well-known/openid-configuration
 Step 3 — Super Admin: triggers full OIDC login inline; verifies returned email matches input
 Step 4 — Launch:     POST /api/setup/complete →
@@ -641,4 +666,74 @@ The SDK signs the request body with HMAC-SHA256 using the `notifySecret` passed 
 
 ---
 
-*End of Architecture Design v1.0*
+## 17. CryptoProvider Abstraction
+
+### 17.1 Interface
+
+`shell/lib/crypto.ts` exports a `CryptoProvider` interface and two implementations selected at module load time:
+
+| Provider | Activated when | Implementation |
+|---|---|---|
+| `kms` | `ENCRYPTION_PROVIDER=kms` or `KMS_KEY_ID` is set | Delegates to `lib/kms.ts` (AWS KMS encrypt/decrypt) |
+| `local` | `ENCRYPTION_PROVIDER=local` or `KMS_KEY_ID` is absent (default) | AES-256-GCM via Node.js `node:crypto`; `ENCRYPTION_KEY` required (64 hex chars = 32 bytes) |
+
+### 17.2 Ciphertext Format
+
+- **KMS:** base64-encoded KMS blob (existing format; unchanged)
+- **Local:** `local:<iv_hex>:<ciphertext_hex>:<auth_tag_hex>` — the `local:` prefix allows the decrypt function to detect and route correctly even if `ENCRYPTION_PROVIDER` changes
+
+### 17.3 Callers
+
+`shell/lib/kms.ts` re-exports `encrypt`/`decrypt` from `crypto.ts` for backwards compatibility. Direct callers are:
+- `shell/app/api/setup/complete/route.ts` (encrypt on wizard completion)
+- `shell/lib/auth.ts:getOidcConfig()` (decrypt on every OIDC bootstrap)
+
+### 17.4 Security Note
+
+AES-256-GCM is equivalent security to KMS for single-tenant deployments. KMS is still recommended for production: it provides key rotation, audit trail via CloudTrail, and hardware-backed key storage. The `local` provider is suitable for local development and self-hosted deployments where those properties are not required.
+
+---
+
+## 18. StorageProvider Abstraction
+
+### 18.1 Interface
+
+`shell/lib/storage.ts` exports a `StorageProvider` interface and two implementations:
+
+| Provider | Activated when | Implementation |
+|---|---|---|
+| `s3` | `STORAGE_PROVIDER=s3` or `AWS_S3_BUCKET` is set | S3 presigned PUT URL generation (existing behavior); CDN URL from `LOGO_CDN_BASE` |
+| `local` | `STORAGE_PROVIDER=local` or `AWS_S3_BUCKET` is absent (default) | Writes file to `public/uploads/logos/`; returns relative URL `/uploads/logos/<filename>` |
+
+### 18.2 Upload Flow Difference
+
+- **S3 mode:** API returns `{ uploadUrl, publicUrl }`; client PUTs the file directly to S3 via the presigned URL, then stores `publicUrl` in `shell_config.logoUrl`.
+- **Local mode:** API returns `{ publicUrl }` with no `uploadUrl`; client POSTs the file directly to the same route (multipart); route writes to disk and returns `publicUrl`.
+
+`shell/app/setup/page.tsx` checks for the presence of `uploadUrl` in the response to determine which path to follow.
+
+### 18.3 Callers
+
+- `shell/app/api/setup/upload-logo/route.ts` (wizard step 1)
+- `shell/app/(shell)/admin/branding` logo upload handler (existing duplicated S3 presign logic consolidated into `storage.ts`)
+
+---
+
+## 19. Open-Source Repository Infrastructure
+
+The following files are added to support open-source contribution workflows. They have no runtime impact:
+
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | Local PostgreSQL for development (postgres:15-alpine, port 5432, named volume `postgres_data`) |
+| `CONTRIBUTING.md` | Local dev setup, branching model, PR process, coding conventions, how to run tests |
+| `.github/ISSUE_TEMPLATE/bug_report.md` | Structured bug reports (environment, steps, expected vs. actual, logs) |
+| `.github/ISSUE_TEMPLATE/feature_request.md` | Structured feature requests (problem, proposed solution, alternatives) |
+| `.github/PULL_REQUEST_TEMPLATE.md` | PR checklist (description, test plan, breaking changes, tests/types/lint pass) |
+| `CHANGELOG.md` | Semantic versioning changelog starting at v1.0.0 listing M1–M13 features |
+
+The `README.md` "Getting started" section is reordered to be local-first: Docker Compose → `.env.local` → `pnpm dev` as the primary path; AWS/Amplify deployment as a secondary path.
+
+---
+
+*End of Architecture Design v1.1*

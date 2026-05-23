@@ -1,7 +1,7 @@
 # PRD: Corporate Application Shell
-**Version:** 1.2 — Final Draft  
+**Version:** 1.3  
 **Status:** Ready for Engineering  
-**Date:** 2026-05-16
+**Date:** 2026-05-23
 
 ---
 
@@ -12,6 +12,7 @@
 | 1.0 | Initial draft |
 | 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; PostgreSQL replaces DynamoDB; AWS Amplify deployment |
 | 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry; first-run setup wizard added for branding/naming |
+| 1.3 | Open-source readiness: G10 added (self-hosted deployment); FR-SETUP-2/5 and FR-AUTH-1 updated for storage/crypto provider abstraction; NFR-13–16 added; §8.1 secrets note updated; §10.6 local dev user flow added |
 
 ---
 
@@ -44,6 +45,7 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | G7 | All infrastructure (shell + child apps) on a single AWS account, managed via AWS Amplify |
 | G8 | Cost-effective at ≤1,000 concurrent users; target <$50/month per 100 active users |
 | G9 | Fork-and-extend from `satnaing/shadcn-admin` — not built from scratch |
+| G10 | Self-hosted / local-first deployment: the shell must be runnable without any AWS account using Docker Compose + local AES-256-GCM encryption + local disk storage |
 
 ## 4. Non-Goals (v1)
 
@@ -84,7 +86,7 @@ The person who completes the **first-run wizard** immediately after the shell is
 
 | Step | Fields |
 |------|--------|
-| 1 — Branding | App name (text), Logo (image upload → S3), Primary brand color (color picker) |
+| 1 — Branding | App name (text), Logo (image upload → S3 or local disk depending on `STORAGE_PROVIDER`), Primary brand color (color picker) |
 | 2 — OIDC Connection | Issuer URL, Client ID, Client Secret |
 | 3 — Super Admin | Enter the email address that will be granted `super_admin` — verified by completing an OIDC login within the wizard |
 | 4 — Review & Launch | Summary of all inputs; "Launch" button writes config to DB and marks setup as complete |
@@ -93,7 +95,7 @@ The person who completes the **first-run wizard** immediately after the shell is
 
 **FR-SETUP-4:** If the OIDC provider cannot be reached during Step 2 (discovery check fails), the wizard shows an inline error with the exact failure reason. The wizard does not proceed until the connection is valid.
 
-**FR-SETUP-5:** Logo uploaded in the wizard is stored in a private S3 bucket and served via CloudFront with a signed URL. Branding is thereafter editable in Admin Panel → Theme.
+**FR-SETUP-5:** Logo uploaded in the wizard is stored via the configured storage provider. When `STORAGE_PROVIDER=s3` (production default), the file is stored in a private S3 bucket and served via CloudFront with a signed URL. When `STORAGE_PROVIDER=local` (default for local dev and self-hosted deployments), the file is saved to `public/uploads/logos/` on the server and served as a static path. Branding is thereafter editable in Admin Panel → Theme.
 
 ### 6.2 Authentication & SSO
 
@@ -103,9 +105,9 @@ The person who completes the **first-run wizard** immediately after the shell is
 
 - `oidcIssuer` — OIDC issuer URL
 - `oidcClientId` — client ID (plaintext)
-- `oidcClientSecret` — client secret, KMS-encrypted at rest; decrypted at runtime via `kmsDecrypt()`
+- `oidcClientSecret` — client secret, encrypted at rest; decrypted at runtime via `decrypt()` from `lib/crypto.ts`
 
-The setup wizard collects these values in Step 2. On "Launch", the client secret is encrypted with AWS KMS (`KMS_KEY_ID` env var) and all three values are written to the `shell_config` table. No OIDC credentials are stored as environment variables.
+The setup wizard collects these values in Step 2. On "Launch", the client secret is encrypted using the configured crypto provider (KMS when `KMS_KEY_ID` is set; AES-256-GCM local encryption otherwise) and all three values are written to the `shell_config` table. No OIDC credentials are stored as environment variables.
 
 **OIDC app registration requirements (documented for the admin):**
 - Application type: Web, OIDC
@@ -313,6 +315,10 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | NFR-10 | Observability | Structured JSON logs to CloudWatch Logs; Next.js `instrumentation.ts` for request tracing |
 | NFR-11 | Cost | < $50/month per 100 active users at ≤1,000 concurrent users |
 | NFR-12 | Maintainability | Shell SDK versioned with semver; breaking changes = major bump + migration guide |
+| NFR-13 | Portability | No mandatory AWS dependency for local dev or self-hosted deployment: KMS, S3, and Secrets Manager must each have a local/no-AWS fallback activated by env vars |
+| NFR-14 | Portability | All required runtime env vars for local dev documented in `.env.local.example`; AWS-specific vars clearly marked as optional for non-AWS deployments |
+| NFR-15 | Testability | Core security-critical modules (`crypto.ts`, `auth.ts`, `middleware.ts`, setup-complete route) must have unit/integration test coverage via Vitest |
+| NFR-16 | Contribution | The repository must include `CONTRIBUTING.md`, GitHub issue templates, a PR template, and a `CHANGELOG.md` to support open-source contribution workflows |
 
 ---
 
@@ -332,7 +338,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | CDN / Static | AWS CloudFront + S3 | Shell SPA assets + child app remoteEntry.js files |
 | Compute | AWS Amplify (manually configured) | Hosts Next.js app; managed outside the repo |
 | DNS | Amazon Route 53 | Custom domain, SSL, health checks |
-| Secrets | AWS Secrets Manager + AWS KMS | Webhook HMAC secret, DB credentials (Secrets Manager); OIDC client secret KMS-encrypted in DB |
+| Secrets | AWS Secrets Manager + AWS KMS | Webhook HMAC key, DB URL (Secrets Manager for production / plain env vars for local); OIDC client secret encrypted in DB via configurable crypto provider (KMS in prod, AES-256-GCM locally) |
 | CI/CD | GitHub Actions | Child apps deploy independently; shell deployed via Amplify |
 | Package Registry | GitHub Packages | `@corp/shell-sdk` and `@corp/create-shell-app` |
 
@@ -735,6 +741,16 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 3. Upgrade Prompt page shown (admin-configured headline + CTA)
 4. Admin upgrades user in User Manager → access granted on next request
 
+### 10.6 Local / Self-Hosted First Deployment
+1. `git clone <repo>`
+2. `docker compose up -d` — starts PostgreSQL on localhost:5432
+3. Copy `.env.local.example` → `shell/.env.local`; fill in `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` (two `openssl rand -hex 32` calls); no AWS credentials needed
+4. `pnpm install && pnpm --filter shell dev`
+5. Navigate to `http://localhost:3000` → redirected to `/setup`
+6. Complete wizard: logo stored to `public/uploads/`; OIDC config encrypted with AES-256-GCM
+7. Shell loads at `/dashboard`; admin panel accessible
+8. To switch to AWS-backed production: set `AWS_S3_BUCKET`, `KMS_KEY_ID`, `AWS_REGION`, `ENCRYPTION_PROVIDER=kms` — no code changes required
+
 ---
 
 ## 11. v2 Roadmap
@@ -782,4 +798,4 @@ All open questions are resolved. No outstanding items.
 
 ---
 
-*End of PRD v1.2 — Ready for Engineering*
+*End of PRD v1.3 — Ready for Engineering*
