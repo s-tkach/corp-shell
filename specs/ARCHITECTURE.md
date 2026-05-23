@@ -396,7 +396,6 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 | `DATABASE_URL` | Secrets Manager / Amplify env / `.env.local` | Next.js (Drizzle ORM); plain env var for local dev, Secrets Manager optional for Amplify production |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env / `.env.local` | Next.js (NextAuth.js JWT encryption); plain env var for local dev, Secrets Manager optional for Amplify production |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
-| `SHELL_NOTIFY_SECRET` | Secrets Manager / Amplify env | Next.js (`/api/internal/notifications` HMAC-SHA256 validation) |
 | `AWS_S3_BUCKET` | Amplify env / optional | `lib/storage.ts` S3 provider; if absent, local disk provider is used automatically |
 | `STORAGE_PROVIDER` | Env var / optional | `lib/storage.ts` — `s3` or `local`; defaults to `local` when `AWS_S3_BUCKET` is absent |
 | `LOGO_CDN_BASE` | Amplify env / optional | CDN base URL for S3-stored logos; omit for local dev |
@@ -592,12 +591,12 @@ Primary key: `(notificationId, userId)`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/notifications` | session | Paginated visible notifications for current user, with read state |
+| POST | `/api/notifications` | session | Create a notification; usable by any authenticated user including child apps (browser fetch with session cookie); `createdBy` set from session |
 | POST | `/api/notifications/read` | session | Mark one or all as read; body: `{ notificationId: string \| "all" }` |
 | GET | `/api/notifications/stream` | session | SSE stream; pushes events when new notifications arrive |
 | GET | `/api/admin/notifications` | admin role | List all notifications with read counts |
-| POST | `/api/admin/notifications` | admin role | Create a notification |
+| POST | `/api/admin/notifications` | admin role | Create a notification (admin UI path) |
 | DELETE | `/api/admin/notifications/[id]` | admin role | Hard delete notification and its read records |
-| POST | `/api/internal/notifications` | HMAC-SHA256 | Create from child app SDK; same HMAC pattern as `/api/internal/subscriptions/assign` |
 
 ### 16.3 UI Components
 
@@ -644,25 +643,24 @@ incrementUnreadCount: () => void
   - `"subscription"` — push to connections where the stored subscription level satisfies the threshold
 - 30-second `": ping"` comment to keep connections alive through proxies
 
-### 16.6 Shell SDK `notify()`
+### 16.6 Child App Notification Push
 
-Added to `packages/shell-sdk/src/index.ts`:
+Child apps push notifications by calling `POST /api/notifications` directly from the browser using the existing SSO session cookie. No additional secret, SDK method, or HMAC signing is required. The session cookie is `httpOnly` and sent automatically on same-origin requests.
 
 ```ts
-shellSdk.notify({
-  title: string,
-  body?: string,
-  actionLabel?: string,
-  actionType?: "url" | "download",
-  actionPayload?: string,
-  targetType: "all" | "user" | "subscription",
-  targetUserId?: string,
-  targetSubLevel?: number,
-  expiresAt?: string,        // ISO 8601
-}): Promise<{ id: string }>
+// Inside any child app React component
+await fetch('/api/notifications', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    title: 'Export complete',
+    targetType: 'user',
+    targetUserId: currentUserId,
+  }),
+});
 ```
 
-The SDK signs the request body with HMAC-SHA256 using the `notifySecret` passed at SDK init time, setting `X-Shell-Signature`. The shell validates it against `SHELL_NOTIFY_SECRET` using constant-time comparison (same pattern as `WEBHOOK_SECRET`).
+`createdBy` is set server-side from the session. All three targeting modes (`all`, `user`, `subscription`) are available to any authenticated caller.
 
 ---
 

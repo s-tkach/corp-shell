@@ -295,7 +295,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 
 **FR-NOTIF-7:** Admins (`admin` or `super_admin` role) can create, view, and delete notifications at `/admin/notifications`. The create form collects: title (required), body (optional), target type + target value, optional action, and optional expiry.
 
-**FR-NOTIF-8:** Child apps can push notifications programmatically via `shellSdk.notify()`. The SDK method calls `POST /api/internal/notifications` authenticated with an HMAC-SHA256 signature derived from `SHELL_NOTIFY_SECRET`. The method supports all targeting and action options available to admin-created notifications.
+**FR-NOTIF-8:** Child apps can push notifications programmatically by calling `POST /api/notifications` directly from the browser. The request is authenticated via the user's existing SSO session cookie — no additional secret or SDK method is required. The endpoint accepts the same payload as admin-created notifications and supports all targeting modes.
 
 ---
 
@@ -389,6 +389,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
                              │  app_registry      sub_tiers    │
                              │  idp_group_maps    shell_config │
                              │  auth_events (v2 viewer)        │
+                             │  notifications     notif_reads  │
                              └────────────────────────────────┘
 
 AWS Account (single)
@@ -664,6 +665,27 @@ export const authEvents = pgTable('auth_events', {
   ipAddress: text('ip_address'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const notifications = pgTable('notifications', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  title:          text('title').notNull(),
+  body:           text('body'),
+  actionLabel:    text('action_label'),
+  actionType:     text('action_type'),               // 'url' | 'download'
+  actionPayload:  text('action_payload'),
+  targetType:     text('target_type').notNull(),      // 'all' | 'user' | 'subscription'
+  targetUserId:   uuid('target_user_id').references(() => users.id),
+  targetSubLevel: integer('target_sub_level'),
+  expiresAt:      timestamp('expires_at', { withTimezone: true }),
+  createdBy:      uuid('created_by').references(() => users.id),
+  createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export const notificationReads = pgTable('notification_reads', {
+  notificationId: uuid('notification_id').references(() => notifications.id, { onDelete: 'cascade' }),
+  userId:         uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  readAt:         timestamp('read_at', { withTimezone: true }).defaultNow(),
+}, (t) => ({ pk: primaryKey(t.notificationId, t.userId) }));
 ```
 
 ### 8.8 Cost Estimate (≤1,000 Concurrent Users)

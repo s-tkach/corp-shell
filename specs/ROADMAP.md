@@ -32,7 +32,7 @@
 | M10 | Subscription & Entitlement Engine | Tier-gated nav, upgrade prompt, webhook |
 | M11 | Observability & Security Hardening | Logging, tracing, CSP, audit events |
 | M12 | Performance & Load Validation | NFR targets verified under load |
-| M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, SDK method |
+| M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, session-auth push API |
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
 
 ---
@@ -361,7 +361,6 @@
 - [x] `packages/shell-sdk/src/events/ShellEventBus.ts`: `emit`, `on`, `off` typed event system
 - [x] `packages/shell-sdk/src/tailwind/preset.ts`: exports shared color/spacing tokens
 - [x] TypeScript build (`tsc --declaration`); `package.json` with `exports` map
-- [ ] `packages/shell-sdk/src/notify.ts`: `notify()` method — see M13-10
 - [x] **Acceptance:** All hooks and event bus export with correct TypeScript types; `pnpm --filter shell-sdk build` passes
 
 #### M9-2: Shell SDK — publish pipeline
@@ -478,7 +477,7 @@
 
 ## M13 — Notifications System
 
-**Goal:** Users see a bell icon with unread badge in the header. New notifications are pushed in real time via SSE as toasts. Admins create/manage notifications from `/admin/notifications`. Child apps push notifications via `shellSdk.notify()`.
+**Goal:** Users see a bell icon with unread badge in the header. New notifications are pushed in real time via SSE as toasts. Admins create/manage notifications from `/admin/notifications`. Child apps push notifications by calling `POST /api/notifications` directly with the SSO session cookie.
 
 ### Tasks
 
@@ -490,9 +489,10 @@
 
 #### M13-2: User-facing API routes
 - [ ] `GET /api/notifications`: returns paginated visible, non-expired notifications for current user with `isRead` per row; applies visibility logic (targetType + expiry)
+- [ ] `POST /api/notifications`: creates notification from request body; `createdBy` set from session; triggers SSE push to eligible connected users; returns `{ id }`; usable by any authenticated user including child apps
 - [ ] `POST /api/notifications/read`: body `{ notificationId: string | "all" }` — upserts rows in `notification_reads`; returns updated unread count
 - [ ] `GET /api/notifications/stream`: SSE endpoint; registers controller in module-level registry; sends `notification` events; sends `": ping"` comment every 30s; cleans up on disconnect
-- [ ] **Acceptance:** List returns correct items for user; read marks correctly; SSE connection stays open and receives test event
+- [ ] **Acceptance:** List returns correct items for user; create returns 201 with id; read marks correctly; SSE connection stays open and receives test event
 
 #### M13-3: Admin API routes
 - [ ] `GET /api/admin/notifications`: paginated list of all notifications with read count per notification; requires `admin` or `super_admin` via `requireRoles()`
@@ -500,43 +500,33 @@
 - [ ] `DELETE /api/admin/notifications/[id]`: hard deletes notification (cascade removes read records); requires admin role
 - [ ] **Acceptance:** Create returns 201 with id; delete returns 204; unauthorized request returns 403
 
-#### M13-4: Internal SDK API route
-- [ ] `POST /api/internal/notifications`: validates `X-Shell-Signature` HMAC-SHA256 against `SHELL_NOTIFY_SECRET` (constant-time compare, same pattern as `/api/internal/subscriptions/assign`); creates notification; triggers SSE push; returns `{ id }`
-- [ ] **Acceptance:** Valid signature creates notification; wrong/missing signature returns 401
-
-#### M13-5: Zustand store additions
+#### M13-4: Zustand store additions
 - [ ] Add `unreadCount: number`, `setUnreadCount(n: number)`, `incrementUnreadCount()` to `shell/lib/store/shell-store.ts`
 - [ ] **Acceptance:** `useShellStore()` exposes new fields without TypeScript errors
 
-#### M13-6: NotificationProvider
+#### M13-5: NotificationProvider
 - [ ] `shell/components/shell/notifications/notification-provider.tsx`: Client component; opens `EventSource` to `/api/notifications/stream` on mount; reconnects with exponential backoff (1s → 2s → 4s … max 30s); on `notification` event: appends toast to local state, calls `incrementUnreadCount()`
 - [ ] Exposes `useNotifications()` hook: `{ notifications, unreadCount, markRead, markAllRead, refresh }`
 - [ ] Wrap `ShellLayoutClient` (or equivalent) with `NotificationProvider` in `shell/app/(shell)/layout.tsx`
 - [ ] Initial unread count loaded from `GET /api/notifications` on mount; stored in Zustand
 - [ ] **Acceptance:** Provider mounts without errors; SSE reconnects after simulated disconnect
 
-#### M13-7: NotificationBell + NotificationDropdown
+#### M13-6: NotificationBell + NotificationDropdown
 - [ ] `shell/components/shell/notifications/notification-bell.tsx`: Ghost `Button` (size `icon`) with `Bell` from lucide-react; absolute-positioned red badge showing `unreadCount` (hidden when 0, `99+` when > 99); wraps `NotificationDropdown` in `DropdownMenu`
 - [ ] Replace `<div data-shell-notifications />` in `shell/components/shell/header.tsx` with `<NotificationBell />`
 - [ ] `shell/components/shell/notifications/notification-dropdown.tsx`: 320px wide, max-height 480px; header row with "Notifications" + "Mark all read"; All/Unread tabs (client-side filter); per-row: dot indicator, bold/muted title, 2-line body, relative timestamp, action link; empty state; loading skeleton
 - [ ] **Acceptance:** Bell appears in header; badge shows/hides correctly; dropdown opens with correct items; clicking row marks read
 
-#### M13-8: NotificationToast
+#### M13-7: NotificationToast
 - [ ] `shell/components/shell/notifications/notification-toast.tsx`: fixed bottom-right; toasts stack upward; max 3 simultaneous (oldest dismissed on 4th); each toast: bell icon, title, body (truncated), optional action link, × button; auto-dismiss after 5s
 - [ ] No external toast library — local React state in `NotificationProvider`
 - [ ] **Acceptance:** Toast appears on SSE event; auto-dismisses at 5s; × dismisses immediately; 4th toast displaces oldest
 
-#### M13-9: Admin notifications page
+#### M13-8: Admin notifications page
 - [ ] `shell/app/(shell)/admin/notifications/page.tsx`: table of all notifications (title, target, expires, created, delete action); "Create notification" button opens dialog/sheet with fields: title, body, target type (All/User/Subscription select), conditional target user search or min sub level, optional action group (label + type + payload), optional expires at datetime
 - [ ] Add `"/admin/notifications": "Notifications"` to `ADMIN_ROUTE_LABEL_MAP`
 - [ ] Server-side role guard via `requireRoles(["admin", "super_admin"])` in the page
 - [ ] **Acceptance:** Admin can create notification; notification appears in table; delete removes it; non-admin role cannot access page
-
-#### M13-10: Shell SDK `notify()` method
-- [ ] Add `shell/packages/shell-sdk/src/notify.ts`: `notify(params)` function that POSTs to `/api/internal/notifications` with HMAC-SHA256 `X-Shell-Signature` header; accepts `notifySecret` and `shellUrl` at init time
-- [ ] Export `notify` from `packages/shell-sdk/src/index.ts`; update SDK type declarations
-- [ ] `pnpm --filter shell-sdk build` passes with no type errors
-- [ ] **Acceptance:** `shellSdk.notify({ title: "Test", targetType: "all" })` from a child app creates a notification visible in the shell dropdown
 
 ---
 
