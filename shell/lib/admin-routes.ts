@@ -7,6 +7,7 @@ import {
   KeyRound,
   AppWindow,
   CreditCard,
+  Bell,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -26,6 +27,7 @@ export const ADMIN_ROUTES: AdminRoute[] = [
   { href: "/admin/sso",           label: "SSO",           description: "OIDC connection health",                     icon: KeyRound },
   { href: "/admin/apps",          label: "Apps",          description: "Register and manage child apps",             icon: AppWindow },
   { href: "/admin/subscriptions", label: "Subscriptions", description: "Manage tiers and upgrade prompts",           icon: CreditCard },
+  { href: "/admin/notifications", label: "Notifications", description: "Create and manage notifications",            icon: Bell },
 ];
 
 export const ADMIN_ROUTE_LABEL_MAP: Record<string, string> = Object.fromEntries(

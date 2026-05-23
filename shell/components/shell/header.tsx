@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ADMIN_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
+import { NotificationBell } from "@/components/shell/notifications/notification-bell";
 
 interface HeaderProps {
   menu: MenuSection[];
@@ -86,7 +87,7 @@ export function Header({ menu, userName, userEmail, userRoles }: HeaderProps) {
       </nav>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        <div data-shell-notifications />
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

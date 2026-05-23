@@ -92,7 +92,7 @@ pnpm --filter shell build
 
 ## Current Status
 
-**Phase: Complete** — All M1–M12 milestones implemented. See `specs/ROADMAP.md` and Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
+**Phase: Complete** — All M1–M13 milestones implemented. See `specs/ROADMAP.md` and Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `shell/`

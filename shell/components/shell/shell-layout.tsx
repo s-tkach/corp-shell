@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useShellStore } from "@/lib/store/shell-store";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { NotificationProvider } from "./notifications/notification-provider";
+import { NotificationToastStack } from "./notifications/notification-toast";
 import type { MenuSection } from "@/app/api/menu/route";
 
 interface ShellLayoutClientProps {
@@ -34,18 +36,21 @@ export function ShellLayoutClient({
   }, [initialSidebarCollapsed, setSidebarCollapsed]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          menu={menu}
-          appName={appName}
-          userName={userName}
-          userEmail={userEmail}
-          userRoles={userRoles}
-        />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <NotificationProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header
+            menu={menu}
+            appName={appName}
+            userName={userName}
+            userEmail={userEmail}
+            userRoles={userRoles}
+          />
+          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        </div>
       </div>
-    </div>
+      <NotificationToastStack />
+    </NotificationProvider>
   );
 }

@@ -482,51 +482,51 @@
 ### Tasks
 
 #### M13-1: DB schema — notifications tables
-- [ ] Add `notifications` table to `shell/lib/db/schema.ts`: `id`, `title`, `body`, `actionLabel`, `actionType`, `actionPayload`, `targetType`, `targetUserId` (FK → users), `targetSubLevel`, `expiresAt`, `createdBy` (FK → users), `createdAt`
-- [ ] Add `notificationReads` table: `notificationId` (FK → notifications, cascade delete), `userId` (FK → users, cascade delete), `readAt`; PK `(notificationId, userId)`
-- [ ] Update existing migration file in place (no new migration file)
-- [ ] **Acceptance:** Migration runs; both tables exist in DB with correct constraints
+- [x] Add `notifications` table to `shell/lib/db/schema.ts`: `id`, `title`, `body`, `actionLabel`, `actionType`, `actionPayload`, `targetType`, `targetUserId` (FK → users), `targetSubLevel`, `expiresAt`, `createdBy` (FK → users), `createdAt`
+- [x] Add `notificationReads` table: `notificationId` (FK → notifications, cascade delete), `userId` (FK → users, cascade delete), `readAt`; PK `(notificationId, userId)`
+- [x] Update existing migration file in place (no new migration file)
+- [x] **Acceptance:** Migration runs; both tables exist in DB with correct constraints
 
 #### M13-2: User-facing API routes
-- [ ] `GET /api/notifications`: returns paginated visible, non-expired notifications for current user with `isRead` per row; applies visibility logic (targetType + expiry)
-- [ ] `POST /api/notifications`: creates notification from request body; `createdBy` set from session; triggers SSE push to eligible connected users; returns `{ id }`; usable by any authenticated user including child apps
-- [ ] `POST /api/notifications/read`: body `{ notificationId: string | "all" }` — upserts rows in `notification_reads`; returns updated unread count
-- [ ] `GET /api/notifications/stream`: SSE endpoint; registers controller in module-level registry; sends `notification` events; sends `": ping"` comment every 30s; cleans up on disconnect
-- [ ] **Acceptance:** List returns correct items for user; create returns 201 with id; read marks correctly; SSE connection stays open and receives test event
+- [x] `GET /api/notifications`: returns paginated visible, non-expired notifications for current user with `isRead` per row; applies visibility logic (targetType + expiry)
+- [x] `POST /api/notifications`: creates notification from request body; `createdBy` set from session; triggers SSE push to eligible connected users; returns `{ id }`; usable by any authenticated user including child apps
+- [x] `POST /api/notifications/read`: body `{ notificationId: string | "all" }` — upserts rows in `notification_reads`; returns updated unread count
+- [x] `GET /api/notifications/stream`: SSE endpoint; registers controller in module-level registry; sends `notification` events; sends `": ping"` comment every 30s; cleans up on disconnect
+- [x] **Acceptance:** List returns correct items for user; create returns 201 with id; read marks correctly; SSE connection stays open and receives test event
 
 #### M13-3: Admin API routes
-- [ ] `GET /api/admin/notifications`: paginated list of all notifications with read count per notification; requires `admin` or `super_admin` via `requireRoles()`
-- [ ] `POST /api/admin/notifications`: creates notification from request body; triggers SSE push to eligible connected users; returns created record
-- [ ] `DELETE /api/admin/notifications/[id]`: hard deletes notification (cascade removes read records); requires admin role
-- [ ] **Acceptance:** Create returns 201 with id; delete returns 204; unauthorized request returns 403
+- [x] `GET /api/admin/notifications`: paginated list of all notifications with read count per notification; requires `admin` or `super_admin` via `requireRoles()`
+- [x] `POST /api/admin/notifications`: creates notification from request body; triggers SSE push to eligible connected users; returns created record
+- [x] `DELETE /api/admin/notifications/[id]`: hard deletes notification (cascade removes read records); requires admin role
+- [x] **Acceptance:** Create returns 201 with id; delete returns 204; unauthorized request returns 403
 
 #### M13-4: Zustand store additions
-- [ ] Add `unreadCount: number`, `setUnreadCount(n: number)`, `incrementUnreadCount()` to `shell/lib/store/shell-store.ts`
-- [ ] **Acceptance:** `useShellStore()` exposes new fields without TypeScript errors
+- [x] Add `unreadCount: number`, `setUnreadCount(n: number)`, `incrementUnreadCount()` to `shell/lib/store/shell-store.ts`
+- [x] **Acceptance:** `useShellStore()` exposes new fields without TypeScript errors
 
 #### M13-5: NotificationProvider
-- [ ] `shell/components/shell/notifications/notification-provider.tsx`: Client component; opens `EventSource` to `/api/notifications/stream` on mount; reconnects with exponential backoff (1s → 2s → 4s … max 30s); on `notification` event: appends toast to local state, calls `incrementUnreadCount()`
-- [ ] Exposes `useNotifications()` hook: `{ notifications, unreadCount, markRead, markAllRead, refresh }`
-- [ ] Wrap `ShellLayoutClient` (or equivalent) with `NotificationProvider` in `shell/app/(shell)/layout.tsx`
-- [ ] Initial unread count loaded from `GET /api/notifications` on mount; stored in Zustand
-- [ ] **Acceptance:** Provider mounts without errors; SSE reconnects after simulated disconnect
+- [x] `shell/components/shell/notifications/notification-provider.tsx`: Client component; opens `EventSource` to `/api/notifications/stream` on mount; reconnects with exponential backoff (1s → 2s → 4s … max 30s); on `notification` event: appends toast to local state, calls `incrementUnreadCount()`
+- [x] Exposes `useNotifications()` hook: `{ notifications, unreadCount, markRead, markAllRead, refresh }`
+- [x] Wrap `ShellLayoutClient` (or equivalent) with `NotificationProvider` in `shell/app/(shell)/layout.tsx`
+- [x] Initial unread count loaded from `GET /api/notifications` on mount; stored in Zustand
+- [x] **Acceptance:** Provider mounts without errors; SSE reconnects after simulated disconnect
 
 #### M13-6: NotificationBell + NotificationDropdown
-- [ ] `shell/components/shell/notifications/notification-bell.tsx`: Ghost `Button` (size `icon`) with `Bell` from lucide-react; absolute-positioned red badge showing `unreadCount` (hidden when 0, `99+` when > 99); wraps `NotificationDropdown` in `DropdownMenu`
-- [ ] Replace `<div data-shell-notifications />` in `shell/components/shell/header.tsx` with `<NotificationBell />`
-- [ ] `shell/components/shell/notifications/notification-dropdown.tsx`: 320px wide, max-height 480px; header row with "Notifications" + "Mark all read"; All/Unread tabs (client-side filter); per-row: dot indicator, bold/muted title, 2-line body, relative timestamp, action link; empty state; loading skeleton
-- [ ] **Acceptance:** Bell appears in header; badge shows/hides correctly; dropdown opens with correct items; clicking row marks read
+- [x] `shell/components/shell/notifications/notification-bell.tsx`: Ghost `Button` (size `icon`) with `Bell` from lucide-react; absolute-positioned red badge showing `unreadCount` (hidden when 0, `99+` when > 99); wraps `NotificationDropdown` in `DropdownMenu`
+- [x] Replace `<div data-shell-notifications />` in `shell/components/shell/header.tsx` with `<NotificationBell />`
+- [x] `shell/components/shell/notifications/notification-dropdown.tsx`: 320px wide, max-height 480px; header row with "Notifications" + "Mark all read"; All/Unread tabs (client-side filter); per-row: dot indicator, bold/muted title, 2-line body, relative timestamp, action link; empty state; loading skeleton
+- [x] **Acceptance:** Bell appears in header; badge shows/hides correctly; dropdown opens with correct items; clicking row marks read
 
 #### M13-7: NotificationToast
-- [ ] `shell/components/shell/notifications/notification-toast.tsx`: fixed bottom-right; toasts stack upward; max 3 simultaneous (oldest dismissed on 4th); each toast: bell icon, title, body (truncated), optional action link, × button; auto-dismiss after 5s
-- [ ] No external toast library — local React state in `NotificationProvider`
-- [ ] **Acceptance:** Toast appears on SSE event; auto-dismisses at 5s; × dismisses immediately; 4th toast displaces oldest
+- [x] `shell/components/shell/notifications/notification-toast.tsx`: fixed bottom-right; toasts stack upward; max 3 simultaneous (oldest dismissed on 4th); each toast: bell icon, title, body (truncated), optional action link, × button; auto-dismiss after 5s
+- [x] No external toast library — local React state in `NotificationProvider`
+- [x] **Acceptance:** Toast appears on SSE event; auto-dismisses at 5s; × dismisses immediately; 4th toast displaces oldest
 
 #### M13-8: Admin notifications page
-- [ ] `shell/app/(shell)/admin/notifications/page.tsx`: table of all notifications (title, target, expires, created, delete action); "Create notification" button opens dialog/sheet with fields: title, body, target type (All/User/Subscription select), conditional target user search or min sub level, optional action group (label + type + payload), optional expires at datetime
-- [ ] Add `"/admin/notifications": "Notifications"` to `ADMIN_ROUTE_LABEL_MAP`
-- [ ] Server-side role guard via `requireRoles(["admin", "super_admin"])` in the page
-- [ ] **Acceptance:** Admin can create notification; notification appears in table; delete removes it; non-admin role cannot access page
+- [x] `shell/app/(shell)/admin/notifications/page.tsx`: table of all notifications (title, target, expires, created, delete action); "Create notification" button opens dialog/sheet with fields: title, body, target type (All/User/Subscription select), conditional target user search or min sub level, optional action group (label + type + payload), optional expires at datetime
+- [x] Add `"/admin/notifications": "Notifications"` to `ADMIN_ROUTE_LABEL_MAP`
+- [x] Server-side role guard via `requireRoles(["admin", "super_admin"])` in the page
+- [x] **Acceptance:** Admin can create notification; notification appears in table; delete removes it; non-admin role cannot access page
 
 ---
 

@@ -16,21 +16,6 @@ import {
 
 // ── Color conversion helpers ────────────────────────────────────────────────
 
-function hslStringToHex(hsl: string): string {
-  const parts = hsl.trim().split(/\s+/);
-  if (parts.length < 3) return "#000000";
-  const h = parseFloat(parts[0]!) / 360;
-  const s = parseFloat(parts[1]!) / 100;
-  const l = parseFloat(parts[2]!) / 100;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k = (n + h * 12) % 12;
-    const color = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-    return Math.round(255 * color).toString(16).padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
 function hexToHslString(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
@@ -50,11 +35,6 @@ function hexToHslString(hex: string): string {
     }
   }
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-}
-
-function getCssVar(variable: string): string {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
 }
 
 // ── Color groups ─────────────────────────────────────────────────────────────
