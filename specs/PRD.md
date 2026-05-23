@@ -154,7 +154,7 @@ The setup wizard collects these values in Step 2. On "Launch", the client secret
 
 **FR-NAV-4:** Each menu item has: `label`, `icon` (Lucide name), `routeType` (`internal` | `external`), `route`, `requiredRoles[]`, `requiredSubscriptionLevel` (integer, 0 = all), `badge` (optional string), `sortOrder`, `isEnabled`.
 
-**FR-NAV-5:** Top header bar: configurable app logo and name (from DB, set in wizard / Admin Panel), breadcrumb trail, user avatar dropdown (name, roles, logout), notification slot for child apps.
+**FR-NAV-5:** Top header bar: configurable app logo and name (from DB, set in wizard / Admin Panel), breadcrumb trail, user avatar dropdown (name, roles, logout), notification bell with unread badge (see §6.8).
 
 **FR-NAV-6:** Light/dark mode toggle; theme persisted per user in DB.
 
@@ -273,6 +273,27 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | **Application Registry** | Register/update/remove child apps. Validate manifest. Map routes to menu items. Live health status indicator. |
 | **Subscription Tiers** | Create/rename/delete tiers. Set numeric level. Configure Upgrade Prompt content per tier. |
 | **Theme & Branding** | Edit app name, re-upload logo, change primary brand color. Live preview. Changes apply globally without redeployment. |
+| **Notifications** | Create notifications with title, body, targeting, optional expiry, and optional action. View and delete existing notifications. |
+
+---
+
+### 6.8 Notifications
+
+**FR-NOTIF-1:** A bell icon sits in the top header bar (left of the theme toggle). When unread notifications exist, a red badge displays the count; the badge is hidden when count is 0 and displays `99+` when count exceeds 99.
+
+**FR-NOTIF-2:** Clicking the bell opens a dropdown panel (320px wide, scrollable). The panel has two tabs — **All** and **Unread (n)**. Each notification row shows: a blue dot (unread) or grey dot (read), title (bold if unread), body (truncated to 2 lines), relative timestamp, and an optional inline action link. Clicking a row marks it as read. A "Mark all read" link marks all visible notifications read at once.
+
+**FR-NOTIF-3:** When a new notification targeting the current user arrives while they are active in the app, it is delivered as an auto-dismissing toast in the bottom-right corner. Toasts auto-dismiss after 5 seconds and include a manual dismiss button. A maximum of 3 toasts are shown simultaneously; the oldest is dismissed when a 4th arrives.
+
+**FR-NOTIF-4:** Notifications target one of three audiences: **all** authenticated users, a **specific user** (by user ID), or users whose subscription level is **at or above** a configured minimum.
+
+**FR-NOTIF-5:** Each notification has an optional `expiresAt` timestamp. Expired notifications are hidden from the dropdown and excluded from the unread count; they are not shown to users who have not yet seen them.
+
+**FR-NOTIF-6:** Each notification has at most one optional action: a label (e.g. "View details"), a type (`url` opens the URL in a new tab; `download` triggers a file download), and a payload URL.
+
+**FR-NOTIF-7:** Admins (`admin` or `super_admin` role) can create, view, and delete notifications at `/admin/notifications`. The create form collects: title (required), body (optional), target type + target value, optional action, and optional expiry.
+
+**FR-NOTIF-8:** Child apps can push notifications programmatically via `shellSdk.notify()`. The SDK method calls `POST /api/internal/notifications` authenticated with an HMAC-SHA256 signature derived from `SHELL_NOTIFY_SECRET`. The method supports all targeting and action options available to admin-created notifications.
 
 ---
 

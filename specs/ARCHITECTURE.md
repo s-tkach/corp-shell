@@ -30,7 +30,8 @@ corp-shell/                          ← monorepo root
 │   │   │   │   ├── apps/
 │   │   │   │   ├── subscriptions/
 │   │   │   │   ├── sso/
-│   │   │   │   └── branding/
+│   │   │   │   ├── branding/
+│   │   │   │   └── notifications/
 │   │   │   └── [...slug]/           # Child app catch-all (Client Component)
 │   │   └── setup/                   # First-run wizard (404 after completion)
 │   ├── api/
@@ -40,11 +41,15 @@ corp-shell/                          ← monorepo root
 │   │   ├── roles/
 │   │   ├── apps/
 │   │   ├── subscriptions/
+│   │   ├── notifications/           # GET list, POST read, GET SSE stream
 │   │   ├── admin/
+│   │   │   └── notifications/       # GET list, POST create, DELETE [id]
 │   │   └── internal/
-│   │       └── webhooks/            # Payment provider webhook (HMAC-SHA256)
+│   │       ├── webhooks/            # Payment provider webhook (HMAC-SHA256)
+│   │       └── notifications/       # POST from SDK (HMAC-SHA256)
 │   ├── components/
 │   │   ├── shell/                   # Sidebar, Header, Breadcrumbs, ErrorBoundary, AppSkeleton
+│   │   │   └── notifications/       # NotificationBell, NotificationDropdown, NotificationToast, NotificationProvider
 │   │   └── ui/                      # Shadcn/ui components
 │   ├── lib/
 │   │   ├── auth.ts                  # NextAuth.js config + OIDC provider
@@ -361,6 +366,8 @@ Admin Panel → Application Registry:
 | `app_registry` | Registered child apps (remoteUrl, routePrefix, healthCheckUrl) |
 | `shell_config` | Single-row: branding, OIDC issuer + client ID + KMS-encrypted client secret, setup_complete flag |
 | `auth_events` | Login/logout/failure events (viewer UI in v2) |
+| `notifications` | Notification records with title, body, targeting (all/user/subscription), optional action, optional expiry |
+| `notification_reads` | Per-user read state junction table (notificationId + userId) |
 
 ### 9.3 Migrations
 
@@ -382,6 +389,7 @@ The shell is hosted on AWS Amplify (manually configured outside the repo). Ampli
 | `DATABASE_URL` | Secrets Manager / Amplify env | Next.js (Drizzle ORM) |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | Next.js (NextAuth.js JWT encryption) |
 | `WEBHOOK_SECRET` | Secrets Manager / Amplify env | Next.js (HMAC-SHA256 webhook validation) |
+| `SHELL_NOTIFY_SECRET` | Secrets Manager / Amplify env | Next.js (`/api/internal/notifications` HMAC-SHA256 validation) |
 | `LOGO_BUCKET` | Amplify env | Next.js (`/api/admin/branding` S3 presigned PUT) |
 | `AWS_REGION` | Amplify env (auto-set by Amplify) | Next.js (S3Client, KMSClient region) |
 
@@ -516,6 +524,120 @@ Step 4 — Launch:     POST /api/setup/complete →
 | Fork over build from scratch | `satnaing/shadcn-admin` | Sidebar, header, Shadcn wiring already done; focus on domain logic |
 | GitHub Packages over npm | GitHub Packages | Org-private packages; GITHUB_TOKEN auth in Actions without extra secrets |
 | AWS Amplify over CDK/SAM | Amplify | First-class Next.js support; managed hosting; no IaC config in repo |
+
+---
+
+## 16. Notifications Architecture
+
+### 16.1 Data Model
+
+**`notifications` table**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | defaultRandom() |
+| `title` | text NOT NULL | Short headline |
+| `body` | text | Optional description |
+| `actionLabel` | text | e.g. "View details" |
+| `actionType` | text | `"url"` or `"download"` |
+| `actionPayload` | text | URL for both action types |
+| `targetType` | text NOT NULL | `"all"` \| `"user"` \| `"subscription"` |
+| `targetUserId` | uuid FK → users | Set when `targetType = "user"` |
+| `targetSubLevel` | integer | Min subscription level required when `targetType = "subscription"` |
+| `expiresAt` | timestamp with tz | Nullable; hidden after this time |
+| `createdBy` | uuid FK → users | Admin or SDK caller |
+| `createdAt` | timestamp with tz | defaultNow() |
+
+**`notification_reads` table**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `notificationId` | uuid FK → notifications (cascade delete) | |
+| `userId` | uuid FK → users (cascade delete) | |
+| `readAt` | timestamp with tz | defaultNow() |
+
+Primary key: `(notificationId, userId)`
+
+**Visibility logic** — a notification is visible to a user if:
+1. `expiresAt` is null OR `expiresAt > now()`
+2. One of: `targetType = "all"` / `targetType = "user" AND targetUserId = currentUserId` / `targetType = "subscription" AND userSubLevel >= targetSubLevel`
+
+### 16.2 API Routes
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/notifications` | session | Paginated visible notifications for current user, with read state |
+| POST | `/api/notifications/read` | session | Mark one or all as read; body: `{ notificationId: string \| "all" }` |
+| GET | `/api/notifications/stream` | session | SSE stream; pushes events when new notifications arrive |
+| GET | `/api/admin/notifications` | admin role | List all notifications with read counts |
+| POST | `/api/admin/notifications` | admin role | Create a notification |
+| DELETE | `/api/admin/notifications/[id]` | admin role | Hard delete notification and its read records |
+| POST | `/api/internal/notifications` | HMAC-SHA256 | Create from child app SDK; same HMAC pattern as `/api/internal/subscriptions/assign` |
+
+### 16.3 UI Components
+
+**`NotificationProvider`** (`components/shell/notifications/notification-provider.tsx`)
+- Client component wrapping the shell layout
+- Opens SSE connection to `/api/notifications/stream` on mount; reconnects with exponential backoff (1s → 2s → 4s … max 30s)
+- On SSE event: adds toast, increments Zustand `unreadCount`
+- Exposes `useNotifications()` hook: `{ notifications, unreadCount, markRead, markAllRead, refresh }`
+
+**`NotificationBell`** (`components/shell/notifications/notification-bell.tsx`)
+- Replaces `<div data-shell-notifications />` in `header.tsx`
+- Ghost icon button with `Bell` (lucide-react); absolute-positioned red badge; hidden when count is 0; capped at `99+`
+- Opens `NotificationDropdown` via `DropdownMenu`
+
+**`NotificationDropdown`** (`components/shell/notifications/notification-dropdown.tsx`)
+- 320px wide, max-height 480px with scroll
+- Header: "Notifications" title + "Mark all read" link
+- All / Unread tabs (client-side filter)
+- Per-row: dot indicator, title, body (2-line truncation), relative timestamp, optional action link
+- Clicking a row marks it read
+
+**`NotificationToast`** (`components/shell/notifications/notification-toast.tsx`)
+- Bottom-right, stacks upward; max 3 simultaneous; oldest dismissed when 4th arrives
+- Content: bell icon, title, body (truncated), optional action link, × dismiss button
+- Auto-dismisses after 5 seconds
+
+### 16.4 Zustand Store Additions
+
+Added to `shell/lib/store/shell-store.ts`:
+
+```ts
+unreadCount: number
+setUnreadCount: (n: number) => void
+incrementUnreadCount: () => void
+```
+
+### 16.5 SSE Delivery
+
+- Response: `Content-Type: text/event-stream`, `ReadableStream`
+- In-process registry: `Map<userId, Set<ReadableStreamDefaultController>>` keyed by userId; a separate `Set<ReadableStreamDefaultController>` holds connections for subscription-level notifications checked at connection time
+- On new notification: iterate eligible controllers based on `targetType`:
+  - `"all"` — push to all active connections
+  - `"user"` — push to the target user's controllers only
+  - `"subscription"` — push to connections where the stored subscription level satisfies the threshold
+- 30-second `": ping"` comment to keep connections alive through proxies
+
+### 16.6 Shell SDK `notify()`
+
+Added to `packages/shell-sdk/src/index.ts`:
+
+```ts
+shellSdk.notify({
+  title: string,
+  body?: string,
+  actionLabel?: string,
+  actionType?: "url" | "download",
+  actionPayload?: string,
+  targetType: "all" | "user" | "subscription",
+  targetUserId?: string,
+  targetSubLevel?: number,
+  expiresAt?: string,        // ISO 8601
+}): Promise<{ id: string }>
+```
+
+The SDK signs the request body with HMAC-SHA256 using the `notifySecret` passed at SDK init time, setting `X-Shell-Signature`. The shell validates it against `SHELL_NOTIFY_SECRET` using constant-time comparison (same pattern as `WEBHOOK_SECRET`).
 
 ---
 
