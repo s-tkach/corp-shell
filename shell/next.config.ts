@@ -9,20 +9,26 @@ const CHILD_APP_ORIGINS = (process.env.CHILD_APP_ORIGINS ?? "")
 const RUM_SCRIPT_ORIGIN = "https://client.rum.us-east-1.amazonaws.com";
 const RUM_DATA_ORIGIN = "https://dataplane.rum.us-east-1.amazonaws.com";
 
+const hasRum = !!process.env.NEXT_PUBLIC_RUM_APP_MONITOR_ID;
+
 const AWS_REGION = process.env.AWS_REGION ?? "us-east-1";
-const S3_ORIGINS = [
-  "https://*.s3.amazonaws.com",
-  `https://*.s3.${AWS_REGION}.amazonaws.com`,
-];
+const hasS3 = !!process.env.AWS_S3_BUCKET;
+const S3_ORIGINS = hasS3
+  ? [
+      "https://*.s3.amazonaws.com",
+      `https://*.s3.${AWS_REGION}.amazonaws.com`,
+      "https://*.cloudfront.net",
+    ]
+  : [];
 
 const isDev = process.env.NODE_ENV === "development";
 
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${RUM_SCRIPT_ORIGIN} ${CHILD_APP_ORIGINS.join(" ")}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${hasRum ? ` ${RUM_SCRIPT_ORIGIN}` : ""} ${CHILD_APP_ORIGINS.join(" ")}`.trimEnd(),
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: https://*.amazonaws.com https://*.cloudfront.net`,
-  `connect-src 'self' ${RUM_DATA_ORIGIN} ${S3_ORIGINS.join(" ")} ${CHILD_APP_ORIGINS.join(" ")}`,
+  `img-src 'self' data: blob:${S3_ORIGINS.length ? ` ${S3_ORIGINS.join(" ")}` : ""}`,
+  `connect-src 'self'${hasRum ? ` ${RUM_DATA_ORIGIN}` : ""}${S3_ORIGINS.length ? ` ${S3_ORIGINS.join(" ")}` : ""} ${CHILD_APP_ORIGINS.join(" ")}`.trimEnd(),
   `font-src 'self'`,
   `frame-src 'none'`,
   `object-src 'none'`,
@@ -48,16 +54,12 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**.amazonaws.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.cloudfront.net",
-      },
-    ],
+    remotePatterns: hasS3
+      ? [
+          { protocol: "https", hostname: "**.amazonaws.com" },
+          { protocol: "https", hostname: "**.cloudfront.net" },
+        ]
+      : [],
   },
   async headers() {
     return [

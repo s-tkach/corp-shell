@@ -56,3 +56,6 @@ coverage/
 # Misc
 .vercel
 .netlify
+
+# Local logo uploads (local storage provider)
+shell/public/uploads/logos/

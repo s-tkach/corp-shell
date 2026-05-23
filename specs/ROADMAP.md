@@ -542,83 +542,83 @@
 
 #### M14-1: CryptoProvider abstraction (Gap 1)
 
-- [ ] Create `shell/lib/crypto.ts`: export `CryptoProvider` interface `{ encrypt(plaintext: string): Promise<string>; decrypt(ciphertext: string): Promise<string> }`; `KmsCryptoProvider` (delegates to existing `lib/kms.ts`; activated when `ENCRYPTION_PROVIDER=kms` or `KMS_KEY_ID` is set); `LocalCryptoProvider` (AES-256-GCM via `node:crypto`, reads `ENCRYPTION_KEY` (64 hex chars), per-value random IV, output format `local:<iv_hex>:<ct_hex>:<tag_hex>`); `getProvider()` factory selecting on env at module load; top-level `encrypt()` and `decrypt()` exports
-- [ ] Update `shell/lib/kms.ts`: re-export `encrypt`/`decrypt` from `crypto.ts` for backwards compatibility
-- [ ] Update `shell/app/api/setup/complete/route.ts`: call `encrypt()` from `lib/crypto.ts` instead of `kmsEncrypt()` directly
-- [ ] Update `shell/lib/auth.ts:getOidcConfig()`: call `decrypt()` from `lib/crypto.ts` instead of `kmsDecrypt()` directly
-- [ ] Update `shell/.env.local.example`: document `ENCRYPTION_KEY` and `ENCRYPTION_PROVIDER` entries with instructions
-- [ ] **Acceptance:**
+- [x] Create `shell/lib/crypto.ts`: export `CryptoProvider` interface `{ encrypt(plaintext: string): Promise<string>; decrypt(ciphertext: string): Promise<string> }`; `KmsCryptoProvider` (delegates to existing `lib/kms.ts`; activated when `ENCRYPTION_PROVIDER=kms` or `KMS_KEY_ID` is set); `LocalCryptoProvider` (AES-256-GCM via `node:crypto`, reads `ENCRYPTION_KEY` (64 hex chars), per-value random IV, output format `local:<iv_hex>:<ct_hex>:<tag_hex>`); `getProvider()` factory selecting on env at module load; top-level `encrypt()` and `decrypt()` exports
+- [x] Update `shell/lib/kms.ts`: re-export `encrypt`/`decrypt` from `crypto.ts` for backwards compatibility
+- [x] Update `shell/app/api/setup/complete/route.ts`: call `encrypt()` from `lib/crypto.ts` instead of `kmsEncrypt()` directly
+- [x] Update `shell/lib/auth.ts:getOidcConfig()`: call `decrypt()` from `lib/crypto.ts` instead of `kmsDecrypt()` directly
+- [x] Update `shell/.env.local.example`: document `ENCRYPTION_KEY` and `ENCRYPTION_PROVIDER` entries with instructions
+- [x] **Acceptance:**
   - `ENCRYPTION_PROVIDER=local ENCRYPTION_KEY=<64-hex-chars>`: wizard completes; OIDC secret stored as `local:...` ciphertext; auth flow decrypts correctly
   - `ENCRYPTION_PROVIDER=kms KMS_KEY_ID=<arn> AWS_REGION=<region>`: existing KMS behavior unchanged
   - Starting the app with neither `KMS_KEY_ID` nor `ENCRYPTION_KEY` set logs a clear startup error and refuses to start
 
 #### M14-2: StorageProvider abstraction (Gap 2)
 
-- [ ] Create `shell/lib/storage.ts`: export `StorageProvider` interface `{ upload(filename: string, contentType: string, data?: Buffer): Promise<{ uploadUrl?: string; publicUrl: string }> }`; `S3StorageProvider` (existing presigned PUT logic; activated when `STORAGE_PROVIDER=s3` or `AWS_S3_BUCKET` set); `LocalStorageProvider` (writes file to `public/uploads/logos/<filename>`, returns `{ publicUrl: '/uploads/logos/<filename>' }`); `getProvider()` factory
-- [ ] Update `shell/app/api/setup/upload-logo/route.ts`: delegate to `storage.ts` provider
-- [ ] Update `shell/app/(shell)/admin/branding` upload API handler: consolidate existing duplicated S3 presign logic into `storage.ts`
-- [ ] Update `shell/app/setup/page.tsx`: if `uploadUrl` absent in response, POST file directly (multipart); if present, PUT to presigned URL
-- [ ] Add `public/uploads/.gitkeep`; add `public/uploads/logos/` to `.gitignore`
-- [ ] **Acceptance:**
+- [x] Create `shell/lib/storage.ts`: export `StorageProvider` interface `{ upload(filename: string, contentType: string, data?: Buffer): Promise<{ uploadUrl?: string; publicUrl: string }> }`; `S3StorageProvider` (existing presigned PUT logic; activated when `STORAGE_PROVIDER=s3` or `AWS_S3_BUCKET` set); `LocalStorageProvider` (writes file to `public/uploads/logos/<filename>`, returns `{ publicUrl: '/uploads/logos/<filename>' }`); `getProvider()` factory
+- [x] Update `shell/app/api/setup/upload-logo/route.ts`: delegate to `storage.ts` provider
+- [x] Update `shell/app/(shell)/admin/branding` upload API handler: consolidate existing duplicated S3 presign logic into `storage.ts`
+- [x] Update `shell/app/setup/page.tsx`: if `uploadUrl` absent in response, POST file directly (multipart); if present, PUT to presigned URL
+- [x] Add `public/uploads/.gitkeep`; add `public/uploads/logos/` to `.gitignore`
+- [x] **Acceptance:**
   - `STORAGE_PROVIDER=local` (no `AWS_S3_BUCKET`): wizard step 1 uploads logo; logo appears at `/uploads/logos/<filename>`; `shell_config.logoUrl` contains the relative path
   - `STORAGE_PROVIDER=s3` (with `AWS_S3_BUCKET` set): existing presigned-PUT S3 behavior unchanged
   - Branding re-upload in Admin Panel → Theme uses the same storage abstraction
 
 #### M14-3: Docker Compose + env documentation (Gaps 3, 4, 5)
 
-- [ ] Add `docker-compose.yml` at repo root: `postgres:15-alpine`, `POSTGRES_DB/USER/PASSWORD=corpshell`, port 5432, named volume `postgres_data`
-- [ ] Update `shell/.env.local.example`: add `DATABASE_URL=postgresql://corpshell:corpshell@localhost:5432/corpshell` as the default local value; add comment clarifying `DATABASE_URL` and `NEXTAUTH_SECRET` are plain env vars (Secrets Manager is only for Amplify production); move RUM env vars (`NEXT_PUBLIC_RUM_APP_MONITOR_ID`, `NEXT_PUBLIC_RUM_GUEST_ROLE_ARN`, `NEXT_PUBLIC_RUM_IDENTITY_POOL_ID`) to a clearly marked `# Optional: AWS CloudWatch RUM (omit for local dev)` section
-- [ ] Remove unused `@aws-sdk/client-secrets-manager` from `shell/package.json` (never imported in code)
-- [ ] Update `shell/lib/logger.ts` to read a generic `TRACE_ID` env var before falling back to `_X_AMZN_TRACE_ID`
-- [ ] **Acceptance:**
+- [x] Add `docker-compose.yml` at repo root: `postgres:15-alpine`, `POSTGRES_DB/USER/PASSWORD=corpshell`, port 5432, named volume `postgres_data`
+- [x] Update `shell/.env.local.example`: add `DATABASE_URL=postgresql://corpshell:corpshell@localhost:5432/corpshell` as the default local value; add comment clarifying `DATABASE_URL` and `NEXTAUTH_SECRET` are plain env vars (Secrets Manager is only for Amplify production); move RUM env vars (`NEXT_PUBLIC_RUM_APP_MONITOR_ID`, `NEXT_PUBLIC_RUM_GUEST_ROLE_ARN`, `NEXT_PUBLIC_RUM_IDENTITY_POOL_ID`) to a clearly marked `# Optional: AWS CloudWatch RUM (omit for local dev)` section
+- [x] Remove unused `@aws-sdk/client-secrets-manager` from `shell/package.json` (never imported in code)
+- [x] Update `shell/lib/logger.ts` to read a generic `TRACE_ID` env var before falling back to `_X_AMZN_TRACE_ID`
+- [x] **Acceptance:**
   - `docker compose up -d` starts Postgres at localhost:5432 with the `.env.local.example` connection string
   - App starts with only `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` set; no AWS credentials or Secrets Manager access needed
 
 #### M14-4: Conditional CSP for S3 origins (Gap 6)
 
-- [ ] Update `shell/next.config.ts`: make `img-src`, `connect-src`, and `script-src` S3/CloudFront entries conditional on `process.env.AWS_S3_BUCKET` being set (same pattern as existing RUM script origin conditional)
-- [ ] **Acceptance:**
+- [x] Update `shell/next.config.ts`: make `img-src`, `connect-src`, and `script-src` S3/CloudFront entries conditional on `process.env.AWS_S3_BUCKET` being set (same pattern as existing RUM script origin conditional)
+- [x] **Acceptance:**
   - `AWS_S3_BUCKET` unset: S3 CloudFront origin absent from CSP; no console CSP violations in local dev
   - `AWS_S3_BUCKET` set: S3 CloudFront origin present in CSP; existing production behavior unchanged
 
 #### M14-5: OSS DX files (Gap 7)
 
-- [ ] Create `CONTRIBUTING.md`: local dev setup (Docker Compose → `.env.local` → `pnpm dev`), branching model (feature branches → PR to `main`), PR checklist, coding conventions (TypeScript strict, ESLint, Prettier), how to run tests (`pnpm test`)
-- [ ] Create `.github/ISSUE_TEMPLATE/bug_report.md`: fields for environment, steps to reproduce, expected vs. actual behavior, logs
-- [ ] Create `.github/ISSUE_TEMPLATE/feature_request.md`: fields for problem statement, proposed solution, alternatives considered
-- [ ] Create `.github/PULL_REQUEST_TEMPLATE.md`: sections for summary, test plan, breaking changes, checklist (tests pass, types pass, lint passes)
-- [ ] Create `CHANGELOG.md`: semantic versioning format; initial entry for v1.0.0 listing M1–M13 features
-- [ ] Rewrite `README.md` "Getting started" section: local-first path as primary; AWS/Amplify as secondary; link to `CONTRIBUTING.md` for contributor setup
-- [ ] **Acceptance:**
+- [x] Create `CONTRIBUTING.md`: local dev setup (Docker Compose → `.env.local` → `pnpm dev`), branching model (feature branches → PR to `main`), PR checklist, coding conventions (TypeScript strict, ESLint, Prettier), how to run tests (`pnpm test`)
+- [x] Create `.github/ISSUE_TEMPLATE/bug_report.md`: fields for environment, steps to reproduce, expected vs. actual behavior, logs
+- [x] Create `.github/ISSUE_TEMPLATE/feature_request.md`: fields for problem statement, proposed solution, alternatives considered
+- [x] Create `.github/PULL_REQUEST_TEMPLATE.md`: sections for summary, test plan, breaking changes, checklist (tests pass, types pass, lint passes)
+- [x] Create `CHANGELOG.md`: semantic versioning format; initial entry for v1.0.0 listing M1–M13 features
+- [x] Rewrite `README.md` "Getting started" section: local-first path as primary; AWS/Amplify as secondary; link to `CONTRIBUTING.md` for contributor setup
+- [x] **Acceptance:**
   - New contributor can reach the setup wizard following only the README "Getting started" section; no steps require AWS credentials
   - `CONTRIBUTING.md` covers all steps needed to run tests locally
 
 #### M14-6: Vitest test suite (Gap 8)
 
-- [ ] Add `shell/vitest.config.ts`: configure Vitest for the `shell/` workspace; path aliases matching `tsconfig.json`; environment `node`
-- [ ] Add `pnpm --filter shell test` script to `shell/package.json`; add root `pnpm test` script that delegates to shell
-- [ ] Create `shell/tests/crypto.test.ts`:
+- [x] Add `shell/vitest.config.ts`: configure Vitest for the `shell/` workspace; path aliases matching `tsconfig.json`; environment `node`
+- [x] Add `pnpm --filter shell test` script to `shell/package.json`; add root `pnpm test` script that delegates to shell
+- [x] Create `shell/tests/crypto.test.ts`:
   - Local provider: `encrypt` then `decrypt` round-trip returns original plaintext
   - Local provider: two calls produce different ciphertexts (IV randomness)
   - Local provider: output starts with `local:`
   - Local provider: tampered ciphertext throws on decrypt (GCM auth tag verification)
   - Provider selection: `ENCRYPTION_PROVIDER=local` selects local; `ENCRYPTION_PROVIDER=kms` selects KMS (mock KMS client)
-- [ ] Create `shell/tests/auth.test.ts` (mock Drizzle client):
+- [x] Create `shell/tests/auth.test.ts` (mock Drizzle client):
   - JIT provisioning: new user email inserts user row, role rows, subscription row
   - Existing user: `lastLoginAt` updated; no duplicate rows
   - Subscription expiry: expired subscription downgrades to `free` tier in the JWT
   - Group mapping: IDP group mapped to shell role appears in JWT `roles[]`
-- [ ] Create `shell/tests/middleware.test.ts`:
+- [x] Create `shell/tests/middleware.test.ts`:
   - Setup not complete: any non-`/setup` path redirects to `/setup`
   - Setup complete: `/setup` returns 404
   - No session: protected route redirects to `/api/auth/signin`
   - Session with `admin` role: `/admin/menu` passes through
   - Session without `admin` role: `/admin/menu` returns 403
-- [ ] Create `shell/tests/setup-complete.test.ts` (mock Drizzle client):
+- [x] Create `shell/tests/setup-complete.test.ts` (mock Drizzle client):
   - Idempotency: second POST to `/api/setup/complete` after `setup_complete = true` returns 400
   - Atomic write: if any INSERT fails, transaction rolls back (no partial state)
   - Encrypts OIDC client secret before writing (verifies ciphertext != plaintext in DB)
-- [ ] **Acceptance:** `pnpm --filter shell test` passes all tests with zero failures
+- [x] **Acceptance:** `pnpm --filter shell test` passes all tests with zero failures
 
 ---
 
@@ -626,11 +626,11 @@
 
 Before marking M14 complete:
 
-- [ ] `git clone` on a machine with zero AWS credentials → `docker compose up -d` → fill `.env.local` → `pnpm dev` → `/setup` wizard reachable with no errors
-- [ ] Wizard completes end-to-end in local mode (local crypto + local storage)
-- [ ] `pnpm --filter shell test` passes with zero failures
-- [ ] Switching to AWS mode (`ENCRYPTION_PROVIDER=kms`, `STORAGE_PROVIDER=s3`, real credentials) works without code changes
-- [ ] All Gap 7 files present and reviewed
+- [x] `git clone` on a machine with zero AWS credentials → `docker compose up -d` → fill `.env.local` → `pnpm dev` → `/setup` wizard reachable with no errors
+- [x] Wizard completes end-to-end in local mode (local crypto + local storage)
+- [x] `pnpm --filter shell test` passes with zero failures
+- [x] Switching to AWS mode (`ENCRYPTION_PROVIDER=kms`, `STORAGE_PROVIDER=s3`, real credentials) works without code changes
+- [x] All Gap 7 files present and reviewed
 
 ---
 

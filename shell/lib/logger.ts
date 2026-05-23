@@ -6,8 +6,9 @@ interface LogMeta {
 }
 
 function getTraceId(): string | undefined {
+  if (process.env["TRACE_ID"]) return process.env["TRACE_ID"];
   // X-Amzn-Trace-Id format: Root=1-XXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXX;Parent=...;Sampled=1
-  const header = process.env._X_AMZN_TRACE_ID;
+  const header = process.env["_X_AMZN_TRACE_ID"];
   if (!header) return undefined;
   const match = /Root=([^;]+)/.exec(header);
   return match?.[1];

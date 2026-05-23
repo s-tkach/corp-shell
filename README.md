@@ -14,7 +14,7 @@ A host web application that serves as the single entry point for all internal co
 
 | Layer | Technology |
 |-------|-----------|
-| Shell framework | Next.js 15 (App Router) |
+| Shell framework | Next.js 16 (App Router) |
 | UI | Shadcn/ui + Tailwind CSS v4 |
 | Module Federation | `@module-federation/nextjs-mf` |
 | Auth | NextAuth.js v5 + OIDC |
@@ -30,7 +30,7 @@ A host web application that serves as the single entry point for all internal co
 
 ```
 corp-shell/
-├── shell/                     # Next.js 15 application
+├── shell/                     # Next.js 16 application
 │   ├── app/
 │   │   ├── (auth)/            # Login, callback, error routes
 │   │   ├── (shell)/           # Protected routes
@@ -51,101 +51,84 @@ corp-shell/
 
 ## Getting started
 
+**No AWS account required for local development.**
+
 ### Prerequisites
 
-- Node 22 LTS (enforced — `package.json` rejects other major versions)
-- pnpm 9.x+
+- Node 22 LTS (`nvm install 22 && nvm use 22`)
+- pnpm 9.x+ (`npm install -g pnpm`)
 - Docker (for local PostgreSQL)
-- AWS CLI + credentials configured
-- An OIDC application registered (Web, Authorization Code + PKCE)
+- An OIDC application registered (Web, Authorization Code + PKCE) — only needed to complete the setup wizard
 
-#### Install Node 22 via nvm
-
-```bash
-nvm install 22
-nvm use 22
-```
-
-#### Install AWS CLI (macOS)
-
-```bash
-brew install awscli
-aws configure   # enter Access Key ID, Secret, region, output format
-```
-
-### Install dependencies
+### 1. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-### Start a local database
+### 2. Start local PostgreSQL
 
 ```bash
-docker run -d \
-  --name shell-pg \
-  -e POSTGRES_PASSWORD=password \
-  -e POSTGRES_DB=shell_dev \
-  -p 5432:5432 \
-  postgres:15
+docker compose up -d
 ```
 
-### Create local env file
-
-Create `shell/.env.local` (gitignored — never commit):
+### 3. Configure environment
 
 ```bash
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=<openssl rand -base64 32>
-
-# Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/shell_dev
-
-# Webhook (any random string locally)
-WEBHOOK_SECRET=<openssl rand -base64 32>
-
-# AWS KMS — required for encrypting/decrypting the OIDC client secret stored in shell_config
-AWS_REGION=eu-central-1
-KMS_KEY_ID=<your-kms-key-id>
-
-# AWS / S3 (required for logo uploads)
-AWS_S3_BUCKET=<your-s3-bucket-name>
-# LOGO_CDN_BASE=https://<cloudfront-dist>.cloudfront.net  # optional — omit to serve logos directly from S3
-# AWS credentials are NOT set here. Run `aws configure` once; the SDK reads ~/.aws/credentials automatically.
+cp shell/.env.local.example shell/.env.local
 ```
 
-> **OIDC credentials are not env vars.** The setup wizard (Step 2) collects the issuer URL, client ID, and client secret. On "Launch", the client secret is KMS-encrypted and all three values are written to the `shell_config` database row. `lib/auth.ts` reads them from the DB at startup.
+Edit `shell/.env.local` and set:
 
-OIDC redirect URI to register: `http://localhost:3000/api/auth/callback/oidc`
+```bash
+NEXTAUTH_SECRET=$(openssl rand -base64 32)
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+```
 
-### Run database migrations
+Leave `ENCRYPTION_PROVIDER=local`, `STORAGE_PROVIDER=local`, and `DATABASE_URL` as-is.
+
+> **No AWS credentials needed.** The local provider encrypts the OIDC client secret with AES-256-GCM instead of KMS, and stores logo uploads to `shell/public/uploads/logos/` instead of S3.
+
+### 4. Run database migrations
 
 ```bash
 pnpm drizzle-kit migrate
 ```
 
-### Development
+### 5. Start the dev server
 
 ```bash
 pnpm --filter shell dev
 ```
 
-Shell runs at `http://localhost:3000`. On first visit you are redirected to `/setup` — complete the 4-step wizard (branding → OIDC → super-admin → launch). After completion `/setup` returns 404 permanently.
+Open `http://localhost:3000` — you are redirected to `/setup`. Complete the 4-step wizard (branding → OIDC connection → super-admin → launch). After completion `/setup` returns 404 permanently.
+
+OIDC redirect URI to register with your provider: `http://localhost:3000/api/auth/callback/oidc`
 
 ### Common commands
 
 ```bash
-# Lint
-pnpm lint
+pnpm lint           # ESLint
+pnpm typecheck      # TypeScript
+pnpm --filter shell test   # Vitest unit tests
+pnpm --filter shell build  # Production build
+```
 
-# Type check
-pnpm typecheck
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contributor setup.
 
-# Build shell for production
-pnpm --filter shell build
+### AWS / production deployment
 
-# Deploy to AWS — via AWS Amplify (manually configured, not in repo)
+To deploy to AWS Amplify, set the following environment variables in the Amplify console instead of `.env.local`:
+
+```
+ENCRYPTION_PROVIDER=kms
+KMS_KEY_ID=alias/corp-shell-oidc-secret
+STORAGE_PROVIDER=s3
+AWS_S3_BUCKET=your-logos-bucket-name
+AWS_REGION=eu-central-1
+DATABASE_URL=<from Secrets Manager or direct>
+NEXTAUTH_SECRET=<from Secrets Manager>
+WEBHOOK_SECRET=<from Secrets Manager>
 ```
 
 ## First-time deployment

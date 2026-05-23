@@ -1,4 +1,5 @@
 import { KMSClient, EncryptCommand, DecryptCommand } from "@aws-sdk/client-kms";
+export { encrypt, decrypt } from "@/lib/crypto";
 
 const client = new KMSClient({ region: process.env["AWS_REGION"] });
 

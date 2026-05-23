@@ -115,7 +115,6 @@ function Step1({
     setUploadError("");
     setUploading(true);
     try {
-      // Get presigned URL from our API
       const res = await fetch("/api/setup/upload-logo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,16 +122,29 @@ function Step1({
       });
       if (!res.ok) throw new Error(await res.text());
       const { uploadUrl, publicUrl } = (await res.json()) as {
-        uploadUrl: string;
+        uploadUrl?: string;
         publicUrl: string;
       };
-      // Upload directly to S3
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!putRes.ok) throw new Error("Upload to S3 failed");
+      if (uploadUrl) {
+        // S3 provider: PUT directly to presigned URL
+        const putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+        if (!putRes.ok) throw new Error("Upload to S3 failed");
+      } else {
+        // Local provider: POST file as multipart to upload API
+        const form = new FormData();
+        form.append("file", file);
+        form.append("filename", file.name);
+        form.append("contentType", file.type);
+        const localRes = await fetch("/api/setup/upload-logo/file", {
+          method: "POST",
+          body: form,
+        });
+        if (!localRes.ok) throw new Error("Local upload failed");
+      }
       onChange({ logoUrl: publicUrl });
       setPreviewUrl(publicUrl);
     } catch (err) {

@@ -1,5 +1,5 @@
 import NextAuth from "next-auth";
-import { kmsDecrypt } from "@/lib/kms";
+import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
 import {
   users,
@@ -25,7 +25,7 @@ async function getOidcConfig() {
   cachedConfig = {
     issuer: config.oidcIssuer,
     clientId: config.oidcClientId,
-    clientSecret: await kmsDecrypt(config.oidcClientSecret),
+    clientSecret: await decrypt(config.oidcClientSecret),
   };
   return cachedConfig;
 }

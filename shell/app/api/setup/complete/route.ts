@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resetAuth } from "@/lib/auth";
-import { kmsEncrypt } from "@/lib/kms";
+import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
 import {
   shellConfig,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
   }
 
-  const encryptedSecret = await kmsEncrypt(oidcClientSecret.trim());
+  const encryptedSecret = await encrypt(oidcClientSecret.trim());
 
   // Atomic write — Drizzle wraps this in a transaction
   await db.transaction(async (tx) => {
