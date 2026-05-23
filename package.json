@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "dev": "pnpm --filter shell dev",
+    "build": "pnpm --filter shell build",
+    "start": "pnpm --filter shell start",
     "typecheck": "pnpm --filter shell typecheck",
     "lint": "pnpm --filter shell lint",
     "test": "pnpm --filter shell test",
