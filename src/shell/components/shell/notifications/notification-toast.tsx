@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Bell, X } from "lucide-react";
 import { useNotifications } from "./notification-provider";
+import { useShellStore } from "@/lib/store/shell-store";
 import type { NotificationItem, ToastConfig } from "./notification-provider";
 
 function Toast({
@@ -54,22 +55,33 @@ function Toast({
   );
 }
 
-function positionClasses(position: string): string {
-  switch (position) {
-    case "bottom-left": return "bottom-4 left-4";
-    case "top-right": return "top-4 right-4";
-    case "top-left": return "top-4 left-4";
-    default: return "bottom-4 right-4";
-  }
+function positionStyle(position: string, sidebarCollapsed: boolean): React.CSSProperties {
+  const sidebarWidth = sidebarCollapsed ? 64 : 256;
+  const headerHeight = 56;
+  const gap = 16;
+
+  const isTop = position.startsWith("top");
+  const isLeft = position.endsWith("left");
+
+  return {
+    top: isTop ? headerHeight + gap : "auto",
+    bottom: isTop ? "auto" : gap,
+    left: isLeft ? sidebarWidth + gap : "auto",
+    right: isLeft ? "auto" : gap,
+  };
 }
 
 export function NotificationToastStack() {
   const { toasts, dismissToast, toastConfig } = useNotifications();
+  const sidebarCollapsed = useShellStore((s) => s.sidebarCollapsed);
 
   if (toasts.length === 0) return null;
 
   return (
-    <div className={`fixed flex flex-col gap-2 z-50 pointer-events-none ${positionClasses(toastConfig.position)}`}>
+    <div
+      className="fixed flex flex-col gap-2 z-50 pointer-events-none"
+      style={positionStyle(toastConfig.position, sidebarCollapsed)}
+    >
       {toasts.map((t) => (
         <Toast key={t.id} notification={t} onDismiss={() => dismissToast(t.id)} config={toastConfig} />
       ))}
