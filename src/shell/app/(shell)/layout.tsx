@@ -6,6 +6,17 @@ import { ShellLayoutClient } from "@/components/shell/shell-layout";
 import { cacheTag } from "next/cache";
 import type { MenuSection } from "@/app/api/menu/route";
 
+function isVisible(
+  item: { requiredSubLevel: number; requiredRoles: unknown },
+  roles: string[],
+  subscriptionLevel: number
+): boolean {
+  if (item.requiredSubLevel > subscriptionLevel) return false;
+  const required = item.requiredRoles as string[];
+  if (required.length > 0 && !required.some((r) => roles.includes(r))) return false;
+  return true;
+}
+
 async function getMenuTree(roles: string[], subscriptionLevel: number): Promise<MenuSection[]> {
   "use cache";
   cacheTag("menu");
@@ -20,28 +31,46 @@ async function getMenuTree(roles: string[], subscriptionLevel: number): Promise<
     .from(menuItems)
     .orderBy(asc(menuItems.sortOrder));
 
-  return sections.map((section) => ({
-    id: section.id,
-    label: section.label,
-    icon: section.icon,
-    sortOrder: section.sortOrder,
-    items: items
-      .filter((item) => {
-        if (item.sectionId !== section.id) return false;
-        if (item.requiredSubLevel > subscriptionLevel) return false;
-        const required = item.requiredRoles as string[];
-        if (required.length > 0 && !required.some((r) => roles.includes(r))) return false;
-        return true;
-      })
-      .map((item) => ({
+  return sections.map((section) => {
+    const sectionItems = items.filter((item) => item.sectionId === section.id);
+    const topLevel = sectionItems.filter(
+      (item) => item.parentItemId === null && isVisible(item, roles, subscriptionLevel)
+    );
+
+    return {
+      id: section.id,
+      label: section.label,
+      icon: section.icon,
+      sortOrder: section.sortOrder,
+      items: topLevel.map((item) => ({
         id: item.id,
         label: item.label,
         route: item.route,
         icon: item.icon,
         badge: item.badge,
         sortOrder: item.sortOrder,
+        isFolder: item.isFolder,
+        children: item.isFolder
+          ? sectionItems
+              .filter(
+                (child) =>
+                  child.parentItemId === item.id &&
+                  isVisible(child, roles, subscriptionLevel)
+              )
+              .map((child) => ({
+                id: child.id,
+                label: child.label,
+                route: child.route,
+                icon: child.icon,
+                badge: child.badge,
+                sortOrder: child.sortOrder,
+                isFolder: false,
+                children: [],
+              }))
+          : [],
       })),
-  }));
+    };
+  });
 }
 
 async function getShellConfig() {

@@ -27,7 +27,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Pencil, Trash2, Folder } from "lucide-react";
 import { ICON_OPTIONS, ICON_MAP } from "@/lib/icon-map";
 
 interface Section {
@@ -40,6 +40,8 @@ interface Section {
 interface Item {
   id: string;
   sectionId: string;
+  parentItemId: string | null;
+  isFolder: boolean;
   label: string;
   route: string;
   icon: string | null;
@@ -71,6 +73,8 @@ interface Props {
 type SectionForm = { label: string; icon: string };
 type ItemForm = {
   sectionId: string;
+  parentItemId: string;
+  isFolder: boolean;
   label: string;
   route: string;
   icon: string;
@@ -81,6 +85,8 @@ type ItemForm = {
 const emptySectionForm: SectionForm = { label: "", icon: "" };
 const emptyItemForm: ItemForm = {
   sectionId: "",
+  parentItemId: "",
+  isFolder: false,
   label: "",
   route: "",
   icon: "",
@@ -174,8 +180,8 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
     refresh();
   }
 
-  function openNewItem(sectionId: string) {
-    setItemForm({ ...emptyItemForm, sectionId });
+  function openNewItem(sectionId: string, parentItemId?: string) {
+    setItemForm({ ...emptyItemForm, sectionId, parentItemId: parentItemId ?? "" });
     setIconSearch("");
     setItemDialog({ open: true, editing: null });
   }
@@ -183,6 +189,8 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
   function openEditItem(item: Item) {
     setItemForm({
       sectionId: item.sectionId,
+      parentItemId: item.parentItemId ?? "",
+      isFolder: item.isFolder,
       label: item.label,
       route: item.route,
       icon: item.icon ?? "",
@@ -207,8 +215,10 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
     const { editing } = itemDialog;
     const payload = {
       sectionId: itemForm.sectionId,
+      parentItemId: itemForm.parentItemId || null,
+      isFolder: itemForm.isFolder,
       label: itemForm.label,
-      route: itemForm.route,
+      route: itemForm.isFolder ? "" : itemForm.route,
       icon: itemForm.icon || undefined,
       requiredRoles: itemForm.requiredRoles,
       requiredSubLevel: itemForm.requiredSubLevel === "none" ? 0 : Number(itemForm.requiredSubLevel),
@@ -242,7 +252,9 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
   }
 
   async function reorderItem(item: Item, direction: "up" | "down") {
-    const sectionItems = initialItems.filter((i) => i.sectionId === item.sectionId);
+    const sectionItems = initialItems.filter(
+      (i) => i.sectionId === item.sectionId && (i.parentItemId ?? null) === (item.parentItemId ?? null)
+    );
     const idx = sectionItems.findIndex((i) => i.id === item.id);
     const swap = direction === "up" ? sectionItems[idx - 1] : sectionItems[idx + 1];
     if (!swap) return;
@@ -310,34 +322,78 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {sectionItems.map((item, iIdx) => (
-                  <div key={item.id} className="flex items-center justify-between rounded border p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{item.label}</span>
-                      <span className="text-xs text-muted-foreground">{item.route}</span>
-                      {item.requiredRoles.map((r) => (
-                        <Badge key={r} variant="outline" className="text-xs">{r}</Badge>
-                      ))}
-                      {item.requiredSubLevel > 0 && (
-                        <Badge variant="secondary" className="text-xs">L{item.requiredSubLevel}+</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" disabled={iIdx === 0 || isPending} onClick={() => reorderItem(item, "up")}>
-                        <ChevronUp className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" disabled={iIdx === sectionItems.length - 1 || isPending} onClick={() => reorderItem(item, "down")}>
-                        <ChevronDown className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  const topLevelItems = sectionItems.filter((i) => !i.parentItemId);
+                  return topLevelItems.map((item, iIdx) => {
+                    const children = sectionItems.filter((i) => i.parentItemId === item.id);
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <div className="flex items-center justify-between rounded border p-2">
+                          <div className="flex items-center gap-2">
+                            {item.isFolder && <Folder className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                            <span className="text-sm font-medium">{item.label}</span>
+                            {!item.isFolder && <span className="text-xs text-muted-foreground">{item.route}</span>}
+                            {item.requiredRoles.map((r) => (
+                              <Badge key={r} variant="outline" className="text-xs">{r}</Badge>
+                            ))}
+                            {item.requiredSubLevel > 0 && (
+                              <Badge variant="secondary" className="text-xs">L{item.requiredSubLevel}+</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" disabled={iIdx === 0 || isPending} onClick={() => reorderItem(item, "up")}>
+                              <ChevronUp className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" disabled={iIdx === topLevelItems.length - 1 || isPending} onClick={() => reorderItem(item, "down")}>
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        {item.isFolder && (
+                          <div className="ml-6 space-y-1 border-l pl-3">
+                            {children.map((child, cIdx) => (
+                              <div key={child.id} className="flex items-center justify-between rounded border p-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">{child.label}</span>
+                                  <span className="text-xs text-muted-foreground">{child.route}</span>
+                                  {child.requiredRoles.map((r) => (
+                                    <Badge key={r} variant="outline" className="text-xs">{r}</Badge>
+                                  ))}
+                                  {child.requiredSubLevel > 0 && (
+                                    <Badge variant="secondary" className="text-xs">L{child.requiredSubLevel}+</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" disabled={cIdx === 0 || isPending} onClick={() => reorderItem(child, "up")}>
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" disabled={cIdx === children.length - 1 || isPending} onClick={() => reorderItem(child, "down")}>
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => openEditItem(child)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => deleteItem(child.id)}>
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                            <Button variant="outline" size="sm" onClick={() => openNewItem(section.id, item.id)} disabled={isPending}>
+                              <Plus className="mr-1 h-3 w-3" /> Add Child Item
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
                 <Button variant="outline" size="sm" onClick={() => openNewItem(section.id)} disabled={isPending}>
                   <Plus className="mr-1 h-3 w-3" /> Add Item
                 </Button>
@@ -431,14 +487,37 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
             <DialogTitle>{itemDialog.editing ? "Edit Item" : "New Item"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {!itemForm.parentItemId && (
+              <div className="space-y-1">
+                <Label>Type</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setItemForm((f) => ({ ...f, isFolder: false }))}
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${!itemForm.isFolder ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                  >
+                    Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setItemForm((f) => ({ ...f, isFolder: true }))}
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${itemForm.isFolder ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                  >
+                    Folder
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Label</Label>
               <Input value={itemForm.label} onChange={(e) => setItemForm((f) => ({ ...f, label: e.target.value }))} />
             </div>
-            <div className="space-y-1">
-              <Label>Route</Label>
-              <Input value={itemForm.route} onChange={(e) => setItemForm((f) => ({ ...f, route: e.target.value }))} placeholder="/dashboard" />
-            </div>
+            {!itemForm.isFolder && (
+              <div className="space-y-1">
+                <Label>Route</Label>
+                <Input value={itemForm.route} onChange={(e) => setItemForm((f) => ({ ...f, route: e.target.value }))} placeholder="/dashboard" />
+              </div>
+            )}
 
             {/* Icon picker */}
             <div className="space-y-1">
@@ -564,7 +643,7 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setItemDialog({ open: false, editing: null })}>Cancel</Button>
-            <Button onClick={saveItem} disabled={!itemForm.label || !itemForm.route || isPending}>Save</Button>
+            <Button onClick={saveItem} disabled={!itemForm.label || (!itemForm.isFolder && !itemForm.route) || isPending}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

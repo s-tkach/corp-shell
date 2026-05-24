@@ -17,8 +17,10 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
   const body = await req.json() as {
     sectionId: string;
+    parentItemId?: string;
+    isFolder?: boolean;
     label: string;
-    route: string;
+    route?: string;
     icon?: string;
     badge?: string;
     requiredRoles?: string[];
@@ -29,8 +31,10 @@ export async function POST(req: NextRequest) {
     .insert(menuItems)
     .values({
       sectionId: body.sectionId,
+      parentItemId: body.parentItemId ?? null,
+      isFolder: body.isFolder ?? false,
       label: body.label,
-      route: body.route,
+      route: body.route ?? "",
       icon: body.icon ?? null,
       badge: body.badge ?? null,
       requiredRoles: body.requiredRoles ?? [],

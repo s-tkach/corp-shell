@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, Settings } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Settings } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,15 +26,43 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => {
+    const ids = new Set<string>();
+    for (const section of menu) {
+      for (const item of section.items) {
+        if (item.isFolder) ids.add(item.id);
+      }
+    }
+    return ids;
+  });
 
   useEffect(() => {
     setCollapsedSections((prev) => {
       const next = new Set(prev);
       for (const section of menu) {
         const hasActive = section.items.some(
-          (item) => pathname === item.route || pathname.startsWith(item.route + "/")
+          (item) =>
+            (item.route && (pathname === item.route || pathname.startsWith(item.route + "/"))) ||
+            item.children.some(
+              (child) => pathname === child.route || pathname.startsWith(child.route + "/")
+            )
         );
         if (hasActive) next.delete(section.id);
+      }
+      return next;
+    });
+
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      for (const section of menu) {
+        for (const item of section.items) {
+          if (item.isFolder) {
+            const hasActive = item.children.some(
+              (child) => pathname === child.route || pathname.startsWith(child.route + "/")
+            );
+            if (hasActive) next.delete(item.id);
+          }
+        }
       }
       return next;
     });
@@ -42,6 +70,15 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
 
   function toggleSection(id: string) {
     setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleFolder(id: string) {
+    setCollapsedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -118,6 +155,77 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
               {!isCollapsed && (
               <div className="space-y-1">
                 {section.items.map((item) => {
+                  if (item.isFolder) {
+                    const folderCollapsed = collapsedFolders.has(item.id);
+                    const hasActiveChild = item.children.some(
+                      (child) => pathname === child.route || pathname.startsWith(child.route + "/")
+                    );
+                    return (
+                      <div key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleFolder(item.id)}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                            hasActiveChild
+                              ? "text-sidebar-primary-foreground bg-sidebar-primary/20"
+                              : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground"
+                          )}
+                          title={sidebarCollapsed ? item.label : undefined}
+                        >
+                          {item.icon && (() => {
+                            const Icon = ICON_MAP[item.icon];
+                            return Icon
+                              ? <Icon className="h-4 w-4 flex-shrink-0" />
+                              : <span className="h-4 w-4 flex-shrink-0 flex items-center justify-center text-base leading-none">{item.icon}</span>;
+                          })()}
+                          {!sidebarCollapsed && (
+                            <>
+                              <span className="flex-1 truncate text-left">{item.label}</span>
+                              {folderCollapsed
+                                ? <ChevronRight className="h-3 w-3 flex-shrink-0 text-sidebar-foreground/50" />
+                                : <ChevronDown className="h-3 w-3 flex-shrink-0 text-sidebar-foreground/50" />
+                              }
+                            </>
+                          )}
+                        </button>
+                        {!sidebarCollapsed && !folderCollapsed && item.children.length > 0 && (
+                          <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                            {item.children.map((child) => {
+                              const active =
+                                pathname === child.route || pathname.startsWith(child.route + "/");
+                              return (
+                                <Link
+                                  key={child.id}
+                                  href={child.route}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                                    active
+                                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground"
+                                  )}
+                                >
+                                  {child.icon && (() => {
+                                    const Icon = ICON_MAP[child.icon];
+                                    return Icon
+                                      ? <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                                      : <span className="h-3.5 w-3.5 flex-shrink-0 flex items-center justify-center text-xs leading-none">{child.icon}</span>;
+                                  })()}
+                                  <span className="flex-1 truncate">{child.label}</span>
+                                  {child.badge && (
+                                    <span className="ml-auto rounded-full bg-sidebar-primary px-1.5 py-0.5 text-xs font-medium text-sidebar-primary-foreground">
+                                      {child.badge}
+                                    </span>
+                                  )}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   const active =
                     pathname === item.route || pathname.startsWith(item.route + "/");
                   return (

@@ -94,8 +94,10 @@ export const menuItems = pgTable("menu_items", {
   sectionId: uuid("section_id")
     .notNull()
     .references(() => menuSections.id, { onDelete: "cascade" }),
+  parentItemId: uuid("parent_item_id"),
+  isFolder: boolean("is_folder").notNull().default(false),
   label: text("label").notNull(),
-  route: text("route").notNull(),
+  route: text("route").notNull().default(""),
   icon: text("icon"),
   badge: text("badge"),
   requiredRoles: jsonb("required_roles").$type<string[]>().notNull().default([]),

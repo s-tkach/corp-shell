@@ -31,8 +31,10 @@ CREATE TABLE "idp_group_role_mappings" (
 CREATE TABLE "menu_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"section_id" uuid NOT NULL,
+	"parent_item_id" uuid,
+	"is_folder" boolean DEFAULT false NOT NULL,
 	"label" text NOT NULL,
-	"route" text NOT NULL,
+	"route" text DEFAULT '' NOT NULL,
 	"icon" text,
 	"badge" text,
 	"required_roles" jsonb DEFAULT '[]'::jsonb NOT NULL,

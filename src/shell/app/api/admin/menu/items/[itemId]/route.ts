@@ -21,6 +21,8 @@ export async function PATCH(
     requiredSubLevel: number;
     sortOrder: number;
     sectionId: string;
+    parentItemId: string | null;
+    isFolder: boolean;
   }>;
   const [row] = await db
     .update(menuItems)

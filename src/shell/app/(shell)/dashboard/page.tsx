@@ -45,6 +45,8 @@ async function getMenuItems(roles: string[], subscriptionLevel: number): Promise
         icon: item.icon,
         badge: item.badge,
         sortOrder: item.sortOrder,
+        isFolder: item.isFolder,
+        children: [],
       })),
   }));
 
