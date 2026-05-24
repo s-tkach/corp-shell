@@ -34,6 +34,7 @@
 | M12 | Performance & Load Validation | NFR targets verified under load |
 | M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, session-auth push API |
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
+| M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
 
 ---
 
@@ -369,8 +370,8 @@
 - [x] Package name: `@corp/shell-sdk` on GitHub Packages
 - [x] **Acceptance:** Tagged release publishes package; `npm install @corp/shell-sdk` resolves from GitHub Packages
 
-#### M9-3: Create-shell-app CLI — scaffolder
-- [x] `packages/create-shell-app/src/index.ts`: reads `<app-name>` arg, copies `template/` with substitutions
+#### M9-3: Create-shell-app CLI — scaffolder (`new` subcommand)
+- [x] `packages/create-shell-app/src/index.ts`: reads `<app-name>` arg under `new` subcommand, copies `template/` with substitutions
 - [x] Template contents:
   - React 18 + TypeScript + Webpack 5
   - Module Federation remote config (pre-filled `name`, `filename: 'remoteEntry.js'`)
@@ -379,7 +380,7 @@
   - `@corp/shell-sdk` pre-installed in template `package.json`
   - `.github/workflows/deploy.yml`: build → S3 sync → CloudFront invalidation
   - `README.md` with registration walkthrough
-- [x] **Acceptance:** `npx @corp/create-shell-app my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
+- [x] **Acceptance:** `npx @corp/create-shell-app new my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
 
 #### M9-4: Create-shell-app — publish pipeline
 - [x] `.github/workflows/publish-cli.yml`: trigger on tag `create-shell-app/v*.*.*`
@@ -648,6 +649,51 @@ Before marking v1 as released, confirm:
 - [ ] Cost Explorer tag `project=corp-shell` shows < $100/month in production
 - [ ] M14 launch criteria all pass (local dev path verified end-to-end)
 - [ ] `CONTRIBUTING.md` and issue templates present and reviewed
+
+---
+
+## M15 — Shell as Distributable Package
+
+**Goal:** Publish `src/shell` as `@corp/shell-app` to GitHub Packages and extend `create-shell-app` with `init` and `update` subcommands so operators can provision and update shell instances without forking the repository.
+
+**Depends on:** M9 (SDK & CLI), M14 (OSS readiness / local dev)
+
+**Status:** Planned — not started
+
+### Tasks
+
+#### M15-1: Prepare `src/shell` for publication
+- [ ] Set `"name": "@corp/shell-app"` and `"private": false` in `src/shell/package.json`
+- [ ] Add `"files"` array to `src/shell/package.json` (see ARCHITECTURE.md §15.5)
+- [ ] Add `shell-app/vX.Y.Z` tag format and release process to `CONTRIBUTING.md`
+- [ ] **Acceptance:** `pnpm --filter @corp/shell-app pack --dry-run` lists only source files; no `.next/` or `node_modules/`
+
+#### M15-2: GitHub Actions publish workflow
+- [ ] Create `.github/workflows/publish-shell-app.yml`
+- [ ] Trigger: tag `shell-app/vX.Y.Z`
+- [ ] Steps: checkout → pnpm install → `pnpm --filter @corp/shell-app build` (validates source compiles) → `npm publish --access restricted`
+- [ ] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@corp/shell-app@1.0.0` to GitHub Packages
+
+#### M15-3: `create-shell-app init` subcommand
+- [ ] Refactor `packages/create-shell-app/src/index.ts` to route `init`, `update`, `new` subcommands
+- [ ] `init <name>`: downloads `@corp/shell-app` from GitHub Packages, extracts source tree to `./<name>/`, writes `./<name>/.shell-version`
+- [ ] Existing default behaviour (scaffold child app) moves to `new <name>` subcommand
+- [ ] **Acceptance:** `npx @corp/create-shell-app init my-shell` creates a directory with full shell source and `.shell-version` file; `npx @corp/create-shell-app new my-app` still scaffolds a child app project
+
+#### M15-4: `create-shell-app update` subcommand
+- [ ] `update [--version X.Y.Z]`: reads `.shell-version` from CWD, downloads target `@corp/shell-app` version, fully overwrites shell source files, updates `.shell-version`
+- [ ] Prints list of overwritten files and post-update instructions (`pnpm install`, `pnpm drizzle-kit migrate`)
+- [ ] **Acceptance:** Running `update --version 1.1.0` in a provisioned instance replaces all shell files and updates `.shell-version` to `1.1.0`
+
+#### M15-5: CLI publish pipeline update
+- [ ] Update `publish-cli.yml` to build and publish `@corp/create-shell-app` with the new subcommands
+- [ ] Bump `create-shell-app` version to `1.0.0` (breaking change: bare `npx @corp/create-shell-app <name>` removed)
+- [ ] **Acceptance:** `npx @corp/create-shell-app --help` shows `init`, `update`, `new` subcommands
+
+#### M15-6: Documentation
+- [ ] Update `README.md` "Getting started" to show `init` as the primary provisioning path
+- [ ] Update `CONTRIBUTING.md` with versioning and release process for `@corp/shell-app`
+- [ ] **Acceptance:** A new operator can provision a shell instance using only the README without reading source code
 
 ---
 

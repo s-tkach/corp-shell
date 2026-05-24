@@ -42,10 +42,11 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | G4 | Admin panel covering menus, roles, users, apps, subscriptions, SSO status, and branding |
 | G5 | First-run setup wizard to configure app name, logo, brand color, and initial super-admin |
 | G6 | Shell SDK + CLI published to GitHub Packages for child app teams |
-| G7 | All infrastructure (shell + child apps) on a single AWS account, managed via AWS Amplify |
-| G8 | Cost-effective at ≤1,000 concurrent users; target <$50/month per 100 active users |
-| G9 | Fork-and-extend from `satnaing/shadcn-admin` — not built from scratch |
-| G10 | Self-hosted / local-first deployment: the shell must be runnable without any AWS account using Docker Compose + local AES-256-GCM encryption + local disk storage |
+| G7 | Shell host distributed as a versioned npm package (`@corp/shell-app`) installable and updatable via CLI |
+| G8 | All infrastructure (shell + child apps) on a single AWS account, managed via AWS Amplify |
+| G9 | Cost-effective at ≤1,000 concurrent users; target <$50/month per 100 active users |
+| G10 | Fork-and-extend from `satnaing/shadcn-admin` — not built from scratch |
+| G11 | Self-hosted / local-first deployment: the shell must be runnable without any AWS account using Docker Compose + local AES-256-GCM encryption + local disk storage |
 
 ## 4. Non-Goals (v1)
 
@@ -66,7 +67,7 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 A corporate employee who logs in via the configured OIDC provider. Sees only the menu items their role and subscription tier permit. Navigates between internal tools without re-authenticating. The shell feels like one coherent product.
 
 ### 5.2 Application Developer
-Builds a new internal React application. Runs `npx @corp/create-shell-app` to scaffold a pre-wired project, deploys it independently to S3/CloudFront (GitHub Actions), then registers it in the Admin Panel. No shell code changes required. Target onboarding time: **under 2 hours**.
+Builds a new internal React application. Runs `npx @corp/create-shell-app new <app-name>` to scaffold a pre-wired project, deploys it independently to S3/CloudFront (GitHub Actions), then registers it in the Admin Panel. No shell code changes required. Target onboarding time: **under 2 hours**.
 
 ### 5.3 Administrator
 Manages shell configuration via the Admin Panel. Adds child apps, creates menu items, assigns roles and subscription tiers. Requires **zero engineering involvement** for routine config changes.
@@ -225,7 +226,7 @@ Also exports shared Tailwind design token presets so child apps extend the same 
 
 #### FR-INT-5: Shell CLI — `@corp/create-shell-app`
 ```bash
-npx @corp/create-shell-app my-app
+npx @corp/create-shell-app new my-app
 ```
 Scaffolds:
 - React 18 + TypeScript + Webpack 5 project
@@ -296,6 +297,36 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 **FR-NOTIF-7:** Admins (`admin` or `super_admin` role) can create, view, and delete notifications at `/admin/notifications`. The create form collects: title (required), body (optional), target type + target value, optional action, and optional expiry.
 
 **FR-NOTIF-8:** Child apps can push notifications programmatically by calling `POST /api/notifications` directly from the browser. The request is authenticated via the user's existing SSO session cookie — no additional secret or SDK method is required. The endpoint accepts the same payload as admin-created notifications and supports all targeting modes.
+
+### 6.9 Shell Distribution (FR-SHELL-DIST)
+
+**FR-SHELL-DIST-1: Package publication**
+`src/shell` is published to GitHub Packages as `@corp/shell-app` (scoped, access restricted). Each release is tagged `shell-app/vX.Y.Z` and triggers a GitHub Actions publish workflow identical in structure to `publish-sdk.yml`.
+
+**FR-SHELL-DIST-2: Provisioning a new shell instance**
+Running `npx @corp/create-shell-app init <instance-name>` must:
+1. Download the latest (or pinned) `@corp/shell-app` package from GitHub Packages
+2. Extract the full source tree into `./<instance-name>/`
+3. Substitute `{{INSTANCE_NAME}}` tokens in extracted files
+4. Print next steps: `cd <instance-name>`, copy `.env.local.example` → `.env.local`, run migrations, start dev server
+
+**FR-SHELL-DIST-3: Updating an existing shell instance**
+Running `npx @corp/create-shell-app update [--version X.Y.Z]` from within a provisioned shell directory must:
+1. Download the specified version of `@corp/shell-app` (default: latest)
+2. Fully overwrite all shell source files with the new version's files
+3. Print a summary of changed files and remind the operator to re-run migrations
+
+**FR-SHELL-DIST-4: Customization contract**
+All instance-specific configuration is expressed exclusively through environment variables (`.env.local` / Amplify env vars) and database records (branding, OIDC config, menus, roles). No file-level overrides are supported. This is the invariant that makes full-overwrite updates safe.
+
+**FR-SHELL-DIST-5: CLI subcommand restructure**
+`@corp/create-shell-app` commands:
+- `npx @corp/create-shell-app init <name>` — provision a new shell host instance (FR-SHELL-DIST-2)
+- `npx @corp/create-shell-app update [--version X.Y.Z]` — update current instance (FR-SHELL-DIST-3)
+- `npx @corp/create-shell-app new <app-name>` — scaffold a child app (existing behaviour, renamed from default)
+
+**FR-SHELL-DIST-6: Version tracking**
+A provisioned instance records the installed shell version in a `.shell-version` file at the repo root. `update` reads this file to show a summary (`installed: 1.0.0 → target: 1.2.0`) before overwriting.
 
 ---
 
@@ -744,7 +775,7 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 5. Employee navigates without re-authenticating
 
 ### 10.3 Developer Onboards a New Child App
-1. `npx @corp/create-shell-app inventory-app`
+1. `npx @corp/create-shell-app new inventory-app`
 2. Develops app; pushes to GitHub → Actions deploys `remoteEntry.js` to S3/CloudFront
 3. Copies CloudFront URL from Actions output
 4. Opens Admin Panel → Application Registry → Add App
@@ -773,6 +804,21 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 6. Complete wizard: logo stored to `public/uploads/`; OIDC config encrypted with AES-256-GCM
 7. Shell loads at `/dashboard`; admin panel accessible
 8. To switch to AWS-backed production: set `AWS_S3_BUCKET`, `KMS_KEY_ID`, `AWS_REGION`, `ENCRYPTION_PROVIDER=kms` — no code changes required
+
+### 10.7 Operator Provisions a New Shell Instance
+1. `npx @corp/create-shell-app init my-corp-shell`
+2. `cd my-corp-shell && cp .env.local.example .env.local`
+3. Fill in `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, `DATABASE_URL`
+4. `docker compose up -d && pnpm drizzle-kit migrate`
+5. `pnpm --filter shell dev` → navigate to `/setup`, complete wizard
+6. `.shell-version` file at repo root records the installed `@corp/shell-app` version
+
+### 10.8 Operator Updates an Existing Shell Instance
+1. Review release notes for the new version
+2. `npx @corp/create-shell-app update --version 1.2.0` (or omit `--version` for latest)
+3. CLI overwrites shell source files; prints list of changed files
+4. Run `pnpm install && pnpm drizzle-kit migrate` to apply any dependency or schema changes
+5. Test locally, then push — Amplify redeploys automatically
 
 ---
 

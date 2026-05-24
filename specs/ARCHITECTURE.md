@@ -16,10 +16,11 @@ The Corporate Application Shell is a **Next.js 15 monorepo** deployed on AWS via
 ## 2. Repository Structure
 
 ```
-corp-shell/                          ← monorepo root
+corp-shell/                          ← monorepo root (also the @corp/shell-app source)
+├── .shell-version                   # Installed shell version (written by create-shell-app init/update)
 ├── package.json                     # Workspace root (pnpm workspaces)
 ├── src/
-│   └── shell/                       # Next.js 15 application
+│   └── shell/                       # Next.js 15 application — published as @corp/shell-app
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout (Server Component): auth, menu, sidebar
 │   │   ├── (auth)/                  # /login, /api/auth/callback, /error
@@ -69,9 +70,9 @@ corp-shell/                          ← monorepo root
 │   │   │   ├── events/              # ShellEventBus
 │   │   │   └── tailwind/            # Shared design token preset
 │   │   └── package.json
-│   └── create-shell-app/            # @corp/create-shell-app CLI
+│   └── create-shell-app/            # @corp/create-shell-app CLI (init, update, new subcommands)
 │       ├── src/
-│       │   └── index.ts             # npx scaffolder entry
+│       │   └── index.ts             # CLI entry: routes init / update / new subcommands
 │       └── template/                # Child app project template
 ```
 
@@ -465,16 +466,35 @@ aws s3 sync dist/ s3://corp-child-apps/{app-name}/
 aws cloudfront create-invalidation
 ```
 
-### 11.3 SDK / CLI Publish Pipeline
+### 11.3 SDK & CLI Publish Pipelines
+
+**SDK** (trigger: tag `shell-sdk/v*.*.*`):
+```
+pnpm --filter shell-sdk build
+  ↓
+npm publish --access restricted → @corp/shell-sdk on GitHub Packages
+```
+
+**CLI** (trigger: tag `create-shell-app/v*.*.*`):
+```
+pnpm --filter create-shell-app build
+  ↓
+npm publish --access restricted → @corp/create-shell-app on GitHub Packages
+```
+
+### 11.4 Shell App Publish Pipeline
+
+Trigger: tag `shell-app/vX.Y.Z` pushed to `main`.
 
 ```
-on: push tag v*.*.*  (packages/shell-sdk or packages/create-shell-app)
+pnpm --filter shell build    # Next.js production build (validates the source compiles)
   ↓
-pnpm build
-  ↓
-npm publish --access restricted  (NODE_AUTH_TOKEN = GITHUB_TOKEN)
-  → @corp/shell-sdk on GitHub Packages
+npm publish --access restricted → @corp/shell-app on GitHub Packages
+  (files: app/, components/, lib/, public/, middleware.ts, next.config.ts, etc.
+   — full source tree, not the compiled .next output)
 ```
+
+The published package contains raw TypeScript/TSX source. Consumers receive the source tree, not a compiled bundle — each instance runs its own `next build` in its own deployment environment.
 
 ---
 
@@ -735,4 +755,86 @@ The `README.md` "Getting started" section is reordered to be local-first: Docker
 
 ---
 
-*End of Architecture Design v1.1*
+## 15. Template-as-Package Architecture
+
+### 15.1 Overview
+
+`src/shell` is published as `@corp/shell-app` to GitHub Packages. Consumers do not fork the repository — they provision a shell instance via the CLI and receive future updates as npm package versions.
+
+```
+GitHub Packages
+  @corp/shell-app@x.y.z  ← full Next.js source tree
+        ↓
+npx @corp/create-shell-app init <name>
+  → downloads @corp/shell-app, extracts source into <name>/
+  → writes <name>/.shell-version
+
+npx @corp/create-shell-app update [--version x.y.z]
+  → downloads target @corp/shell-app version
+  → full overwrite of shell source files
+  → operator runs: pnpm install + pnpm drizzle-kit migrate
+```
+
+### 15.2 Customization Contract
+
+The full-overwrite update model is safe because all instance-specific state lives outside the source tree:
+
+| Concern | Location |
+|---------|----------|
+| Secrets, API keys | `.env.local` / Amplify env vars |
+| Branding (logo, colors, name) | `shell_config` DB row (set via wizard / admin panel) |
+| Navigation menus | `menu_sections` + `menu_items` DB tables |
+| OIDC config | `shell_config.oidcClientSecret` (KMS-encrypted) |
+| Roles & permissions | `roles` + `role_assignments` DB tables |
+| Child app registry | `app_registry` DB table |
+
+Operators MUST NOT modify shell source files. Any file in `src/shell/` is owned by `@corp/shell-app` and will be overwritten on update.
+
+### 15.3 Version Tracking
+
+A `.shell-version` file at the instance repo root records the installed version:
+
+```
+1.2.0
+```
+
+`create-shell-app update` reads this file to display a before/after version summary (`installed: 1.0.0 → target: 1.2.0`). It is written by both `init` and `update`.
+
+### 15.4 CLI Subcommands
+
+| Subcommand | Purpose |
+|------------|---------|
+| `init <name>` | Provision a new shell host instance from `@corp/shell-app` |
+| `update [--version X.Y.Z]` | Full-overwrite update of current instance |
+| `new <app-name>` | Scaffold a new Module Federation child app (existing behaviour) |
+
+### 15.5 `src/shell/package.json` Changes Required for Publishing
+
+```json
+{
+  "name": "@corp/shell-app",
+  "version": "1.0.0",
+  "private": false,
+  "files": [
+    "app",
+    "components",
+    "lib",
+    "public",
+    "middleware.ts",
+    "next.config.ts",
+    "tsconfig.json",
+    "postcss.config.mjs",
+    "components.json",
+    "instrumentation.ts",
+    "proxy.ts",
+    ".env.local.example",
+    "package.json"
+  ]
+}
+```
+
+`.next/`, `node_modules/`, and `*.env.local` are excluded. The `files` array ships only the source, not build artefacts or secrets.
+
+---
+
+*End of Architecture Design v1.2*
