@@ -1,5 +1,4 @@
 import {
-  LayoutDashboard,
   Palette,
   Menu,
   Shield,
@@ -19,7 +18,6 @@ export interface AdminRoute {
 }
 
 export const ADMIN_ROUTES: AdminRoute[] = [
-  { href: "/admin",               label: "Overview",      description: "Admin panel overview",                       icon: LayoutDashboard },
   { href: "/admin/branding",      label: "Branding",      description: "App name, logo, and brand color",            icon: Palette },
   { href: "/admin/menu",          label: "Menu",          description: "CRUD and reorder nav sections and items",    icon: Menu },
   { href: "/admin/roles",         label: "Roles",         description: "Manage roles and IDP group mappings",        icon: Shield },

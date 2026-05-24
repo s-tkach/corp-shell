@@ -1062,7 +1062,7 @@ export function BrandingClient({ config }: Props) {
               {/* Content area */}
               <div className="flex flex-col flex-1 min-w-0">
                 {/* Top bar */}
-                <div className="flex items-center justify-between px-3 py-2 border-b bg-background" style={{ minHeight: "36px" }}>
+                <div className="flex items-center justify-between px-3 py-2.5 border-b bg-background" style={{ minHeight: "36px" }}>
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                   <div className="flex items-center gap-1.5">
                     {headerShowDate && (
@@ -1193,8 +1193,8 @@ export function BrandingClient({ config }: Props) {
               className="absolute pointer-events-none"
               style={{
                 bottom: toastPosition.startsWith("bottom") ? "8px" : "auto",
-                top: toastPosition.startsWith("top") ? "8px" : "auto",
-                left: toastPosition.endsWith("left") ? "8px" : "auto",
+                top: toastPosition.startsWith("top") ? "44px" : "auto",
+                left: toastPosition.endsWith("left") ? "168px" : "auto",
                 right: toastPosition.endsWith("right") ? "8px" : "auto",
               }}
             >
