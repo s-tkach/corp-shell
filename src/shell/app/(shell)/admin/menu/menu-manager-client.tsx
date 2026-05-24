@@ -13,8 +13,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ChevronUp, ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
+import { ICON_OPTIONS, ICON_MAP } from "@/lib/icon-map";
 
 interface Section {
   id: string;
@@ -40,10 +54,18 @@ interface Role {
   displayName: string;
 }
 
+interface Tier {
+  id: string;
+  slug: string;
+  displayName: string;
+  level: number;
+}
+
 interface Props {
   sections: Section[];
   items: Item[];
   allRoles: Role[];
+  allTiers: Tier[];
 }
 
 type SectionForm = { label: string; icon: string };
@@ -52,7 +74,7 @@ type ItemForm = {
   label: string;
   route: string;
   icon: string;
-  requiredRoles: string;
+  requiredRoles: string[];
   requiredSubLevel: string;
 };
 
@@ -62,11 +84,11 @@ const emptyItemForm: ItemForm = {
   label: "",
   route: "",
   icon: "",
-  requiredRoles: "",
-  requiredSubLevel: "0",
+  requiredRoles: [],
+  requiredSubLevel: "none",
 };
 
-export function MenuManagerClient({ sections: initialSections, items: initialItems, allRoles }: Props) {
+export function MenuManagerClient({ sections: initialSections, items: initialItems, allRoles, allTiers }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -81,6 +103,8 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
     editing: null,
   });
   const [itemForm, setItemForm] = useState<ItemForm>(emptyItemForm);
+  const [iconSearch, setIconSearch] = useState("");
+  const [sectionIconSearch, setSectionIconSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
@@ -89,11 +113,13 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
 
   function openNewSection() {
     setSectionForm(emptySectionForm);
+    setSectionIconSearch("");
     setSectionDialog({ open: true, editing: null });
   }
 
   function openEditSection(s: Section) {
     setSectionForm({ label: s.label, icon: s.icon ?? "" });
+    setSectionIconSearch("");
     setSectionDialog({ open: true, editing: s });
   }
 
@@ -150,6 +176,7 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
 
   function openNewItem(sectionId: string) {
     setItemForm({ ...emptyItemForm, sectionId });
+    setIconSearch("");
     setItemDialog({ open: true, editing: null });
   }
 
@@ -159,10 +186,20 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
       label: item.label,
       route: item.route,
       icon: item.icon ?? "",
-      requiredRoles: item.requiredRoles.join(", "),
-      requiredSubLevel: String(item.requiredSubLevel),
+      requiredRoles: item.requiredRoles,
+      requiredSubLevel: item.requiredSubLevel > 0 ? String(item.requiredSubLevel) : "none",
     });
+    setIconSearch("");
     setItemDialog({ open: true, editing: item });
+  }
+
+  function toggleRole(slug: string) {
+    setItemForm((f) => ({
+      ...f,
+      requiredRoles: f.requiredRoles.includes(slug)
+        ? f.requiredRoles.filter((r) => r !== slug)
+        : [...f.requiredRoles, slug],
+    }));
   }
 
   async function saveItem() {
@@ -173,10 +210,8 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
       label: itemForm.label,
       route: itemForm.route,
       icon: itemForm.icon || undefined,
-      requiredRoles: itemForm.requiredRoles
-        ? itemForm.requiredRoles.split(",").map((r) => r.trim()).filter(Boolean)
-        : [],
-      requiredSubLevel: Number(itemForm.requiredSubLevel),
+      requiredRoles: itemForm.requiredRoles,
+      requiredSubLevel: itemForm.requiredSubLevel === "none" ? 0 : Number(itemForm.requiredSubLevel),
     };
 
     if (editing) {
@@ -225,6 +260,13 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
     ]);
     refresh();
   }
+
+  const filteredIcons = ICON_OPTIONS.filter((name) =>
+    name.toLowerCase().includes(iconSearch.toLowerCase())
+  );
+  const filteredSectionIcons = ICON_OPTIONS.filter((name) =>
+    name.toLowerCase().includes(sectionIconSearch.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -318,7 +360,61 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
             </div>
             <div className="space-y-1">
               <Label>Icon (optional)</Label>
-              <Input value={sectionForm.icon} onChange={(e) => setSectionForm((f) => ({ ...f, icon: e.target.value }))} placeholder="e.g. LayoutDashboard" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <span className="flex items-center gap-2">
+                      {sectionForm.icon && ICON_MAP[sectionForm.icon] ? (
+                        <>
+                          {(() => { const Icon = ICON_MAP[sectionForm.icon]; return Icon ? <Icon className="h-4 w-4" /> : null; })()}
+                          <span>{sectionForm.icon}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">No icon</span>
+                      )}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-72 p-2" align="start">
+                  <Input
+                    placeholder="Search icons..."
+                    value={sectionIconSearch}
+                    onChange={(e) => setSectionIconSearch(e.target.value)}
+                    className="mb-2 h-8"
+                  />
+                  <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
+                    {filteredSectionIcons.map((name) => {
+                      const Icon = ICON_MAP[name];
+                      if (!Icon) return null;
+                      return (
+                        <button
+                          type="button"
+                          key={name}
+                          title={name}
+                          onClick={() => setSectionForm((f) => ({ ...f, icon: name }))}
+                          className={`flex flex-col items-center gap-0.5 rounded p-1.5 text-xs transition-colors hover:bg-accent ${sectionForm.icon === name ? "bg-primary text-primary-foreground hover:bg-primary" : ""}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate w-full text-center" style={{ fontSize: "9px" }}>{name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {sectionForm.icon && (
+                    <button
+                      type="button"
+                      className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground text-center"
+                      onClick={() => setSectionForm((f) => ({ ...f, icon: "" }))}
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           <DialogFooter>
@@ -330,7 +426,7 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
 
       {/* Item dialog */}
       <Dialog open={itemDialog.open} onOpenChange={(o) => setItemDialog((s) => ({ ...s, open: o }))}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{itemDialog.editing ? "Edit Item" : "New Item"}</DialogTitle>
           </DialogHeader>
@@ -343,26 +439,127 @@ export function MenuManagerClient({ sections: initialSections, items: initialIte
               <Label>Route</Label>
               <Input value={itemForm.route} onChange={(e) => setItemForm((f) => ({ ...f, route: e.target.value }))} placeholder="/dashboard" />
             </div>
+
+            {/* Icon picker */}
             <div className="space-y-1">
               <Label>Icon (optional)</Label>
-              <Input value={itemForm.icon} onChange={(e) => setItemForm((f) => ({ ...f, icon: e.target.value }))} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <span className="flex items-center gap-2">
+                      {itemForm.icon && ICON_MAP[itemForm.icon] ? (
+                        <>
+                          {(() => { const Icon = ICON_MAP[itemForm.icon]; return Icon ? <Icon className="h-4 w-4" /> : null; })()}
+                          <span>{itemForm.icon}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">No icon</span>
+                      )}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-72 p-2" align="start">
+                  <Input
+                    placeholder="Search icons..."
+                    value={iconSearch}
+                    onChange={(e) => setIconSearch(e.target.value)}
+                    className="mb-2 h-8"
+                  />
+                  <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
+                    {filteredIcons.map((name) => {
+                      const Icon = ICON_MAP[name];
+                      if (!Icon) return null;
+                      return (
+                        <button
+                          type="button"
+                          key={name}
+                          title={name}
+                          onClick={() => setItemForm((f) => ({ ...f, icon: name }))}
+                          className={`flex flex-col items-center gap-0.5 rounded p-1.5 text-xs transition-colors hover:bg-accent ${itemForm.icon === name ? "bg-primary text-primary-foreground hover:bg-primary" : ""}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate w-full text-center" style={{ fontSize: "9px" }}>{name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {itemForm.icon && (
+                    <button
+                      type="button"
+                      className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground text-center"
+                      onClick={() => setItemForm((f) => ({ ...f, icon: "" }))}
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="space-y-1">
-              <Label>Required Roles (comma-separated)</Label>
-              <Input
-                value={itemForm.requiredRoles}
-                onChange={(e) => setItemForm((f) => ({ ...f, requiredRoles: e.target.value }))}
-                placeholder={allRoles.map((r) => r.slug).join(", ")}
-              />
+
+            {/* Required Roles */}
+            <div className="space-y-2">
+              <Label>Required Roles</Label>
+              {allRoles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No roles defined</p>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <span className="flex flex-wrap gap-1 flex-1 text-left">
+                        {itemForm.requiredRoles.length === 0 ? (
+                          <span className="text-muted-foreground">No restriction</span>
+                        ) : (
+                          itemForm.requiredRoles.map((slug) => {
+                            const role = allRoles.find((r) => r.slug === slug);
+                            return (
+                              <Badge key={slug} variant="secondary" className="text-xs">
+                                {role?.displayName ?? slug}
+                              </Badge>
+                            );
+                          })
+                        )}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-full min-w-[200px]">
+                    {allRoles.map((role) => (
+                      <DropdownMenuCheckboxItem
+                        key={role.slug}
+                        checked={itemForm.requiredRoles.includes(role.slug)}
+                        onCheckedChange={() => toggleRole(role.slug)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {role.displayName}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
+
+            {/* Required Subscription Level */}
             <div className="space-y-1">
-              <Label>Required Subscription Level</Label>
-              <Input
-                type="number"
-                min={0}
-                value={itemForm.requiredSubLevel}
-                onChange={(e) => setItemForm((f) => ({ ...f, requiredSubLevel: e.target.value }))}
-              />
+              <Label>Required Subscription</Label>
+              <Select value={itemForm.requiredSubLevel} onValueChange={(v) => setItemForm((f) => ({ ...f, requiredSubLevel: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No restriction" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTiers.map((tier) => (
+                    <SelectItem key={tier.id} value={String(tier.level)}>
+                      {tier.displayName} (L{tier.level})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

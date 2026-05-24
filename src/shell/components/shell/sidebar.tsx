@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, Settings } from "lucide-react";
+import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -92,11 +93,12 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
                       )}
                       title={sidebarCollapsed ? item.label : undefined}
                     >
-                      {item.icon && (
-                        <span className="h-4 w-4 flex-shrink-0 flex items-center justify-center text-base leading-none">
-                          {item.icon}
-                        </span>
-                      )}
+                      {item.icon && (() => {
+                        const Icon = ICON_MAP[item.icon];
+                        return Icon
+                          ? <Icon className="h-4 w-4 flex-shrink-0" />
+                          : <span className="h-4 w-4 flex-shrink-0 flex items-center justify-center text-base leading-none">{item.icon}</span>;
+                      })()}
                       {!sidebarCollapsed && (
                         <span className="flex-1 truncate">{item.label}</span>
                       )}
