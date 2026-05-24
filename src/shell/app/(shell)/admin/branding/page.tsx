@@ -19,6 +19,11 @@ export default async function BrandingPage() {
       loginButtonText: shellConfig.loginButtonText,
       headerShowDate: shellConfig.headerShowDate,
       headerDateFormat: shellConfig.headerDateFormat,
+      toastPosition: shellConfig.toastPosition,
+      toastBgColor: shellConfig.toastBgColor,
+      toastTextColor: shellConfig.toastTextColor,
+      toastBorderColor: shellConfig.toastBorderColor,
+      toastDuration: shellConfig.toastDuration,
     })
     .from(shellConfig)
     .limit(1);

@@ -121,6 +121,13 @@ export default async function ShellGroupLayout({ children }: { children: React.R
       initialSidebarCollapsed={preferences.sidebarCollapsed ?? false}
       headerShowDate={config?.headerShowDate ?? false}
       headerDateFormat={config?.headerDateFormat ?? "PPP"}
+      toastConfig={{
+        position: config?.toastPosition ?? "bottom-right",
+        bgColor: config?.toastBgColor ?? "#ffffff",
+        textColor: config?.toastTextColor ?? "#020817",
+        borderColor: config?.toastBorderColor ?? "#e2e8f0",
+        duration: config?.toastDuration ?? 5000,
+      }}
     >
       {children}
     </ShellLayoutClient>

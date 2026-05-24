@@ -6,6 +6,7 @@ import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { NotificationProvider } from "./notifications/notification-provider";
 import { NotificationToastStack } from "./notifications/notification-toast";
+import type { ToastConfig } from "./notifications/notification-provider";
 import type { MenuSection } from "@/app/api/menu/route";
 
 interface ShellLayoutClientProps {
@@ -19,6 +20,7 @@ interface ShellLayoutClientProps {
   initialSidebarCollapsed: boolean;
   headerShowDate: boolean;
   headerDateFormat: string;
+  toastConfig: ToastConfig;
 }
 
 export function ShellLayoutClient({
@@ -32,6 +34,7 @@ export function ShellLayoutClient({
   initialSidebarCollapsed,
   headerShowDate,
   headerDateFormat,
+  toastConfig,
 }: ShellLayoutClientProps) {
   const { setSidebarCollapsed } = useShellStore();
 
@@ -40,7 +43,7 @@ export function ShellLayoutClient({
   }, [initialSidebarCollapsed, setSidebarCollapsed]);
 
   return (
-    <NotificationProvider>
+    <NotificationProvider toastConfig={toastConfig}>
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} />
         <div className="flex flex-1 flex-col overflow-hidden">

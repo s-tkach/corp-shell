@@ -10,6 +10,22 @@ import {
 } from "react";
 import { useShellStore } from "@/lib/store/shell-store";
 
+export interface ToastConfig {
+  position: string;
+  bgColor: string;
+  textColor: string;
+  borderColor: string;
+  duration: number;
+}
+
+export const DEFAULT_TOAST_CONFIG: ToastConfig = {
+  position: "bottom-right",
+  bgColor: "#ffffff",
+  textColor: "#020817",
+  borderColor: "#e2e8f0",
+  duration: 5000,
+};
+
 export interface NotificationItem {
   id: string;
   title: string;
@@ -30,6 +46,7 @@ interface NotificationsContextValue {
   notifications: NotificationItem[];
   unreadCount: number;
   toasts: NotificationItem[];
+  toastConfig: ToastConfig;
   dismissToast: (id: string) => void;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -44,7 +61,7 @@ export function useNotifications(): NotificationsContextValue {
   return ctx;
 }
 
-export function NotificationProvider({ children }: { children: React.ReactNode }) {
+export function NotificationProvider({ children, toastConfig = DEFAULT_TOAST_CONFIG }: { children: React.ReactNode; toastConfig?: ToastConfig }) {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [toasts, setToasts] = useState<NotificationItem[]>([]);
   const setUnreadCount = useShellStore((s) => s.setUnreadCount);
@@ -131,7 +148,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   return (
     <NotificationsContext.Provider
-      value={{ notifications: notifs, unreadCount, toasts, dismissToast, markRead, markAllRead, refresh }}
+      value={{ notifications: notifs, unreadCount, toasts, toastConfig, dismissToast, markRead, markAllRead, refresh }}
     >
       {children}
     </NotificationsContext.Provider>

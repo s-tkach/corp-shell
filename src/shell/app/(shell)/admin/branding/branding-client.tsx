@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Save, RotateCcw, ChevronDown, Bell, Moon, Settings } from "lucide-react";
+import { Upload, Save, RotateCcw, ChevronDown, Bell, Moon, Settings, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -191,6 +191,11 @@ interface Config {
   loginButtonText: string | null;
   headerShowDate: boolean | null;
   headerDateFormat: string | null;
+  toastPosition: string | null;
+  toastBgColor: string | null;
+  toastTextColor: string | null;
+  toastBorderColor: string | null;
+  toastDuration: number | null;
 }
 
 interface Props {
@@ -311,6 +316,16 @@ export function BrandingClient({ config }: Props) {
   const [headerDateFormat, setHeaderDateFormat] = useState(config?.headerDateFormat ?? "PPP");
   const [savedHeaderShowDate] = useState(config?.headerShowDate ?? false);
   const [savedHeaderDateFormat] = useState(config?.headerDateFormat ?? "PPP");
+  const [toastPosition, setToastPosition] = useState(config?.toastPosition ?? "bottom-right");
+  const [toastBgColor, setToastBgColor] = useState(config?.toastBgColor ?? "#ffffff");
+  const [toastTextColor, setToastTextColor] = useState(config?.toastTextColor ?? "#020817");
+  const [toastBorderColor, setToastBorderColor] = useState(config?.toastBorderColor ?? "#e2e8f0");
+  const [toastDuration, setToastDuration] = useState(config?.toastDuration ?? 5000);
+  const [savedToastPosition] = useState(config?.toastPosition ?? "bottom-right");
+  const [savedToastBgColor] = useState(config?.toastBgColor ?? "#ffffff");
+  const [savedToastTextColor] = useState(config?.toastTextColor ?? "#020817");
+  const [savedToastBorderColor] = useState(config?.toastBorderColor ?? "#e2e8f0");
+  const [savedToastDuration] = useState(config?.toastDuration ?? 5000);
   const [uploading, setUploading] = useState(false);
   const [loginBgUploading, setLoginBgUploading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -337,7 +352,12 @@ export function BrandingClient({ config }: Props) {
     countDiffs(colorOverridesDark, savedOverridesDark) +
     (appName !== savedAppName ? 1 : 0) +
     (headerShowDate !== savedHeaderShowDate ? 1 : 0) +
-    (headerDateFormat !== savedHeaderDateFormat ? 1 : 0);
+    (headerDateFormat !== savedHeaderDateFormat ? 1 : 0) +
+    (toastPosition !== savedToastPosition ? 1 : 0) +
+    (toastBgColor !== savedToastBgColor ? 1 : 0) +
+    (toastTextColor !== savedToastTextColor ? 1 : 0) +
+    (toastBorderColor !== savedToastBorderColor ? 1 : 0) +
+    (toastDuration !== savedToastDuration ? 1 : 0);
 
   const activeOverrides = activeTheme === "light" ? colorOverrides : colorOverridesDark;
   const setActiveOverrides = activeTheme === "light" ? setColorOverrides : setColorOverridesDark;
@@ -363,6 +383,14 @@ export function BrandingClient({ config }: Props) {
     } else {
       setColorOverridesDark({});
     }
+  }
+
+  function handleResetNotifications() {
+    setToastPosition("bottom-right");
+    setToastBgColor("#ffffff");
+    setToastTextColor("#020817");
+    setToastBorderColor("#e2e8f0");
+    setToastDuration(5000);
   }
 
   function handleResetLoginPage() {
@@ -441,6 +469,11 @@ export function BrandingClient({ config }: Props) {
         loginButtonText,
         headerShowDate,
         headerDateFormat,
+        toastPosition,
+        toastBgColor,
+        toastTextColor,
+        toastBorderColor,
+        toastDuration,
         ...(primaryHex ? { primaryColor: primaryHex } : {}),
       }),
     });
@@ -455,11 +488,12 @@ export function BrandingClient({ config }: Props) {
     refresh();
   }
 
-  const TAB_ORDER = ["identity", "colors", "login"] as const;
+  const TAB_ORDER = ["identity", "colors", "notifications", "login"] as const;
   type TabKey = typeof TAB_ORDER[number];
   const TAB_LABELS: Record<TabKey, string> = {
     identity: "Identity",
     colors: "Design colors",
+    notifications: "Notifications",
     login: "Login page",
   };
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
@@ -495,6 +529,7 @@ export function BrandingClient({ config }: Props) {
             <TabsList className="w-full justify-start">
               <TabsTrigger value="identity">Identity</TabsTrigger>
               <TabsTrigger value="colors">Design colors</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="login">Login page</TabsTrigger>
             </TabsList>
 
@@ -598,6 +633,74 @@ export function BrandingClient({ config }: Props) {
                       defaultOpen={i === 0}
                     />
                   ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Notifications tab */}
+            <TabsContent value="notifications" className="mt-6">
+              <div className="space-y-6 max-w-sm">
+                {/* Position */}
+                <div className="space-y-2">
+                  <Label>Toast position</Label>
+                  <Select value={toastPosition} onValueChange={setToastPosition}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bottom-right">Bottom right</SelectItem>
+                      <SelectItem value="bottom-left">Bottom left</SelectItem>
+                      <SelectItem value="top-right">Top right</SelectItem>
+                      <SelectItem value="top-left">Top left</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Colors */}
+                <div className="space-y-2">
+                  <Label>Colors</Label>
+                  <div className="space-y-2">
+                    {[
+                      { label: "Background", value: toastBgColor, setter: setToastBgColor },
+                      { label: "Text", value: toastTextColor, setter: setToastTextColor },
+                      { label: "Border", value: toastBorderColor, setter: setToastBorderColor },
+                    ].map(({ label, value, setter }) => (
+                      <div key={label} className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                        <label className="relative h-10 w-10 shrink-0 cursor-pointer rounded-md border overflow-hidden" title={`Edit ${label} color`}>
+                          <div className="h-full w-full" style={{ background: value }} />
+                          <input
+                            type="color"
+                            value={value}
+                            onChange={(e) => setter(e.target.value)}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                          />
+                        </label>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="font-mono text-xs text-muted-foreground">{value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div className="space-y-2">
+                  <Label>Auto-dismiss duration</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={1000}
+                      max={10000}
+                      step={500}
+                      value={toastDuration}
+                      onChange={(e) => setToastDuration(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm tabular-nums w-14 text-right text-muted-foreground">
+                      {(toastDuration / 1000).toFixed(1)}s
+                    </span>
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -770,8 +873,8 @@ export function BrandingClient({ config }: Props) {
               <p className="font-mono text-xs text-muted-foreground tracking-widest uppercase">Live Preview</p>
               <p className="text-lg font-semibold">Preview</p>
             </div>
-            {/* Dark/Light toggle — hidden on login tab */}
-            <div className={`flex rounded-md border overflow-hidden text-sm ${activeTab === "login" ? "invisible" : ""}`}>
+            {/* Dark/Light toggle — hidden on login and notifications tabs */}
+            <div className={`flex rounded-md border overflow-hidden text-sm ${activeTab === "login" || activeTab === "notifications" ? "invisible" : ""}`}>
               <button
                 type="button"
                 onClick={() => setActiveTheme("dark")}
@@ -813,7 +916,7 @@ export function BrandingClient({ config }: Props) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {activeTab !== "login" && (
+                  {activeTab !== "login" && activeTab !== "notifications" && (
                     <>
                       <DropdownMenuItem
                         onClick={handleResetUnsaved}
@@ -825,6 +928,11 @@ export function BrandingClient({ config }: Props) {
                         Reset to default ({activeTheme})
                       </DropdownMenuItem>
                     </>
+                  )}
+                  {activeTab === "notifications" && (
+                    <DropdownMenuItem onClick={handleResetNotifications}>
+                      Reset notifications to defaults
+                    </DropdownMenuItem>
                   )}
                   {activeTab === "login" && (
                     <DropdownMenuItem onClick={handleResetLoginPage}>
@@ -889,7 +997,7 @@ export function BrandingClient({ config }: Props) {
             </div>
           ) : (
           <div
-            className={`rounded-lg border overflow-hidden ${activeTheme === "dark" ? "dark" : ""}`}
+            className={`rounded-lg border overflow-hidden relative ${activeTheme === "dark" ? "dark" : ""}`}
             style={previewVars}
           >
             <div className="transition-all duration-200 bg-background text-foreground w-full flex" style={{ minHeight: "520px" }}>
@@ -1079,6 +1187,34 @@ export function BrandingClient({ config }: Props) {
               </div>
 
             </div>
+
+            {/* Toast preview overlay */}
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                bottom: toastPosition.startsWith("bottom") ? "8px" : "auto",
+                top: toastPosition.startsWith("top") ? "8px" : "auto",
+                left: toastPosition.endsWith("left") ? "8px" : "auto",
+                right: toastPosition.endsWith("right") ? "8px" : "auto",
+              }}
+            >
+              <div
+                className="flex items-start gap-2 rounded-lg border p-2 w-44 shadow-md"
+                style={{
+                  background: toastBgColor,
+                  color: toastTextColor,
+                  borderColor: toastBorderColor,
+                }}
+              >
+                <Bell className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: toastTextColor, opacity: 0.6 }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-medium truncate">New notification</p>
+                  <p className="text-[9px] truncate" style={{ color: toastTextColor, opacity: 0.6 }}>Your report is ready</p>
+                </div>
+                <X className="h-2.5 w-2.5 flex-shrink-0" style={{ color: toastTextColor, opacity: 0.5 }} />
+              </div>
+            </div>
+
           </div>
           )}
         </div>

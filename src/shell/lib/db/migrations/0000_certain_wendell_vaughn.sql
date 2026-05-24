@@ -78,6 +78,11 @@ CREATE TABLE "shell_config" (
 	"oidc_client_secret" text,
 	"header_show_date" boolean DEFAULT false NOT NULL,
 	"header_date_format" text DEFAULT 'PPP',
+	"toast_position" text DEFAULT 'bottom-right',
+	"toast_bg_color" text DEFAULT '#ffffff',
+	"toast_text_color" text DEFAULT '#020817',
+	"toast_border_color" text DEFAULT '#e2e8f0',
+	"toast_duration" integer DEFAULT 5000,
 	"setup_complete" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

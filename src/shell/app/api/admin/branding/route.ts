@@ -30,6 +30,11 @@ export async function PATCH(req: NextRequest) {
     loginButtonText: string;
     headerShowDate: boolean;
     headerDateFormat: string;
+    toastPosition: string;
+    toastBgColor: string;
+    toastTextColor: string;
+    toastBorderColor: string;
+    toastDuration: number;
   }>;
   const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;

@@ -135,6 +135,11 @@ export const shellConfig = pgTable("shell_config", {
   oidcClientSecret: text("oidc_client_secret"),
   headerShowDate: boolean("header_show_date").notNull().default(false),
   headerDateFormat: text("header_date_format").default("PPP"),
+  toastPosition: text("toast_position").default("bottom-right"),
+  toastBgColor: text("toast_bg_color").default("#ffffff"),
+  toastTextColor: text("toast_text_color").default("#020817"),
+  toastBorderColor: text("toast_border_color").default("#e2e8f0"),
+  toastDuration: integer("toast_duration").default(5000),
   setupComplete: boolean("setup_complete").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
