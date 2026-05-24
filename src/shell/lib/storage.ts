@@ -5,14 +5,17 @@ export interface StorageProvider {
   upload(
     filename: string,
     contentType: string,
-    data?: Buffer
+    data?: Buffer,
+    prefix?: string
   ): Promise<{ uploadUrl?: string; publicUrl: string }>;
 }
 
 class S3StorageProvider implements StorageProvider {
   async upload(
     filename: string,
-    contentType: string
+    contentType: string,
+    _data?: Buffer,
+    prefix = "logos"
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     const bucket = process.env["AWS_S3_BUCKET"]!;
     const region = process.env["AWS_REGION"] ?? "eu-central-1";
@@ -22,7 +25,7 @@ class S3StorageProvider implements StorageProvider {
     const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
 
     const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const key = `logos/${Date.now()}-${sanitized}`;
+    const key = `${prefix}/${Date.now()}-${sanitized}`;
     const s3 = new S3Client({ region });
     const uploadUrl = await getSignedUrl(
       s3,
@@ -40,16 +43,17 @@ class LocalStorageProvider implements StorageProvider {
   async upload(
     filename: string,
     _contentType: string,
-    data?: Buffer
+    data?: Buffer,
+    prefix = "logos"
   ): Promise<{ publicUrl: string }> {
     const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const name = `${Date.now()}-${sanitized}`;
-    const dir = join(process.cwd(), "public", "uploads", "logos");
+    const dir = join(process.cwd(), "public", "uploads", prefix);
     await mkdir(dir, { recursive: true });
     if (data) {
       await writeFile(join(dir, name), data);
     }
-    return { publicUrl: `/uploads/logos/${name}` };
+    return { publicUrl: `/uploads/${prefix}/${name}` };
   }
 }
 

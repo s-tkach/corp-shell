@@ -56,7 +56,9 @@ export async function proxy(request: NextRequest) {
   const session = await auth();
 
   if (!session) {
-    return NextResponse.redirect(new URL("/api/auth/signin", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   const roles: string[] = session.user.roles ?? [];
@@ -84,6 +86,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/setup|api/internal|api/health|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
+    "/((?!login|setup|api/auth|api/setup|api/internal|api/health|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
   ],
 };

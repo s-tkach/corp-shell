@@ -21,6 +21,13 @@ export async function PATCH(req: NextRequest) {
     logoUrl: string;
     colorOverrides: Record<string, string>;
     colorOverridesDark: Record<string, string>;
+    loginBgImageUrl: string;
+    loginBgColor: string;
+    loginHeadline: string;
+    loginFormPosition: string;
+    loginCardColor: string;
+    loginButtonColor: string;
+    loginButtonText: string;
   }>;
   const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;
@@ -40,11 +47,13 @@ export async function POST(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
 
-  const body = await req.json() as { fileName: string; contentType: string };
+  const body = await req.json() as { fileName: string; contentType: string; uploadType?: string };
   if (!body.fileName || !body.contentType?.startsWith("image/")) {
     return NextResponse.json({ error: "fileName and an image contentType are required" }, { status: 400 });
   }
 
-  const result = await storageProvider().upload(body.fileName, body.contentType);
+  const prefix = body.uploadType === "login-bg" ? "login-bg" : "logos";
+  const result = await storageProvider().upload(body.fileName, body.contentType, undefined, prefix);
+
   return NextResponse.json(result);
 }

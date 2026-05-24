@@ -543,7 +543,7 @@ Step 4 — Launch:     POST /api/setup/complete →
 |----------|--------|-----------|
 | No separate backend | Next.js API routes | Reduces operational surface; Lambda scales to zero |
 | No Redis / session store | Stateless JWT cookie | ≤1,000 users; Lambda ephemeral; no sticky sessions needed |
-| Module Federation over iFrame | MF (v1) | Shared React context, SDK hooks, and design tokens; iFrame in v2 |
+| Module Federation over iFrame | MF (v1) | Shared React context, SDK hooks, and design colors; iFrame in v2 |
 | PostgreSQL over DynamoDB | PostgreSQL | RBAC, menu, and admin queries are relational; Drizzle ORM type safety |
 | Single AWS account | One account | Simplified IAM, networking, and cost tracking for v1 |
 | Fork over build from scratch | `satnaing/shadcn-admin` | Sidebar, header, Shadcn wiring already done; focus on domain logic |

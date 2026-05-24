@@ -39,6 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
 
   return {
     secret: process.env["NEXTAUTH_SECRET"],
+    pages: { signIn: "/login" },
     providers: [
       {
         id: "oidc",

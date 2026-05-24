@@ -169,6 +169,13 @@ interface Config {
   logoUrl: string | null;
   colorOverrides: Record<string, string> | null;
   colorOverridesDark: Record<string, string> | null;
+  loginBgImageUrl: string | null;
+  loginBgColor: string | null;
+  loginHeadline: string | null;
+  loginFormPosition: string | null;
+  loginCardColor: string | null;
+  loginButtonColor: string | null;
+  loginButtonText: string | null;
 }
 
 interface Props {
@@ -275,10 +282,22 @@ export function BrandingClient({ config }: Props) {
     config?.colorOverridesDark ?? {}
   );
   const [activeTheme, setActiveTheme] = useState<"light" | "dark">("light");
+  const [loginBgImageUrl, setLoginBgImageUrl] = useState(config?.loginBgImageUrl ?? "");
+  const [previewLoginBgImageUrl, setPreviewLoginBgImageUrl] = useState(config?.loginBgImageUrl ?? "");
+  const [loginBgColor, setLoginBgColor] = useState(config?.loginBgColor ?? "#0f172a");
+  const [loginHeadline, setLoginHeadline] = useState(config?.loginHeadline ?? "");
+  const [loginFormPosition, setLoginFormPosition] = useState<"left" | "center" | "right">(
+    (config?.loginFormPosition as "left" | "center" | "right") ?? "center"
+  );
+  const [loginCardColor, setLoginCardColor] = useState(config?.loginCardColor ?? "#ffffff");
+  const [loginButtonColor, setLoginButtonColor] = useState(config?.loginButtonColor ?? "#0f172a");
+  const [loginButtonText, setLoginButtonText] = useState(config?.loginButtonText ?? "");
   const [uploading, setUploading] = useState(false);
+  const [loginBgUploading, setLoginBgUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const loginBgFileRef = useRef<HTMLInputElement>(null);
   const [savedOverrides, setSavedOverrides] = useState<Record<string, string>>(
     config?.colorOverrides ?? {}
   );
@@ -325,6 +344,17 @@ export function BrandingClient({ config }: Props) {
     }
   }
 
+  function handleResetLoginPage() {
+    setLoginBgImageUrl("");
+    setPreviewLoginBgImageUrl("");
+    setLoginBgColor("#0f172a");
+    setLoginHeadline("");
+    setLoginFormPosition("center");
+    setLoginCardColor("#ffffff");
+    setLoginButtonColor("#0f172a");
+    setLoginButtonText("");
+  }
+
   function refresh() {
     startTransition(() => { router.refresh(); });
   }
@@ -349,6 +379,26 @@ export function BrandingClient({ config }: Props) {
     }
   }
 
+  async function uploadLoginBg(file: File) {
+    setLoginBgUploading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/branding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, uploadType: "login-bg" }),
+      });
+      const urlData = await res.json() as { uploadUrl?: string; publicUrl?: string; error?: string };
+      if (!res.ok) { setError(urlData.error ?? "Failed to get upload URL"); return; }
+      const { uploadUrl, publicUrl } = urlData as { uploadUrl: string; publicUrl: string };
+      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      setLoginBgImageUrl(publicUrl);
+      setPreviewLoginBgImageUrl(URL.createObjectURL(file));
+    } finally {
+      setLoginBgUploading(false);
+    }
+  }
+
   async function save() {
     setError(null);
     setSaved(false);
@@ -361,6 +411,13 @@ export function BrandingClient({ config }: Props) {
         logoUrl: logoUrl || undefined,
         colorOverrides,
         colorOverridesDark,
+        loginBgImageUrl: loginBgImageUrl || undefined,
+        loginBgColor,
+        loginHeadline,
+        loginFormPosition,
+        loginCardColor,
+        loginButtonColor,
+        loginButtonText,
         ...(primaryHex ? { primaryColor: primaryHex } : {}),
       }),
     });
@@ -375,11 +432,12 @@ export function BrandingClient({ config }: Props) {
     refresh();
   }
 
-  const TAB_ORDER = ["identity", "colors"] as const;
+  const TAB_ORDER = ["identity", "colors", "login"] as const;
   type TabKey = typeof TAB_ORDER[number];
   const TAB_LABELS: Record<TabKey, string> = {
     identity: "Identity",
-    colors: "Design tokens",
+    colors: "Design colors",
+    login: "Login page",
   };
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
 
@@ -401,7 +459,7 @@ export function BrandingClient({ config }: Props) {
       <div>
         <h1 className="text-2xl font-bold">Theme &amp; Branding</h1>
         <p className="text-muted-foreground text-sm">
-          Tune your workspace identity and design tokens. Changes preview live on the right and
+          Tune your workspace identity and design colors. Changes preview live on the right and
           only ship to teammates when you save.
         </p>
       </div>
@@ -413,7 +471,8 @@ export function BrandingClient({ config }: Props) {
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
             <TabsList className="w-full justify-start">
               <TabsTrigger value="identity">Identity</TabsTrigger>
-              <TabsTrigger value="colors">Design tokens</TabsTrigger>
+              <TabsTrigger value="colors">Design colors</TabsTrigger>
+              <TabsTrigger value="login">Login page</TabsTrigger>
             </TabsList>
 
             {/* Identity tab */}
@@ -462,7 +521,7 @@ export function BrandingClient({ config }: Props) {
               </div>
             </TabsContent>
 
-            {/* Design tokens tab */}
+            {/* Design colors tab */}
             <TabsContent value="colors" className="mt-6">
               <div className="space-y-4">
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -470,7 +529,7 @@ export function BrandingClient({ config }: Props) {
                     Click any swatch to edit. All values are HSL — paste hex/RGB and we&apos;ll convert.
                   </p>
                   <span className="shrink-0">
-                    {Object.keys(activeOverrides).length} tokens · {COLOR_GROUPS.length} groups
+                    {Object.keys(activeOverrides).length} colors · {COLOR_GROUPS.length} groups
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -485,6 +544,140 @@ export function BrandingClient({ config }: Props) {
                       defaultOpen={i === 0}
                     />
                   ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Login page tab */}
+            <TabsContent value="login" className="mt-6">
+              <div className="space-y-6">
+                {/* Background image */}
+                <div className="space-y-1">
+                  <Label>Background image</Label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loginBgFileRef.current?.click()}
+                      disabled={loginBgUploading}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {loginBgUploading ? "Uploading..." : "Upload image"}
+                    </Button>
+                    <input
+                      ref={loginBgFileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadLoginBg(file);
+                      }}
+                    />
+                    {previewLoginBgImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previewLoginBgImageUrl}
+                        alt="Background preview"
+                        className="h-10 w-16 rounded object-cover border"
+                      />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Used as the full-screen background. A dark overlay is added automatically.</p>
+                </div>
+
+                {/* Color pickers row */}
+                <div className="space-y-1">
+                  <Label>Colors</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Background color */}
+                    <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                      <label className="relative h-10 w-10 shrink-0 cursor-pointer rounded-md border overflow-hidden" title="Edit Background color">
+                        <div className="h-full w-full" style={{ background: loginBgColor }} />
+                        <input
+                          type="color"
+                          value={loginBgColor}
+                          onChange={(e) => setLoginBgColor(e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">Background</p>
+                        <p className="font-mono text-xs text-muted-foreground truncate">{loginBgColor}</p>
+                      </div>
+                    </div>
+                    {/* Card color */}
+                    <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                      <label className="relative h-10 w-10 shrink-0 cursor-pointer rounded-md border overflow-hidden" title="Edit Card background color">
+                        <div className="h-full w-full" style={{ background: loginCardColor }} />
+                        <input
+                          type="color"
+                          value={loginCardColor}
+                          onChange={(e) => setLoginCardColor(e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">Card</p>
+                        <p className="font-mono text-xs text-muted-foreground truncate">{loginCardColor}</p>
+                      </div>
+                    </div>
+                    {/* Button color */}
+                    <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                      <label className="relative h-10 w-10 shrink-0 cursor-pointer rounded-md border overflow-hidden" title="Edit Button color">
+                        <div className="h-full w-full" style={{ background: loginButtonColor }} />
+                        <input
+                          type="color"
+                          value={loginButtonColor}
+                          onChange={(e) => setLoginButtonColor(e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">Button</p>
+                        <p className="font-mono text-xs text-muted-foreground truncate">{loginButtonColor}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Headline + Button text */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Headline / tagline</Label>
+                    <Input
+                      value={loginHeadline}
+                      onChange={(e) => setLoginHeadline(e.target.value)}
+                      placeholder="Welcome to your workspace"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Button text</Label>
+                    <Input
+                      value={loginButtonText}
+                      onChange={(e) => setLoginButtonText(e.target.value)}
+                      placeholder="Sign in with SSO"
+                    />
+                  </div>
+                </div>
+
+                {/* Form position */}
+                <div className="space-y-2">
+                  <Label>Form panel position</Label>
+                  <div className="flex gap-2">
+                    {(["left", "center", "right"] as const).map((pos) => (
+                      <Button
+                        key={pos}
+                        type="button"
+                        variant={loginFormPosition === pos ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setLoginFormPosition(pos)}
+                        className="capitalize"
+                      >
+                        {pos}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -523,8 +716,8 @@ export function BrandingClient({ config }: Props) {
               <p className="font-mono text-xs text-muted-foreground tracking-widest uppercase">Live Preview</p>
               <p className="text-lg font-semibold">Preview</p>
             </div>
-            {/* Dark/Light toggle — sits right next to the label */}
-            <div className="flex rounded-md border overflow-hidden text-sm">
+            {/* Dark/Light toggle — hidden on login tab */}
+            <div className={`flex rounded-md border overflow-hidden text-sm ${activeTab === "login" ? "invisible" : ""}`}>
               <button
                 type="button"
                 onClick={() => setActiveTheme("dark")}
@@ -566,15 +759,24 @@ export function BrandingClient({ config }: Props) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={handleResetUnsaved}
-                    disabled={unsavedCount === 0}
-                  >
-                    Reset unsaved changes
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleResetToDefault}>
-                    Reset to default ({activeTheme})
-                  </DropdownMenuItem>
+                  {activeTab !== "login" && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={handleResetUnsaved}
+                        disabled={unsavedCount === 0}
+                      >
+                        Reset unsaved changes
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleResetToDefault}>
+                        Reset to default ({activeTheme})
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {activeTab === "login" && (
+                    <DropdownMenuItem onClick={handleResetLoginPage}>
+                      Reset login page to defaults
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button size="sm" onClick={() => void save()} disabled={isPending || uploading}>
@@ -585,11 +787,58 @@ export function BrandingClient({ config }: Props) {
           </div>
 
           {/* Preview body */}
+          {activeTab === "login" ? (
+            /* Login page preview */
+            <div
+              className="rounded-lg border overflow-hidden relative flex items-center"
+              style={{
+                minHeight: "520px",
+                backgroundColor: loginBgColor,
+                ...(previewLoginBgImageUrl
+                  ? { backgroundImage: `url(${previewLoginBgImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+                  : {}),
+                justifyContent: loginFormPosition === "left" ? "flex-start" : loginFormPosition === "right" ? "flex-end" : "center",
+              }}
+            >
+              {previewLoginBgImageUrl && (
+                <div className="absolute inset-0 bg-black/40 rounded-lg" />
+              )}
+              <div
+                className="relative z-10 m-4 rounded-xl shadow-xl p-5 flex flex-col gap-3"
+                style={{ width: "140px", backgroundColor: loginCardColor }}
+              >
+                <div className="flex items-center gap-2">
+                  {previewLogoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewLogoUrl} alt="" className="h-5 w-5 rounded object-contain flex-shrink-0" />
+                  ) : (
+                    <div
+                      className="flex h-5 w-5 items-center justify-center rounded text-white text-[9px] font-bold flex-shrink-0"
+                      style={{ background: previewPrimaryHex }}
+                    >
+                      {appName.charAt(0).toUpperCase() || "A"}
+                    </div>
+                  )}
+                  <span className="text-[10px] font-semibold text-zinc-800 truncate">{appName || "Corp Shell"}</span>
+                </div>
+                {loginHeadline && (
+                  <p className="text-[10px] font-bold text-zinc-800 leading-tight">{loginHeadline}</p>
+                )}
+                <button
+                  type="button"
+                  className="w-full rounded text-white text-[9px] font-semibold py-1.5 cursor-pointer"
+                  style={{ background: loginButtonColor }}
+                >
+                  {loginButtonText || "Sign in with SSO"}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div
             className={`rounded-lg border overflow-hidden ${activeTheme === "dark" ? "dark" : ""}`}
             style={previewVars}
           >
-            <div className="transition-all duration-200 bg-background text-foreground w-full flex" style={{ minHeight: "320px" }}>
+            <div className="transition-all duration-200 bg-background text-foreground w-full flex" style={{ minHeight: "520px" }}>
 
               {/* Sidebar */}
               <div className="flex flex-col border-r w-40 flex-shrink-0" style={{ background: "hsl(var(--sidebar-background))", borderColor: "hsl(var(--sidebar-border))" }}>
@@ -764,6 +1013,7 @@ export function BrandingClient({ config }: Props) {
 
             </div>
           </div>
+          )}
         </div>
       </div>
 
