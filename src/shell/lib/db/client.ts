@@ -7,6 +7,8 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
+export { connectionString };
+
 const client = postgres(connectionString, { max: 1 });
 
 export const db = drizzle(client, { schema });

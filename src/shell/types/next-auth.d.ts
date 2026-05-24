@@ -7,6 +7,8 @@ declare module "next-auth" {
       roles: string[];
       subscriptionTier: string;
       subscriptionLevel: number;
+      tenantId: string;
+      tenantSlug: string;
     } & DefaultSession["user"];
   }
 }
@@ -18,5 +20,7 @@ declare module "@auth/core/jwt" {
     subscriptionTier?: string;
     subscriptionLevel?: number;
     idToken?: string;
+    tenantId?: string;
+    tenantSlug?: string;
   }
 }

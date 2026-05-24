@@ -1,40 +1,43 @@
 import NextAuth from "next-auth";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
+import { withTenant } from "@/lib/db/tenant";
 import {
   users,
   roles,
   userRoles,
   idpGroupRoleMappings,
   subscriptionTiers,
-  userSubscriptions,
+  tenantSubscription,
   authEvents,
-  shellConfig,
+  idpProviders,
+  tenants,
 } from "@/lib/db/schema";
+import { getTenantSlug } from "@/lib/tenant-resolver";
 import { eq, inArray } from "drizzle-orm";
 
-let cachedConfig: { issuer: string; clientId: string; clientSecret: string } | null = null;
-
 async function getOidcConfig() {
-  if (cachedConfig) return cachedConfig;
-  const rows = await db.select().from(shellConfig).limit(1);
-  const config = rows[0];
-  if (!config?.oidcIssuer || !config.oidcClientId || !config.oidcClientSecret) {
-    throw new Error("OIDC not configured — complete setup first");
+  const rows = await db
+    .select()
+    .from(idpProviders)
+    .where(eq(idpProviders.isEnabled, true))
+    .limit(1);
+  const provider = rows[0];
+  if (!provider) {
+    throw new Error("No IDP configured — complete setup first");
   }
-  cachedConfig = {
-    issuer: config.oidcIssuer,
-    clientId: config.oidcClientId,
-    clientSecret: await decrypt(config.oidcClientSecret),
+  return {
+    id: provider.id,
+    issuer: provider.issuer,
+    clientId: provider.clientId,
+    clientSecret: await decrypt(provider.encryptedClientSecret),
   };
-  return cachedConfig;
 }
 
-export function resetAuth() {
-  cachedConfig = null;
-}
+export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
+  const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
+  const tenantSlug = getTenantSlug(host) ?? "default";
 
-export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const { issuer, clientId, clientSecret } = await getOidcConfig();
 
   return {
@@ -54,6 +57,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     callbacks: {
       async jwt({ token, account, profile, trigger }) {
         if (trigger === "signIn" && account && profile) {
+          // Resolve tenant from host captured in factory closure
+          const tenantRows = await db
+            .select({ id: tenants.id, slug: tenants.slug })
+            .from(tenants)
+            .where(eq(tenants.slug, tenantSlug))
+            .limit(1);
+          const tenant = tenantRows[0];
+          if (!tenant) throw new Error(`Tenant "${tenantSlug}" not found`);
+
+          token.tenantId = tenant.id;
+          token.tenantSlug = tenant.slug;
+
+          const tenantDb = withTenant(tenantSlug);
+
           if (account.id_token) {
             token.idToken = account.id_token;
           }
@@ -69,7 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
 
           let roleSlugs: string[] = [];
           if (idpGroups.length > 0) {
-            const mappings = await db
+            const mappings = await tenantDb
               .select({ slug: roles.slug })
               .from(idpGroupRoleMappings)
               .innerJoin(roles, eq(idpGroupRoleMappings.roleId, roles.id))
@@ -77,7 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             roleSlugs = [...new Set(mappings.map((m) => m.slug))];
           }
 
-          const existingUsers = await db
+          const existingUsers = await tenantDb
             .select()
             .from(users)
             .where(eq(users.email, email))
@@ -86,7 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           let userId: string;
 
           if (existingUsers.length === 0 || existingUsers[0] === undefined) {
-            const inserted = await db
+            const inserted = await tenantDb
               .insert(users)
               .values({
                 email,
@@ -101,30 +118,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             userId = newUser.id;
 
             if (roleSlugs.length > 0) {
-              const roleRows = await db
+              const roleRows = await tenantDb
                 .select({ id: roles.id })
                 .from(roles)
                 .where(inArray(roles.slug, roleSlugs));
               if (roleRows.length > 0) {
-                await db.insert(userRoles).values(
+                await tenantDb.insert(userRoles).values(
                   roleRows.map((r) => ({ userId, roleId: r.id }))
                 );
               }
             }
 
-            const freeTier = await db
-              .select({ id: subscriptionTiers.id })
-              .from(subscriptionTiers)
-              .where(eq(subscriptionTiers.slug, "free"))
-              .limit(1);
-            if (freeTier[0]) {
-              await db.insert(userSubscriptions).values({
-                userId,
-                tierId: freeTier[0].id,
-              });
-            }
-
-            await db.insert(authEvents).values({
+            await tenantDb.insert(authEvents).values({
               userId,
               email,
               eventType: "JIT_PROVISION",
@@ -132,12 +137,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           } else {
             userId = existingUsers[0].id;
 
-            await db
+            await tenantDb
               .update(users)
               .set({ lastLoginAt: new Date() })
               .where(eq(users.id, userId));
 
-            const dbRoleRows = await db
+            const dbRoleRows = await tenantDb
               .select({ slug: roles.slug })
               .from(userRoles)
               .innerJoin(roles, eq(userRoles.roleId, roles.id))
@@ -145,44 +150,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             roleSlugs = [...new Set([...roleSlugs, ...dbRoleRows.map((r) => r.slug)])];
           }
 
-          await db.insert(authEvents).values({
+          await tenantDb.insert(authEvents).values({
             userId,
             email,
             eventType: "LOGIN",
           });
 
-          const subRow = await db
+          const subRow = await tenantDb
             .select({
-              id: userSubscriptions.id,
               slug: subscriptionTiers.slug,
               level: subscriptionTiers.level,
-              expiresAt: userSubscriptions.expiresAt,
+              expiresAt: tenantSubscription.expiresAt,
+              status: tenantSubscription.status,
             })
-            .from(userSubscriptions)
-            .innerJoin(
-              subscriptionTiers,
-              eq(userSubscriptions.tierId, subscriptionTiers.id)
-            )
-            .where(eq(userSubscriptions.userId, userId))
+            .from(tenantSubscription)
+            .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
             .limit(1);
 
-          let tier = subRow[0];
-
-          if (tier && tier.expiresAt && tier.expiresAt < new Date() && tier.slug !== "free") {
-            const freeTier = await db
-              .select({ id: subscriptionTiers.id, slug: subscriptionTiers.slug, level: subscriptionTiers.level })
-              .from(subscriptionTiers)
-              .where(eq(subscriptionTiers.slug, "free"))
-              .limit(1);
-            if (freeTier[0]) {
-              await db
-                .update(userSubscriptions)
-                .set({ tierId: freeTier[0].id, expiresAt: null })
-                .where(eq(userSubscriptions.id, tier.id));
-              tier = { ...freeTier[0], id: tier.id, expiresAt: null };
-            }
-          }
-
+          const tier = subRow[0];
           token.userId = userId;
           token.roles = roleSlugs;
           token.subscriptionTier = tier?.slug ?? "free";
@@ -199,6 +184,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           (token.subscriptionTier as string | undefined) ?? "free";
         session.user.subscriptionLevel =
           (token.subscriptionLevel as number | undefined) ?? 0;
+        session.user.tenantId = (token.tenantId as string | undefined) ?? "";
+        session.user.tenantSlug = (token.tenantSlug as string | undefined) ?? "";
         return session;
       },
     },

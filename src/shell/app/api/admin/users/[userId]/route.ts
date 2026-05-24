@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
-import { users, userRoles, roles, userSubscriptions } from "@/lib/db/schema";
+import { withTenant } from "@/lib/db/tenant";
+import { users, userRoles, roles, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq, inArray } from "drizzle-orm";
+import { getTenantSlug } from "@/lib/tenant-slug";
 
 export async function PATCH(
   req: NextRequest,
@@ -18,27 +19,29 @@ export async function PATCH(
     expiresAt?: string | null;
   };
 
+  const tenantSlug = getTenantSlug();
+  const tenantDb = withTenant(tenantSlug);
+
   if (typeof body.isActive === "boolean") {
-    await db.update(users).set({ isActive: body.isActive }).where(eq(users.id, userId));
+    await tenantDb.update(users).set({ isActive: body.isActive }).where(eq(users.id, userId));
   }
 
   if (Array.isArray(body.roleSlugs)) {
-    await db.delete(userRoles).where(eq(userRoles.userId, userId));
+    await tenantDb.delete(userRoles).where(eq(userRoles.userId, userId));
     if (body.roleSlugs.length > 0) {
-      const roleRows = await db
+      const roleRows = await tenantDb
         .select({ id: roles.id })
         .from(roles)
         .where(inArray(roles.slug, body.roleSlugs));
       if (roleRows.length > 0) {
-        await db.insert(userRoles).values(roleRows.map((r) => ({ userId, roleId: r.id })));
+        await tenantDb.insert(userRoles).values(roleRows.map((r) => ({ userId, roleId: r.id })));
       }
     }
   }
 
   if (body.tierId !== undefined) {
-    await db.delete(userSubscriptions).where(eq(userSubscriptions.userId, userId));
-    await db.insert(userSubscriptions).values({
-      userId,
+    await tenantDb.delete(tenantSubscription).where(eq(tenantSubscription.tierId, body.tierId));
+    await tenantDb.insert(tenantSubscription).values({
       tierId: body.tierId,
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
     });
