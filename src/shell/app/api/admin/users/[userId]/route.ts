@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { users, userRoles, roles, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq, inArray } from "drizzle-orm";
-import { getTenantSlug } from "@/lib/tenant-slug";
 
 export async function PATCH(
   req: NextRequest,
@@ -19,7 +19,8 @@ export async function PATCH(
     expiresAt?: string | null;
   };
 
-  const tenantSlug = getTenantSlug();
+  const session = await auth();
+  const tenantSlug = session?.user.tenantSlug ?? "default";
   const tenantDb = withTenant(tenantSlug);
 
   if (typeof body.isActive === "boolean") {

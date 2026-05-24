@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { idpProviders } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
-import { getTenantSlug } from "@/lib/tenant-slug";
 import { eq } from "drizzle-orm";
 
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
 
-  const tenantSlug = getTenantSlug();
+  const session = await auth();
+  const tenantSlug = session?.user.tenantSlug ?? "default";
   const tenantDb = withTenant(tenantSlug);
 
   const rows = await tenantDb

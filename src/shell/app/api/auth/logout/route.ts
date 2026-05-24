@@ -3,13 +3,11 @@ import { auth, signOut } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { authEvents, idpProviders } from "@/lib/db/schema";
 import { getToken } from "next-auth/jwt";
-import { getTenantSlug } from "@/lib/tenant-slug";
 import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
 
-  // Read idToken from the JWT before clearing the session
   const rawToken = await getToken({
     req: request,
     secret: process.env["NEXTAUTH_SECRET"]!,
@@ -17,8 +15,9 @@ export async function GET(request: NextRequest) {
 
   const idToken = rawToken?.idToken as string | undefined;
 
+  const tenantSlug = session?.user.tenantSlug ?? "default";
+
   if (session?.user) {
-    const tenantSlug = getTenantSlug();
     const tenantDb = withTenant(tenantSlug);
     await tenantDb.insert(authEvents).values({
       userId: session.user.userId || null,
@@ -27,10 +26,8 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Clear the local session cookie
   await signOut({ redirect: false });
 
-  const tenantSlug = getTenantSlug();
   const tenantDb = withTenant(tenantSlug);
   const configRows = await tenantDb
     .select({ issuer: idpProviders.issuer })

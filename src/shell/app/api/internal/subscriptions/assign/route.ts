@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "tenantSlug and tierId are required" }, { status: 400 });
   }
 
-  // Verify tenant exists
   const tenantRows = await db
     .select({ id: tenants.id })
     .from(tenants)
@@ -50,14 +49,12 @@ export async function POST(req: NextRequest) {
 
   const tenantDb = withTenant(tenantSlug);
 
-  // Check if subscription already exists
   const existing = await tenantDb
     .select()
     .from(tenantSubscription)
     .limit(1);
 
   if (existing[0]) {
-    // Update existing subscription
     await tenantDb
       .update(tenantSubscription)
       .set({
@@ -67,7 +64,6 @@ export async function POST(req: NextRequest) {
         assignedAt: new Date(),
       });
   } else {
-    // Insert new subscription
     await tenantDb
       .insert(tenantSubscription)
       .values({

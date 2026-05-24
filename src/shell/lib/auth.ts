@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
+import { withTenant } from "@/lib/db/tenant";
 import {
   users,
   roles,
@@ -10,7 +11,9 @@ import {
   tenantSubscription,
   authEvents,
   idpProviders,
+  tenants,
 } from "@/lib/db/schema";
+import { getTenantSlug } from "@/lib/tenant-resolver";
 import { eq, inArray } from "drizzle-orm";
 
 async function getOidcConfig() {
@@ -31,7 +34,10 @@ async function getOidcConfig() {
   };
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
+  const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
+  const tenantSlug = getTenantSlug(host) ?? "default";
+
   const { issuer, clientId, clientSecret } = await getOidcConfig();
 
   return {
@@ -51,6 +57,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     callbacks: {
       async jwt({ token, account, profile, trigger }) {
         if (trigger === "signIn" && account && profile) {
+          // Resolve tenant from host captured in factory closure
+          const tenantRows = await db
+            .select({ id: tenants.id, slug: tenants.slug })
+            .from(tenants)
+            .where(eq(tenants.slug, tenantSlug))
+            .limit(1);
+          const tenant = tenantRows[0];
+          if (!tenant) throw new Error(`Tenant "${tenantSlug}" not found`);
+
+          token.tenantId = tenant.id;
+          token.tenantSlug = tenant.slug;
+
+          const tenantDb = withTenant(tenantSlug);
+
           if (account.id_token) {
             token.idToken = account.id_token;
           }
@@ -66,7 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
 
           let roleSlugs: string[] = [];
           if (idpGroups.length > 0) {
-            const mappings = await db
+            const mappings = await tenantDb
               .select({ slug: roles.slug })
               .from(idpGroupRoleMappings)
               .innerJoin(roles, eq(idpGroupRoleMappings.roleId, roles.id))
@@ -74,7 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             roleSlugs = [...new Set(mappings.map((m) => m.slug))];
           }
 
-          const existingUsers = await db
+          const existingUsers = await tenantDb
             .select()
             .from(users)
             .where(eq(users.email, email))
@@ -83,7 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           let userId: string;
 
           if (existingUsers.length === 0 || existingUsers[0] === undefined) {
-            const inserted = await db
+            const inserted = await tenantDb
               .insert(users)
               .values({
                 email,
@@ -98,18 +118,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             userId = newUser.id;
 
             if (roleSlugs.length > 0) {
-              const roleRows = await db
+              const roleRows = await tenantDb
                 .select({ id: roles.id })
                 .from(roles)
                 .where(inArray(roles.slug, roleSlugs));
               if (roleRows.length > 0) {
-                await db.insert(userRoles).values(
+                await tenantDb.insert(userRoles).values(
                   roleRows.map((r) => ({ userId, roleId: r.id }))
                 );
               }
             }
 
-            await db.insert(authEvents).values({
+            await tenantDb.insert(authEvents).values({
               userId,
               email,
               eventType: "JIT_PROVISION",
@@ -117,12 +137,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           } else {
             userId = existingUsers[0].id;
 
-            await db
+            await tenantDb
               .update(users)
               .set({ lastLoginAt: new Date() })
               .where(eq(users.id, userId));
 
-            const dbRoleRows = await db
+            const dbRoleRows = await tenantDb
               .select({ slug: roles.slug })
               .from(userRoles)
               .innerJoin(roles, eq(userRoles.roleId, roles.id))
@@ -130,13 +150,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             roleSlugs = [...new Set([...roleSlugs, ...dbRoleRows.map((r) => r.slug)])];
           }
 
-          await db.insert(authEvents).values({
+          await tenantDb.insert(authEvents).values({
             userId,
             email,
             eventType: "LOGIN",
           });
 
-          const subRow = await db
+          const subRow = await tenantDb
             .select({
               slug: subscriptionTiers.slug,
               level: subscriptionTiers.level,
@@ -164,6 +184,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           (token.subscriptionTier as string | undefined) ?? "free";
         session.user.subscriptionLevel =
           (token.subscriptionLevel as number | undefined) ?? 0;
+        session.user.tenantId = (token.tenantId as string | undefined) ?? "";
+        session.user.tenantSlug = (token.tenantSlug as string | undefined) ?? "";
         return session;
       },
     },

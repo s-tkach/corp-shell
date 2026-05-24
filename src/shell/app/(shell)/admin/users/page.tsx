@@ -1,7 +1,7 @@
+import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
-import { getTenantSlug } from "@/lib/tenant-slug";
 import { UserManagerClient } from "./user-manager-client";
 
 const PAGE_SIZE = 20;
@@ -15,7 +15,8 @@ export default async function UserManagerPage({
   const page = Math.max(1, Number(pageParam ?? 1));
   const offset = (page - 1) * PAGE_SIZE;
 
-  const tenantSlug = getTenantSlug();
+  const session = await auth();
+  const tenantSlug = session?.user.tenantSlug ?? "default";
   const tenantDb = withTenant(tenantSlug);
 
   const userRows = await tenantDb
@@ -32,7 +33,6 @@ export default async function UserManagerPage({
     .limit(PAGE_SIZE)
     .offset(offset);
 
-  // Get org-level subscription (single subscription per tenant in M16)
   const orgSubRow = await tenantDb
     .select({
       tierId: tenantSubscription.tierId,

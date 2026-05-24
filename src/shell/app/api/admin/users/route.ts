@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { asc, desc, eq } from "drizzle-orm";
-import { getTenantSlug } from "@/lib/tenant-slug";
 
 export async function GET(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   const limit = 20;
   const offset = (page - 1) * limit;
 
-  const tenantSlug = getTenantSlug();
+  const session = await auth();
+  const tenantSlug = session?.user.tenantSlug ?? "default";
   const tenantDb = withTenant(tenantSlug);
 
   const rows = await tenantDb
@@ -31,7 +32,6 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .offset(offset);
 
-  // Get org-level subscription (single subscription per tenant in M16)
   const orgSubRow = await tenantDb
     .select({ slug: subscriptionTiers.slug, displayName: subscriptionTiers.displayName, level: subscriptionTiers.level, expiresAt: tenantSubscription.expiresAt })
     .from(tenantSubscription)
