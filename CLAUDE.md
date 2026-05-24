@@ -1,39 +1,25 @@
 # corp-shell
 
-## Spec-Driven Development (SDD) Workflow
+## Spec-Driven Development (SDD)
 
-**No application code is written until the relevant spec exists and is approved.**
+**This is a spec-driven project. All changes — features, bug fixes, architectural decisions — must flow through the spec documents before touching code.**
 
-### Phase Gate Order
+| File | Purpose |
+|---|---|
+| `specs/PRD.md` | All product requirements, goals, and user stories |
+| `specs/ARCHITECTURE.md` | System design, component boundaries, data flow, tech stack |
+| `specs/ROADMAP.md` | Milestones, phases, ordered task list, and completion status |
+| `CHANGELOG.md` | Record of all notable changes per release |
 
-```
-1. PRD (Product Requirements Document)   →  specs/PRD.md
-2. Architecture Design                   →  specs/ARCHITECTURE.md
-3. Roadmap & Step-by-Step Plan           →  specs/ROADMAP.md
-4. Implementation (feature by feature)   →  src/
-5. Tests                                 →  tests/
-```
-
-Each phase must be completed and explicitly confirmed before the next begins. If a requirement changes mid-implementation, update the relevant spec first, then the code.
-
----
-
-## Project Specs
-
-> Specs live in `specs/`. Do not modify application code to work around a spec — update the spec first.
-
-| File | Status | Description |
-|---|---|---|
-| `specs/PRD.md` | DONE | Product requirements, goals, non-goals, user stories |
-| `specs/ARCHITECTURE.md` | DONE | System design, component boundaries, data flow, tech stack |
-| `specs/ROADMAP.md` | DONE | Milestones, phases, ordered task list |
+- Update the relevant spec first, then the code. Never the other way around.
+- Each phase must be completed and confirmed before the next begins.
+- All documentation goes in `specs/`. Exception: implementation plans (transient artifacts).
 
 ---
 
 ## Development Guidelines
 
 ### General
-- Follow the phase gate order strictly. Do not skip phases.
 - Prefer simple, direct implementations — no premature abstractions.
 - No feature flags, backwards-compat shims, or dead code.
 - Do not add error handling for scenarios that cannot happen.
@@ -46,7 +32,7 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 - Consistent naming that mirrors the domain language in the PRD.
 
 ### Roadmap Tracking
-- After implementing any M1–M12 roadmap feature (or set of tasks), mark all completed tasks as `[x]` in `specs/ROADMAP.md` and update the **Current Status** section in `CLAUDE.md` to reflect the new milestone.
+- After completing any roadmap task, mark it `[x]` in `specs/ROADMAP.md` and update `CHANGELOG.md` when a milestone ships.
 
 ### Database
 - The database is in development — it can be recreated at any time.
@@ -67,37 +53,10 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 ## Commands
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Run development server (shell app)
-pnpm --filter @corp/shell-app dev
-
-# Run tests
-pnpm --filter @corp/shell-app test
-
-# Run linter
-pnpm lint
-
-# Typecheck
-pnpm typecheck
-
-# Build for production
-pnpm --filter @corp/shell-app build
-
-# Deploy to AWS — managed via AWS Amplify (manually configured, not in repo)
+pnpm install                          # Install dependencies
+pnpm --filter @corp/shell-app dev     # Run dev server
+pnpm --filter @corp/shell-app test    # Run tests
+pnpm lint                             # Lint
+pnpm typecheck                        # Typecheck
+pnpm --filter @corp/shell-app build   # Production build
 ```
-
----
-
-## Current Status
-
-**Phase: Complete** — All milestones implemented. See [`CHANGELOG.md`](CHANGELOG.md) for the full milestone list and `specs/ROADMAP.md` Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
-
-### Stack (confirmed in M1)
-- Next.js 16 (App Router) in `src/shell/`
-- pnpm workspaces — packages: `src/shell`, `packages/*`
-- Shadcn/ui + Tailwind CSS v4
-- AWS Amplify (manually configured, outside repo)
-- GitHub Actions CI/CD for SDK/CLI publish workflows
-- ESLint (flat config) + TypeScript strict mode + `noUncheckedIndexedAccess`
