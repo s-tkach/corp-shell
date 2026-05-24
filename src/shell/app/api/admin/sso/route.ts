@@ -1,20 +1,30 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
-import { shellConfig } from "@/lib/db/schema";
+import { withTenant } from "@/lib/db/tenant";
+import { idpProviders } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
+import { getTenantSlug } from "@/lib/tenant-slug";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
 
-  const rows = await db.select().from(shellConfig).limit(1);
+  const tenantSlug = getTenantSlug();
+  const tenantDb = withTenant(tenantSlug);
+
+  const rows = await tenantDb
+    .select()
+    .from(idpProviders)
+    .where(eq(idpProviders.isEnabled, true))
+    .limit(1);
+
   const config = rows[0];
-  if (!config?.oidcIssuer) {
+  if (!config?.issuer) {
     return NextResponse.json({ connected: false, error: "No OIDC issuer configured" });
   }
 
-  const issuer = config.oidcIssuer;
-  const clientId = config.oidcClientId;
+  const issuer = config.issuer;
+  const clientId = config.clientId;
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
 
   try {

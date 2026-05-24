@@ -2,12 +2,34 @@ import {
   boolean,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+
+export const tenantStatusEnum = pgEnum("tenant_status", [
+  "active",
+  "suspended",
+  "deleted",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+]);
+
+export const tenants = pgTable("tenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  status: tenantStatusEnum("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -68,15 +90,24 @@ export const subscriptionTiers = pgTable("subscription_tiers", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const userSubscriptions = pgTable("user_subscriptions", {
+export const idpProviders = pgTable("idp_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .unique()
-    .references(() => users.id, { onDelete: "cascade" }),
+  displayName: text("display_name").notNull(),
+  issuer: text("issuer").notNull(),
+  clientId: text("client_id").notNull(),
+  encryptedClientSecret: text("encrypted_client_secret").notNull(),
+  scopes: text("scopes").$type<string[]>().notNull(),
+  groupClaimName: text("group_claim_name"),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const tenantSubscription = pgTable("tenant_subscription", {
+  id: uuid("id").primaryKey().defaultRandom(),
   tierId: uuid("tier_id")
     .notNull()
     .references(() => subscriptionTiers.id),
+  status: subscriptionStatusEnum("status").notNull().default("active"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -130,9 +161,6 @@ export const shellConfig = pgTable("shell_config", {
   loginCardColor: text("login_card_color"),
   loginButtonColor: text("login_button_color"),
   loginButtonText: text("login_button_text"),
-  oidcIssuer: text("oidc_issuer"),
-  oidcClientId: text("oidc_client_id"),
-  oidcClientSecret: text("oidc_client_secret"),
   headerShowDate: boolean("header_show_date").notNull().default(false),
   headerDateFormat: text("header_date_format").default("PPP"),
   toastPosition: text("toast_position").default("bottom-right"),

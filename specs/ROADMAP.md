@@ -35,7 +35,7 @@
 | M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, session-auth push API |
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
 | M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
-| M16 | Multi-Tenant Data Model *(planned)* | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
+| M16 | Multi-Tenant Data Model | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
 | M17 | Subdomain Routing + Tenant JWT *(planned)* | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
 | M18 | Dynamic IDP Registration *(planned)* | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
 | M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
@@ -717,25 +717,27 @@ Before marking v1 as released, confirm:
 
 **Depends on:** M15 complete.
 
+**Status:** Complete
+
 ### Tasks
 
 #### M16-1: Schema changes — `public.tenants` + per-tenant tables
-- [ ] In `src/shell/lib/db/schema.ts`:
+- [x] In `src/shell/lib/db/schema.ts`:
   - Add `pgEnum("tenant_status", ["active", "suspended", "deleted"])`
   - Add `pgEnum("subscription_status", ["active", "trialing", "past_due", "canceled"])`
   - Add `public.tenants` table: `id` (uuid PK defaultRandom), `slug` (text unique not null), `displayName` (text not null), `status` (tenant_status not null default "active"), `createdAt` (timestamp defaultNow)
   - Add `idpProviders` table (per-tenant schema): `id` (uuid PK), `displayName` (text), `issuer` (text), `clientId` (text), `encryptedClientSecret` (text), `scopes` (text[]), `groupClaimName` (text), `isEnabled` (boolean default true), `createdAt` (timestamp defaultNow)
   - Add `tenantSubscription` table (per-tenant schema): `tierId` (uuid FK → subscriptionTiers.id), `status` (subscription_status not null default "active"), `expiresAt` (timestamp nullable), `assignedAt` (timestamp defaultNow)
   - Remove `userSubscriptions` table definition
-- [ ] Update existing migration file in place (no new migration file)
-- [ ] **Acceptance:** `pnpm drizzle-kit generate` produces valid SQL; no TypeScript errors in schema file
+- [x] Update existing migration file in place (no new migration file)
+- [x] **Acceptance:** `pnpm drizzle-kit generate` produces valid SQL; no TypeScript errors in schema file
 
 #### M16-2: Export `connectionString` from `client.ts`
-- [ ] In `src/shell/lib/db/client.ts`, export the raw `connectionString` string used to construct the `postgres()` client
-- [ ] **Acceptance:** `import { connectionString } from "~/lib/db/client"` resolves without circular dependency
+- [x] In `src/shell/lib/db/client.ts`, export the raw `connectionString` string used to construct the `postgres()` client
+- [x] **Acceptance:** `import { connectionString } from "~/lib/db/client"` resolves without circular dependency
 
 #### M16-3: `withTenant(slug)` Drizzle client factory
-- [ ] Create `src/shell/lib/db/tenant.ts`:
+- [x] Create `src/shell/lib/db/tenant.ts`:
   ```typescript
   import postgres from "postgres";
   import { drizzle } from "drizzle-orm/postgres-js";
@@ -749,10 +751,10 @@ Before marking v1 as released, confirm:
     return drizzle(client, { schema });
   }
   ```
-- [ ] **Acceptance:** `withTenant("acme")` returns a typed Drizzle client; querying `users` table reads from `tenant_acme.users`
+- [x] **Acceptance:** `withTenant("acme")` returns a typed Drizzle client; querying `users` table reads from `tenant_acme.users`
 
 #### M16-4: `provisionTenant()` provisioning function
-- [ ] Create `src/shell/lib/db/provision.ts`:
+- [x] Create `src/shell/lib/db/provision.ts`:
   - `provisionTenant(slug: string, displayName: string, adminEmail: string)`:
     1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid
     2. Check `public.tenants` for slug uniqueness — throw if taken
@@ -761,12 +763,12 @@ Before marking v1 as released, confirm:
     5. Run DDL for all per-tenant tables against `tenant_{slug}` schema (using `withTenant(slug)`)
     6. Seed: `shellConfig` (setup_complete=true, default branding), `subscriptionTiers` (free level 0, standard level 1, enterprise level 2), `roles` (super_admin isSystem=true, admin), initial admin `users` row (email=adminEmail, isActive=true), `userRoles` (super_admin → admin user), `tenantSubscription` (free tier, status=active)
     7. Return the created tenant record
-- [ ] **Acceptance:** Calling `provisionTenant("acme", "Acme Corp", "admin@acme.com")` creates `tenant_acme` schema with all tables and seed data; re-calling with same slug throws
+- [x] **Acceptance:** Calling `provisionTenant("acme", "Acme Corp", "admin@acme.com")` creates `tenant_acme` schema with all tables and seed data; re-calling with same slug throws
 
 #### M16-5: Fix broken imports after `userSubscriptions` removal
-- [ ] Update `src/shell/lib/auth.ts`: remove `userSubscriptions` query; replace with `tenantSubscription` query via `withTenant(tenantSlug)` (tenantSlug not yet in JWT at this step — reads from env `TENANT_SLUG` or hardcoded for single-tenant compat until M17)
-- [ ] Update `src/shell/app/api/internal/subscriptions/assign/route.ts`: change payload from `{ userId, tierId, expiresAt? }` to `{ tenantSlug, tierId, expiresAt? }`; write to `tenantSubscription` via `withTenant(tenantSlug)`
-- [ ] **Acceptance:** `pnpm typecheck` passes; `pnpm --filter shell build` succeeds; existing tests pass
+- [x] Update `src/shell/lib/auth.ts`: remove `userSubscriptions` query; replace with `tenantSubscription` query via `withTenant(tenantSlug)` (tenantSlug not yet in JWT at this step — reads from env `TENANT_SLUG` or hardcoded for single-tenant compat until M17)
+- [x] Update `src/shell/app/api/internal/subscriptions/assign/route.ts`: change payload from `{ userId, tierId, expiresAt? }` to `{ tenantSlug, tierId, expiresAt? }`; write to `tenantSubscription` via `withTenant(tenantSlug)`
+- [x] **Acceptance:** `pnpm typecheck` passes; `pnpm --filter shell build` succeeds; existing tests pass
 
 ---
 

@@ -1,0 +1,336 @@
+import postgres from "postgres";
+import { db, connectionString } from "./client";
+import { tenants, roles, users, userRoles, subscriptionTiers, tenantSubscription, shellConfig } from "./schema";
+import { eq } from "drizzle-orm";
+import { withTenant } from "./tenant";
+
+const SLUG_PATTERN = /^[a-z0-9-]+$/;
+
+export async function provisionTenant(
+  slug: string,
+  displayName: string,
+  adminEmail: string
+): Promise<{ tenantId: string }> {
+  // Validate slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new Error("Invalid slug");
+  }
+
+  // Check slug uniqueness
+  const existing = await db.select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
+  if (existing.length > 0) {
+    throw new Error(`Slug "${slug}" already exists`);
+  }
+
+  // Create postgres connection for raw SQL
+  const sql = postgres(connectionString!);
+
+  try {
+    // Insert tenant row
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        slug,
+        displayName,
+        status: "active",
+      })
+      .returning();
+
+    if (!tenant) {
+      throw new Error("Failed to create tenant");
+    }
+
+    // Create schema
+    await sql`CREATE SCHEMA ${ sql(slug, "identifier") }`;
+
+    // Run DDL for per-tenant tables
+    const ddl = perTenantDDL(slug);
+    await sql.unsafe(ddl);
+
+    // Seed defaults
+    const tenantDb = withTenant(slug);
+    await seedTenant(tenantDb, tenant.id, adminEmail);
+
+    return { tenantId: tenant.id };
+  } finally {
+    await sql.end();
+  }
+}
+
+export function perTenantDDL(schema: string): string {
+  // Generate all table creation SQL for the per-tenant schema
+  return `
+    SET search_path TO "${schema}",public;
+
+    CREATE TABLE "${schema}".roles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug text NOT NULL UNIQUE,
+      display_name text NOT NULL,
+      is_system boolean NOT NULL DEFAULT false,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".users (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      email text NOT NULL UNIQUE,
+      display_name text NOT NULL,
+      idp_source text NOT NULL,
+      idp_subject text NOT NULL,
+      is_active boolean NOT NULL DEFAULT true,
+      preferences jsonb,
+      last_login_at timestamp with time zone,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".user_roles (
+      user_id uuid NOT NULL REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
+      assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, role_id)
+    );
+
+    CREATE TABLE "${schema}".idp_group_role_mappings (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      idp_group_name text NOT NULL,
+      role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
+      created_at timestamp with time zone NOT NULL DEFAULT now(),
+      UNIQUE(idp_group_name, role_id)
+    );
+
+    CREATE TABLE "${schema}".subscription_tiers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug text NOT NULL UNIQUE,
+      display_name text NOT NULL,
+      level integer NOT NULL,
+      upgrade_cta_headline text,
+      upgrade_cta_body text,
+      upgrade_cta_label text,
+      upgrade_url text,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".tenant_subscription (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tier_id uuid NOT NULL REFERENCES "${schema}".subscription_tiers(id),
+      status text NOT NULL DEFAULT 'active',
+      expires_at timestamp with time zone,
+      assigned_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".idp_providers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      display_name text NOT NULL,
+      issuer text NOT NULL,
+      client_id text NOT NULL,
+      encrypted_client_secret text NOT NULL,
+      scopes text[] NOT NULL,
+      group_claim_name text,
+      is_enabled boolean NOT NULL DEFAULT true,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".app_registry (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL UNIQUE,
+      remote_url text NOT NULL,
+      route_prefix text NOT NULL UNIQUE,
+      health_check_url text,
+      is_enabled boolean NOT NULL DEFAULT true,
+      last_healthy_at timestamp with time zone,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".menu_sections (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      label text NOT NULL,
+      icon text,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".menu_items (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      section_id uuid NOT NULL REFERENCES "${schema}".menu_sections(id) ON DELETE CASCADE,
+      parent_item_id uuid,
+      is_folder boolean NOT NULL DEFAULT false,
+      label text NOT NULL,
+      route text NOT NULL DEFAULT '',
+      icon text,
+      badge text,
+      required_roles jsonb NOT NULL DEFAULT '[]'::jsonb,
+      required_sub_level integer NOT NULL DEFAULT 0,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".shell_config (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      app_name text NOT NULL,
+      logo_url text,
+      color_overrides jsonb,
+      color_overrides_dark jsonb,
+      login_bg_image_url text,
+      login_bg_color text,
+      login_headline text,
+      login_form_position text,
+      login_card_color text,
+      login_button_color text,
+      login_button_text text,
+      header_show_date boolean NOT NULL DEFAULT false,
+      header_date_format text DEFAULT 'PPP',
+      toast_position text DEFAULT 'bottom-right',
+      toast_bg_color text DEFAULT '#ffffff',
+      toast_text_color text DEFAULT '#020817',
+      toast_border_color text DEFAULT '#e2e8f0',
+      toast_duration integer DEFAULT 5000,
+      setup_complete boolean NOT NULL DEFAULT false,
+      updated_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".auth_events (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid REFERENCES "${schema}".users(id) ON DELETE SET NULL,
+      email text,
+      event_type text NOT NULL,
+      metadata jsonb,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".notifications (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      title text NOT NULL,
+      body text NOT NULL,
+      action_label text,
+      action_type text,
+      action_payload text,
+      target_type text NOT NULL DEFAULT 'all',
+      target_user_id uuid REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      target_sub_level integer,
+      expires_at timestamp with time zone,
+      created_by uuid NOT NULL REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".notification_reads (
+      notification_id uuid NOT NULL REFERENCES "${schema}".notifications(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      read_at timestamp with time zone NOT NULL DEFAULT now(),
+      PRIMARY KEY (notification_id, user_id)
+    );
+  `;
+}
+
+async function seedTenant(
+  tenantDb: ReturnType<typeof withTenant>,
+  tenantId: string,
+  adminEmail: string
+): Promise<void> {
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(adminEmail)) {
+    throw new Error(`Invalid email format: "${adminEmail}"`);
+  }
+
+  // Insert default roles
+  const superAdminRoles = await tenantDb
+    .insert(roles)
+    .values({
+      slug: "super_admin",
+      displayName: "Super Admin",
+      isSystem: true,
+    })
+    .returning();
+
+  const superAdminRole = superAdminRoles[0];
+  if (!superAdminRole) {
+    throw new Error("Failed to create super_admin role");
+  }
+
+  await tenantDb
+    .insert(roles)
+    .values({
+      slug: "admin",
+      displayName: "Admin",
+      isSystem: true,
+    });
+
+  await tenantDb
+    .insert(roles)
+    .values({
+      slug: "user",
+      displayName: "User",
+      isSystem: true,
+    });
+
+  // Insert default subscription tiers
+  const freeTiers = await tenantDb
+    .insert(subscriptionTiers)
+    .values({
+      slug: "free",
+      displayName: "Free",
+      level: 0,
+    })
+    .returning();
+
+  const freeTier = freeTiers[0];
+  if (!freeTier) {
+    throw new Error("Failed to create free tier");
+  }
+
+  await tenantDb
+    .insert(subscriptionTiers)
+    .values({
+      slug: "standard",
+      displayName: "Standard",
+      level: 1,
+    });
+
+  await tenantDb
+    .insert(subscriptionTiers)
+    .values({
+      slug: "enterprise",
+      displayName: "Enterprise",
+      level: 2,
+    });
+
+  // Insert shell config with defaults
+  await tenantDb
+    .insert(shellConfig)
+    .values({
+      appName: "Shell",
+      setupComplete: true,
+    });
+
+  // Insert admin user
+  const adminUsers = await tenantDb
+    .insert(users)
+    .values({
+      email: adminEmail,
+      displayName: adminEmail.split("@")[0] ?? "admin",
+      idpSource: "pending",
+      idpSubject: "pending",
+      isActive: true,
+    })
+    .returning();
+
+  const adminUser = adminUsers[0];
+  if (!adminUser) {
+    throw new Error("Failed to create admin user");
+  }
+
+  // Assign super_admin role to admin user
+  await tenantDb
+    .insert(userRoles)
+    .values({
+      userId: adminUser.id,
+      roleId: superAdminRole.id,
+    });
+
+  // Assign free tier subscription
+  await tenantDb
+    .insert(tenantSubscription)
+    .values({
+      tierId: freeTier.id,
+      status: "active",
+    });
+}

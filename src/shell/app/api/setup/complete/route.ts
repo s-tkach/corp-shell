@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { resetAuth } from "@/lib/auth";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
-import {
-  shellConfig,
-  subscriptionTiers,
-  roles,
-  users,
-  userRoles,
-  userSubscriptions,
-} from "@/lib/db/schema";
+import { withTenant } from "@/lib/db/tenant";
+import { tenants, shellConfig, subscriptionTiers, roles, users, userRoles, tenantSubscription, idpProviders } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { getTenantSlug } from "@/lib/tenant-slug";
 
 interface SetupPayload {
   appName: string;
@@ -43,16 +37,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid super admin email" }, { status: 400 });
   }
 
+  const tenantSlug = getTenantSlug();
+  const tenantDb = withTenant(tenantSlug);
+
   // Guard: reject if already set up
-  const existing = await db.select().from(shellConfig).limit(1);
+  const existing = await tenantDb.select().from(shellConfig).limit(1);
   if (existing[0]?.setupComplete) {
     return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
+  }
+
+  // Ensure tenant record exists in public schema for single-tenant mode
+  const tenantExists = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
+
+  if (!tenantExists.length) {
+    await db.insert(tenants).values({
+      slug: tenantSlug,
+      displayName: appName.trim(),
+      status: "active",
+    });
   }
 
   const encryptedSecret = await encrypt(oidcClientSecret.trim());
 
   // Atomic write — Drizzle wraps this in a transaction
-  await db.transaction(async (tx) => {
+  await tenantDb.transaction(async (tx) => {
     // 1. shell_config
     await tx.insert(shellConfig).values({
       appName: appName.trim(),
@@ -64,9 +76,6 @@ export async function POST(request: Request) {
         "--accent": accentColor || "#f1f5f9",
         "--destructive": destructiveColor || "#ef4444",
       },
-      oidcIssuer: oidcIssuer.trim(),
-      oidcClientId: oidcClientId.trim(),
-      oidcClientSecret: encryptedSecret,
       setupComplete: true,
     });
 
@@ -116,17 +125,26 @@ export async function POST(request: Request) {
       roleId: superAdminRole.id,
     });
 
-    // 6. user_subscriptions: enterprise tier, no expiry
+    // 6. tenant_subscription: enterprise tier, no expiry
     const entTier = enterpriseTier[0] ?? freeTier;
     if (!entTier) throw new Error("No enterprise tier found");
 
-    await tx.insert(userSubscriptions).values({
-      userId: superAdminUser.id,
+    await tx.insert(tenantSubscription).values({
       tierId: entTier.id,
+      status: "active",
+    });
+
+    // 7. Store OIDC config in idpProviders
+    await tx.insert(idpProviders).values({
+      displayName: "Default OIDC",
+      issuer: oidcIssuer.trim(),
+      clientId: oidcClientId.trim(),
+      encryptedClientSecret: encryptedSecret,
+      scopes: ["openid", "profile", "email"],
+      groupClaimName: "groups",
+      isEnabled: true,
     });
   });
-
-  resetAuth();
 
   // Set setup_complete cookie so proxy.ts stops redirecting to /setup
   const response = NextResponse.json({ ok: true });

@@ -7,31 +7,28 @@ import {
   userRoles,
   idpGroupRoleMappings,
   subscriptionTiers,
-  userSubscriptions,
+  tenantSubscription,
   authEvents,
-  shellConfig,
+  idpProviders,
 } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
-let cachedConfig: { issuer: string; clientId: string; clientSecret: string } | null = null;
-
 async function getOidcConfig() {
-  if (cachedConfig) return cachedConfig;
-  const rows = await db.select().from(shellConfig).limit(1);
-  const config = rows[0];
-  if (!config?.oidcIssuer || !config.oidcClientId || !config.oidcClientSecret) {
-    throw new Error("OIDC not configured — complete setup first");
+  const rows = await db
+    .select()
+    .from(idpProviders)
+    .where(eq(idpProviders.isEnabled, true))
+    .limit(1);
+  const provider = rows[0];
+  if (!provider) {
+    throw new Error("No IDP configured — complete setup first");
   }
-  cachedConfig = {
-    issuer: config.oidcIssuer,
-    clientId: config.oidcClientId,
-    clientSecret: await decrypt(config.oidcClientSecret),
+  return {
+    id: provider.id,
+    issuer: provider.issuer,
+    clientId: provider.clientId,
+    clientSecret: await decrypt(provider.encryptedClientSecret),
   };
-  return cachedConfig;
-}
-
-export function resetAuth() {
-  cachedConfig = null;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
@@ -112,18 +109,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
               }
             }
 
-            const freeTier = await db
-              .select({ id: subscriptionTiers.id })
-              .from(subscriptionTiers)
-              .where(eq(subscriptionTiers.slug, "free"))
-              .limit(1);
-            if (freeTier[0]) {
-              await db.insert(userSubscriptions).values({
-                userId,
-                tierId: freeTier[0].id,
-              });
-            }
-
             await db.insert(authEvents).values({
               userId,
               email,
@@ -153,36 +138,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
 
           const subRow = await db
             .select({
-              id: userSubscriptions.id,
               slug: subscriptionTiers.slug,
               level: subscriptionTiers.level,
-              expiresAt: userSubscriptions.expiresAt,
+              expiresAt: tenantSubscription.expiresAt,
+              status: tenantSubscription.status,
             })
-            .from(userSubscriptions)
-            .innerJoin(
-              subscriptionTiers,
-              eq(userSubscriptions.tierId, subscriptionTiers.id)
-            )
-            .where(eq(userSubscriptions.userId, userId))
+            .from(tenantSubscription)
+            .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
             .limit(1);
 
-          let tier = subRow[0];
-
-          if (tier && tier.expiresAt && tier.expiresAt < new Date() && tier.slug !== "free") {
-            const freeTier = await db
-              .select({ id: subscriptionTiers.id, slug: subscriptionTiers.slug, level: subscriptionTiers.level })
-              .from(subscriptionTiers)
-              .where(eq(subscriptionTiers.slug, "free"))
-              .limit(1);
-            if (freeTier[0]) {
-              await db
-                .update(userSubscriptions)
-                .set({ tierId: freeTier[0].id, expiresAt: null })
-                .where(eq(userSubscriptions.id, tier.id));
-              tier = { ...freeTier[0], id: tier.id, expiresAt: null };
-            }
-          }
-
+          const tier = subRow[0];
           token.userId = userId;
           token.roles = roleSlugs;
           token.subscriptionTier = tier?.slug ?? "free";
