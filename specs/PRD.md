@@ -1,7 +1,7 @@
 # PRD: Corporate Application Shell
-**Version:** 1.3  
+**Version:** 2.0  
 **Status:** Ready for Engineering  
-**Date:** 2026-05-23
+**Date:** 2026-05-24
 
 ---
 
@@ -13,6 +13,7 @@
 | 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; PostgreSQL replaces DynamoDB; AWS Amplify deployment |
 | 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry; first-run setup wizard added for branding/naming |
 | 1.3 | Open-source readiness: G10 added (self-hosted deployment); FR-SETUP-2/5 and FR-AUTH-1 updated for storage/crypto provider abstraction; NFR-13–16 added; §8.1 secrets note updated; §10.6 local dev user flow added |
+| 2.0 | v2 multi-tenant: schema-per-tenant PostgreSQL isolation; subdomain routing with tenant-in-JWT; dynamic IDP registration per tenant; org-level subscription model; platform admin tenant management. Stripe/self-serve billing deferred to v3. |
 
 ---
 
@@ -34,6 +35,8 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 
 ## 3. Goals
 
+### 3.1 Goals (v1)
+
 | # | Goal |
 |---|------|
 | G1 | SSO via OIDC; any OIDC-compliant IDP supported without code changes |
@@ -48,7 +51,20 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | G10 | Fork-and-extend from `satnaing/shadcn-admin` — not built from scratch |
 | G11 | Self-hosted / local-first deployment: the shell must be runnable without any AWS account using Docker Compose + local AES-256-GCM encryption + local disk storage |
 
-## 4. Non-Goals (v1)
+### 3.2 Goals (v2)
+
+| # | Goal |
+|---|------|
+| G12 | Multiple independent organizations served from a single deployment, each isolated by PostgreSQL schema |
+| G13 | Subdomain routing (`acme.corp.example.com`) via CloudFront wildcard DNS + single Amplify app |
+| G14 | Tenant identity carried in the signed JWT; host header trusted only at the login boundary |
+| G15 | Each tenant configures their own OIDC provider(s) via the admin panel — no redeploy required |
+| G16 | Subscription ownership moves to the org level; all users in a tenant inherit the org's tier |
+| G17 | Platform admins provision, suspend, and manage all tenants from a dedicated `/platform` panel |
+
+## 4. Non-Goals
+
+### 4.1 Non-Goals (v1)
 
 | # | Non-Goal | Planned For |
 |---|----------|-------------|
@@ -58,6 +74,14 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | NG4 | Self-serve billing / payment gateway (webhook endpoint stubbed) | v2 |
 | NG5 | Dynamic IDP registration via Admin Panel (env-var config in v1) | v2 |
 | NG6 | Mobile native apps | — |
+
+### 4.2 Non-Goals (v2)
+
+| # | Non-Goal | Planned For |
+|---|----------|-------------|
+| NG7 | Self-serve public tenant signup (tenant provisioning is platform-admin-only) | v3 |
+| NG8 | Stripe / self-serve billing integration (generic webhook pattern retained) | v3 |
+| NG9 | Per-seat subscription counting within a tenant | v3 |
 
 ---
 
@@ -74,6 +98,12 @@ Manages shell configuration via the Admin Panel. Adds child apps, creates menu i
 
 ### 5.4 First-Time Setup User (super-admin)
 The person who completes the **first-run wizard** immediately after the shell is first deployed. They set the app name, upload a logo, choose a brand color, and create the initial `super_admin` account linked to their OIDC identity. The wizard is only accessible once; subsequent access requires the `super_admin` role.
+
+### 5.5 Platform Administrator (v2)
+The operator who manages all tenants. Accesses `/platform/tenants` (requires `super_admin` role in the `tenant_platform` schema). Creates new tenants, assigns subdomain slugs, provisions schemas, and sends setup links to tenant admins. Can suspend or soft-delete tenants.
+
+### 5.6 Tenant Administrator (v2)
+An org admin within a specific tenant subdomain. Configures their own OIDC provider(s) via `/admin/sso`, manages users and roles within their org, and views their org's subscription tier. Cannot see or affect other tenants.
 
 ---
 
@@ -822,16 +852,58 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 
 ---
 
-## 11. v2 Roadmap
+## 11. v2 Functional Requirements
+
+### FR-MT-1: Schema-per-Tenant Data Isolation
+Each tenant's data lives in its own PostgreSQL schema (`tenant_{slug}`). The `public` schema holds only the tenant registry (`public.tenants`). No query from one tenant's request can touch another tenant's schema. A `withTenant(slug)` Drizzle client factory enforces this at the application layer.
+
+### FR-MT-2: Subdomain Routing
+`*.corp.example.com` resolves to a single CloudFront distribution pointing at the single Amplify app. The middleware reads the `Host` header exactly once — at the unauthenticated login boundary — to resolve the tenant and load their OIDC providers. After login, tenant identity is read exclusively from the signed JWT.
+
+### FR-MT-3: Tenant-in-JWT
+The NextAuth `jwt` callback writes `tenantId` and `tenantSlug` into the signed JWT at login. All subsequent authenticated requests read tenant identity from the token. The middleware asserts `token.tenantSlug === subdomain(host)` on every request — a mismatch returns 401, preventing cross-tenant token replay.
+
+### FR-MT-4: Tenant Suspension
+The middleware checks tenant `status` from `public.tenants` at the login boundary. A tenant with `status = suspended` is redirected to `/suspended` before any auth processing occurs.
+
+### FR-MT-5: Dynamic IDP Registration
+Each tenant's `idpProviders` table (within their schema) holds their OIDC provider configurations. Tenant admins add, edit, and delete providers via `/admin/sso`. On save, the server validates the OIDC discovery endpoint (`{issuer}/.well-known/openid-configuration`) before persisting. Client secrets are encrypted via `CryptoProvider` before storage.
+
+### FR-MT-6: Dynamic Auth Config
+`getAuthConfig(tenantSlug)` reads enabled providers from the tenant's `idpProviders` table at request time and returns a fresh NextAuth config. No restart or redeploy is required when a tenant changes their IDP config.
+
+### FR-MT-7: Org-Level Subscription
+Per-user `userSubscriptions` is replaced by a single `tenantSubscription` row per tenant schema. All users in a tenant inherit the org's subscription tier. The JWT `jwt` callback reads from `tenantSubscription` instead of a per-user row; all existing RBAC middleware subscription checks continue to work unchanged.
+
+### FR-MT-8: Subscription Webhook Update
+`POST /api/internal/subscriptions/assign` payload changes from `{ userId, tierId, expiresAt }` to `{ tenantSlug, tierId, expiresAt }`. The endpoint updates the target tenant's `tenantSubscription` row. HMAC-SHA256 signature validation is unchanged.
+
+### FR-MT-9: Platform Admin Panel
+`/platform/tenants` is accessible only to users authenticated in the `tenant_platform` schema with `super_admin` role. It provides: tenant list with status, create-tenant form (slug + display name + admin email), suspend/reactivate, soft-delete. Tenant creation calls `provisionTenant()` which creates the schema, runs DDL, and seeds defaults.
+
+### FR-MT-10: Tenant Provisioning
+`provisionTenant(slug, displayName, adminEmail)` is the sole mechanism for creating a new tenant. It: validates slug format (`^[a-z0-9-]+$`), inserts into `public.tenants`, creates `tenant_{slug}` schema, runs all per-tenant DDL, seeds default `shellConfig`, `free` subscription tier, `super_admin`/`admin`/`user` roles, and an initial admin user record. The platform admin then sends the tenant admin a setup link to `https://{slug}.corp.example.com/setup`.
+
+---
+
+## 12. v2 Roadmap Summary
+
+| Milestone | Feature |
+|-----------|---------|
+| M16 | Multi-tenant data model: `public.tenants`, `idpProviders`, `tenantSubscription`, `withTenant()`, `provisionTenant()` |
+| M17 | Subdomain routing + tenant-in-JWT: host resolution at login, JWT tenant fields, cross-tenant replay protection |
+| M18 | Dynamic IDP registration: `getAuthConfig()`, multi-IDP admin CRUD, OIDC discovery validation |
+| M19 | Platform admin: `/platform/tenants` panel, tenant provisioning API, org-level subscription view |
+
+## 13. v3 Backlog (Out of Scope for v2)
 
 | Feature | Notes |
 |---------|-------|
-| iFrame fallback integration mode | For non-React / third-party apps; adds CSP and postMessage auth |
+| Self-serve public tenant signup | No public `/signup` in v2; platform admin provisions all tenants |
+| Stripe / self-serve billing | Generic HMAC webhook retained; Stripe checkout + portal in v3 |
+| Per-seat subscription counting | Org-level flat tier in v2; seat limits in v3 |
+| iFrame fallback integration mode | For non-React / third-party apps |
 | Audit log Admin Panel viewer | Events already in DB from v1 |
-| Subdomain multi-tenant routing | `acme.corp.com` → per-tenant CloudFront + OIDC org |
-| Self-serve billing | Stripe / Chargebee webhook already stubbed in v1 |
-| Dynamic IDP registration via Admin Panel | No-redeploy IDP add/remove |
-| Organization-level subscription management | Group billing, org admin role, seat counts |
 
 ---
 

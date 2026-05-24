@@ -1,9 +1,9 @@
 # Roadmap: Corporate Application Shell
-**Version:** 1.1  
+**Version:** 2.0  
 **Status:** Updated  
-**Date:** 2026-05-23  
-**PRD Reference:** `specs/PRD.md` v1.3  
-**Architecture Reference:** `specs/ARCHITECTURE.md` v1.1
+**Date:** 2026-05-24  
+**PRD Reference:** `specs/PRD.md` v2.0  
+**Architecture Reference:** `specs/ARCHITECTURE.md` v2.0
 
 ---
 
@@ -35,6 +35,10 @@
 | M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, session-auth push API |
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
 | M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
+| M16 | Multi-Tenant Data Model *(planned)* | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
+| M17 | Subdomain Routing + Tenant JWT *(planned)* | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
+| M18 | Dynamic IDP Registration *(planned)* | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
+| M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
 
 ---
 
@@ -697,18 +701,279 @@ Before marking v1 as released, confirm:
 
 ---
 
-## v2 Backlog (Out of Scope for v1)
-
-| Feature | Depends On |
-|---------|-----------|
-| iFrame integration mode (CSP + postMessage auth) | M8 complete |
-| Audit log Admin Panel viewer | M11 auth_events table |
-| Subdomain multi-tenant routing | New Amplify app per tenant (or CloudFront routing rules) |
-| Self-serve billing (Stripe/Chargebee) | M10 webhook endpoint |
-| Dynamic IDP registration via Admin Panel | M4 auth config |
-| Organization-level subscription management | M10 complete |
-| Vercel support | Depends on MF/Webpack compatibility investigation; see ARCHITECTURE.md v2 notes |
+---
 
 ---
 
-*End of Roadmap v1.1*
+## v2 Milestones (M16–M19)
+
+> **v2 implementation begins after M15 is complete and shipped.** The design for M16–M19 is documented here ahead of implementation. Sections §1–§19 of `ARCHITECTURE.md` remain the authoritative description of the running system; §20 documents the v2 design.
+
+---
+
+## M16 — Multi-Tenant Data Model
+
+**Goal:** PostgreSQL schema-per-tenant is in place. `withTenant(slug)` returns a Drizzle client scoped to `tenant_{slug}`. `provisionTenant()` creates a new tenant schema and seeds it with defaults. All existing v1 queries continue to work, now routed through the tenant client.
+
+**Depends on:** M15 complete.
+
+### Tasks
+
+#### M16-1: Schema changes — `public.tenants` + per-tenant tables
+- [ ] In `src/shell/lib/db/schema.ts`:
+  - Add `pgEnum("tenant_status", ["active", "suspended", "deleted"])`
+  - Add `pgEnum("subscription_status", ["active", "trialing", "past_due", "canceled"])`
+  - Add `public.tenants` table: `id` (uuid PK defaultRandom), `slug` (text unique not null), `displayName` (text not null), `status` (tenant_status not null default "active"), `createdAt` (timestamp defaultNow)
+  - Add `idpProviders` table (per-tenant schema): `id` (uuid PK), `displayName` (text), `issuer` (text), `clientId` (text), `encryptedClientSecret` (text), `scopes` (text[]), `groupClaimName` (text), `isEnabled` (boolean default true), `createdAt` (timestamp defaultNow)
+  - Add `tenantSubscription` table (per-tenant schema): `tierId` (uuid FK → subscriptionTiers.id), `status` (subscription_status not null default "active"), `expiresAt` (timestamp nullable), `assignedAt` (timestamp defaultNow)
+  - Remove `userSubscriptions` table definition
+- [ ] Update existing migration file in place (no new migration file)
+- [ ] **Acceptance:** `pnpm drizzle-kit generate` produces valid SQL; no TypeScript errors in schema file
+
+#### M16-2: Export `connectionString` from `client.ts`
+- [ ] In `src/shell/lib/db/client.ts`, export the raw `connectionString` string used to construct the `postgres()` client
+- [ ] **Acceptance:** `import { connectionString } from "~/lib/db/client"` resolves without circular dependency
+
+#### M16-3: `withTenant(slug)` Drizzle client factory
+- [ ] Create `src/shell/lib/db/tenant.ts`:
+  ```typescript
+  import postgres from "postgres";
+  import { drizzle } from "drizzle-orm/postgres-js";
+  import { connectionString } from "~/lib/db/client";
+  import * as schema from "~/lib/db/schema";
+
+  export function withTenant(slug: string) {
+    const client = postgres(connectionString, {
+      connection: { search_path: `tenant_${slug},public` },
+    });
+    return drizzle(client, { schema });
+  }
+  ```
+- [ ] **Acceptance:** `withTenant("acme")` returns a typed Drizzle client; querying `users` table reads from `tenant_acme.users`
+
+#### M16-4: `provisionTenant()` provisioning function
+- [ ] Create `src/shell/lib/db/provision.ts`:
+  - `provisionTenant(slug: string, displayName: string, adminEmail: string)`:
+    1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid
+    2. Check `public.tenants` for slug uniqueness — throw if taken
+    3. `INSERT public.tenants`
+    4. `CREATE SCHEMA tenant_{slug}` (raw SQL via `postgres()`)
+    5. Run DDL for all per-tenant tables against `tenant_{slug}` schema (using `withTenant(slug)`)
+    6. Seed: `shellConfig` (setup_complete=true, default branding), `subscriptionTiers` (free level 0, standard level 1, enterprise level 2), `roles` (super_admin isSystem=true, admin), initial admin `users` row (email=adminEmail, isActive=true), `userRoles` (super_admin → admin user), `tenantSubscription` (free tier, status=active)
+    7. Return the created tenant record
+- [ ] **Acceptance:** Calling `provisionTenant("acme", "Acme Corp", "admin@acme.com")` creates `tenant_acme` schema with all tables and seed data; re-calling with same slug throws
+
+#### M16-5: Fix broken imports after `userSubscriptions` removal
+- [ ] Update `src/shell/lib/auth.ts`: remove `userSubscriptions` query; replace with `tenantSubscription` query via `withTenant(tenantSlug)` (tenantSlug not yet in JWT at this step — reads from env `TENANT_SLUG` or hardcoded for single-tenant compat until M17)
+- [ ] Update `src/shell/app/api/internal/subscriptions/assign/route.ts`: change payload from `{ userId, tierId, expiresAt? }` to `{ tenantSlug, tierId, expiresAt? }`; write to `tenantSubscription` via `withTenant(tenantSlug)`
+- [ ] **Acceptance:** `pnpm typecheck` passes; `pnpm --filter shell build` succeeds; existing tests pass
+
+---
+
+## M17 — Subdomain Routing + Tenant JWT
+
+**Goal:** The middleware extracts the tenant slug from the Host header at the login boundary and does nothing with it for authenticated requests beyond asserting `token.tenantSlug === host-slug`. The signed JWT carries `tenantId` and `tenantSlug` from login onward. Cross-tenant token replay returns 401.
+
+**Depends on:** M16 complete.
+
+### Tasks
+
+#### M17-1: `getTenantSlug()` utility
+- [ ] Create `src/shell/lib/tenant-slug.ts`:
+  ```typescript
+  export function getTenantSlug(host: string): string {
+    if (process.env.TENANT_SLUG) return process.env.TENANT_SLUG;
+    return host.split(".")[0] ?? "";
+  }
+  ```
+- [ ] **Acceptance:** `getTenantSlug("acme.corp.com")` returns `"acme"`; `TENANT_SLUG=acme` env override returns `"acme"` regardless of host
+
+#### M17-2: Extend NextAuth session types
+- [ ] Create or update `src/shell/types/next-auth.d.ts`:
+  - Add `tenantId: string` and `tenantSlug: string` to the `JWT` interface
+  - Add `tenantId: string` and `tenantSlug: string` to the `Session.user` interface
+- [ ] **Acceptance:** `token.tenantSlug` and `session.user.tenantSlug` are typed without `any` cast
+
+#### M17-3: Write `tenantId` + `tenantSlug` into JWT in `auth.ts`
+- [ ] In `src/shell/lib/auth.ts` `jwt()` callback:
+  - At login trigger (`!token.sub` condition): read `tenantSlug` from `getTenantSlug(req.headers.host)`
+  - Look up `public.tenants` by slug (global `db`, not `withTenant`) → get `tenantId`
+  - Write `token.tenantId = tenant.id` and `token.tenantSlug = slug`
+  - Read `tenantSubscription` via `withTenant(slug)` → write `subscriptionTier` + `subscriptionLevel` to JWT
+- [ ] **Acceptance:** After login on `acme.corp.com`, the decoded JWT contains `tenantId` and `tenantSlug = "acme"`
+
+#### M17-4: Middleware — host-based login boundary + cross-tenant check
+- [ ] In `src/shell/proxy.ts` (middleware):
+  - Unauthenticated login paths (`/login`, `/api/auth/**`): call `getTenantSlug(host)` → check `public.tenants` → 404 if not found → redirect `/suspended` if status=suspended
+  - Authenticated paths: decode JWT → assert `token.tenantSlug === getTenantSlug(host)` → 401 if mismatch
+  - Suspended tenant check on authenticated path: if `public.tenants.status === "suspended"` → redirect `/suspended` (check infrequently via short JWT-embedded flag or single DB lookup)
+- [ ] **Acceptance:** Token minted for `acme` is rejected with 401 on `globocorp.corp.com`; suspended tenant redirects to `/suspended`
+
+#### M17-5: `/suspended` page
+- [ ] Create `src/shell/app/suspended/page.tsx`: static page showing "This organization's account has been suspended. Contact your administrator." — no auth required, no sidebar
+- [ ] **Acceptance:** Navigating to `/suspended` renders the page without a login redirect loop
+
+#### M17-6: CloudFront wildcard DNS (documentation)
+- [ ] Add `docs/ops/wildcard-dns-setup.md`:
+  - Route 53: `*.corp.com` ALIAS → existing CloudFront distribution
+  - ACM: request wildcard cert `*.corp.com` in `us-east-1`; validate via DNS
+  - CloudFront: add `*.corp.com` as alternate domain name; attach wildcard cert
+  - Amplify: no change (CloudFront routes to same origin)
+- [ ] **Acceptance:** Doc reviewed; DNS change applied in staging; `acme.corp.com` and `globocorp.corp.com` both resolve to the shell
+
+---
+
+## M18 — Dynamic IDP Registration
+
+**Goal:** Each tenant manages its own OIDC provider(s) via the Admin Panel. `getAuthConfig(tenantSlug)` loads enabled providers from the `idpProviders` table at login time. The NextAuth factory pattern re-configures auth per request.
+
+**Depends on:** M17 complete.
+
+### Tasks
+
+#### M18-1: `getAuthConfig(tenantSlug)` in `lib/auth-config.ts`
+- [ ] Create `src/shell/lib/auth-config.ts`:
+  ```typescript
+  import { withTenant } from "~/lib/db/tenant";
+  import * as schema from "~/lib/db/schema";
+  import { decrypt } from "~/lib/crypto";
+  import { eq } from "drizzle-orm";
+  import type { NextAuthConfig } from "next-auth";
+
+  export async function getAuthConfig(tenantSlug: string): Promise<NextAuthConfig> {
+    const db = withTenant(tenantSlug);
+    const providers = await db.select().from(schema.idpProviders)
+      .where(eq(schema.idpProviders.isEnabled, true));
+    return {
+      providers: await Promise.all(providers.map(async (p) => ({
+        id: p.id,
+        name: p.displayName,
+        type: "oidc" as const,
+        issuer: p.issuer,
+        clientId: p.clientId,
+        clientSecret: await decrypt(p.encryptedClientSecret),
+        authorization: { params: { scope: p.scopes.join(" ") } },
+      }))),
+    };
+  }
+  ```
+- [ ] **Acceptance:** `getAuthConfig("acme")` returns a valid `NextAuthConfig` with providers populated from `tenant_acme.idpProviders`
+
+#### M18-2: Replace `getOidcConfig()` in `auth.ts` with factory pattern
+- [ ] Update `src/shell/lib/auth.ts` to use the NextAuth v5 factory pattern:
+  ```typescript
+  import { getAuthConfig } from "~/lib/auth-config";
+  import { getTenantSlug } from "~/lib/tenant-slug";
+
+  export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
+    const slug = getTenantSlug(req?.headers?.get("host") ?? "");
+    const config = await getAuthConfig(slug);
+    return {
+      ...config,
+      callbacks: {
+        jwt: async ({ token, account, profile }) => {
+          // existing JWT callback logic (tenant fields added in M17-3)
+          return token;
+        },
+      },
+    };
+  });
+  ```
+- [ ] Remove the old `getOidcConfig()` function and `cachedConfig` variable
+- [ ] **Acceptance:** `pnpm typecheck` passes; login flow works end-to-end with providers from DB
+
+#### M18-3: SSO Admin API — multi-IDP CRUD
+- [ ] Update `src/shell/app/api/admin/sso/route.ts` to support:
+  - `GET /api/admin/sso` → list all `idpProviders` for the tenant (clientSecret omitted from response)
+  - `POST /api/admin/sso` → create new provider; validate `issuer/.well-known/openid-configuration` before insert; encrypt clientSecret; return created record (without secret)
+  - `PATCH /api/admin/sso/[id]` → update provider fields; re-validate issuer if changed; re-encrypt secret if changed
+  - `DELETE /api/admin/sso/[id]` → delete provider (hard delete)
+  - All routes: `requireRoles(["super_admin", "admin"])`; use `withTenant(token.tenantSlug)` for DB access
+- [ ] On save: `fetch(`${issuer}/.well-known/openid-configuration`)` — return 400 with error detail if non-200 or invalid JSON
+- [ ] **Acceptance:** POST with valid issuer persists record; POST with unreachable issuer returns 400; secret in DB is ciphertext not plaintext
+
+#### M18-4: SSO Admin UI — multi-IDP list and form
+- [ ] Update `src/shell/app/(shell)/admin/sso/page.tsx`:
+  - Replace single-provider read-only view with a list of configured providers (name, issuer, enabled toggle, edit/delete actions)
+  - "Add IDP" button opens a sheet/dialog: fields for displayName, issuer, clientId, clientSecret (password input), scopes (comma-separated), groupClaimName, isEnabled toggle
+  - "Test Connection" button calls the discovery validation before submitting
+  - Edit: pre-fill form (clientSecret field shows placeholder, not actual value)
+  - Delete: confirmation dialog
+- [ ] Create `src/shell/components/shell/sso-idp-form.tsx`: reusable form component for add/edit
+- [ ] **Acceptance:** Admin can add, toggle, edit, and delete IDP providers; invalid issuer shows inline error; secret never echoed back in the UI
+
+---
+
+## M19 — Platform Admin Tenant Management
+
+**Goal:** Platform super admins manage all tenants from `https://platform.corp.com/platform/tenants`. They can create new tenants, suspend, and soft-delete them. The org-level subscription model is fully wired: `tenantSubscription` is the authoritative source; the webhook updates it at the tenant level.
+
+**Depends on:** M16, M17, M18 complete.
+
+### Tasks
+
+#### M19-1: Bootstrap platform tenant
+- [ ] Create `src/shell/scripts/bootstrap-platform.ts` (run once, not part of app startup):
+  - Check if `tenant_platform` schema exists — exit if already bootstrapped
+  - Call `provisionTenant("platform", "Platform Admin", platformAdminEmail)` where `platformAdminEmail` is read from `PLATFORM_ADMIN_EMAIL` env var
+  - Log the setup link: `https://platform.corp.com/setup` (or dev equivalent)
+- [ ] Add script to `src/shell/package.json`: `"bootstrap-platform": "tsx scripts/bootstrap-platform.ts"`
+- [ ] **Acceptance:** Running `pnpm bootstrap-platform` creates `tenant_platform` schema with seeded super_admin user; re-running is a no-op
+
+#### M19-2: `isPlatformAdmin()` guard
+- [ ] Create `src/shell/lib/platform-guard.ts`:
+  ```typescript
+  import type { JWT } from "next-auth/jwt";
+
+  export function isPlatformAdmin(token: JWT): boolean {
+    return token.tenantSlug === "platform" && token.roles.includes("super_admin");
+  }
+  ```
+- [ ] In `src/shell/proxy.ts`: add `/platform/**` route protection that calls `isPlatformAdmin(token)` → 403 if false
+- [ ] **Acceptance:** Request with `tenantSlug="acme"` and `super_admin` role is blocked from `/platform/**`; request with `tenantSlug="platform"` and `super_admin` role passes
+
+#### M19-3: Platform admin layout
+- [ ] Create `src/shell/app/(platform)/layout.tsx`:
+  - Server component; calls `auth()` and `isPlatformAdmin(token)` → redirect `/403` if false
+  - Minimal sidebar with only platform admin navigation (no tenant-specific menu)
+- [ ] **Acceptance:** Authenticated platform admin sees the platform layout; non-platform-admin is redirected to 403
+
+#### M19-4: Tenant provisioning API
+- [ ] Create `src/shell/app/api/platform/tenants/route.ts`:
+  - `GET /api/platform/tenants` → list all rows from `public.tenants` with user count per tenant (cross-schema count query); requires `isPlatformAdmin()`
+  - `POST /api/platform/tenants` → body: `{ slug, displayName, adminEmail }`; call `provisionTenant()`; return created tenant; requires `isPlatformAdmin()`
+- [ ] Create `src/shell/app/api/platform/tenants/[slug]/route.ts`:
+  - `PATCH /api/platform/tenants/[slug]` → body: `{ status: "active" | "suspended" | "deleted" }`; update `public.tenants.status`; requires `isPlatformAdmin()`
+- [ ] **Acceptance:** POST creates tenant and schema; PATCH to `suspended` causes middleware to redirect that tenant's users to `/suspended`
+
+#### M19-5: Platform tenants UI page
+- [ ] Create `src/shell/app/(platform)/platform/tenants/page.tsx`:
+  - Table: slug, displayName, status badge, createdAt, user count, actions (suspend/unsuspend/delete)
+  - "Create Tenant" button opens a sheet: fields for org name, subdomain slug (with format hint), admin email; submit calls `POST /api/platform/tenants`
+  - Status badge: green for active, yellow for suspended, gray for deleted
+  - Suspend/Unsuspend/Delete actions with confirmation dialog
+- [ ] **Acceptance:** Platform admin can create a tenant from the UI; created tenant appears in list; suspend changes badge; deleted tenants show as gray
+
+#### M19-6: Org-level subscription admin view
+- [ ] Update `src/shell/app/(shell)/admin/subscriptions/page.tsx`:
+  - Replace per-user subscription table with org-level view: current tier name, level, status, expiresAt
+  - "Assigned by platform admin" label — tenant admin cannot change tier from this UI
+  - Keep upgrade CTA link for tenants on non-enterprise tiers
+- [ ] **Acceptance:** Tenant admin sees org tier; no controls to self-upgrade; platform admin assigns tiers via platform panel or webhook
+
+---
+
+## v3 Backlog (Out of Scope for v2)
+
+| Feature | Notes |
+|---------|-------|
+| Public self-serve tenant signup | Tenant provisioning currently platform-admin-only |
+| Stripe / self-serve billing | HMAC webhook pattern retained as the integration point |
+| Per-seat pricing model | Requires user count tracking + billing events |
+| iFrame integration mode | CSP + postMessage auth for non-MF child apps |
+| Audit log Admin Panel viewer | `authEvents` table already populated |
+| Vercel support | MF/Webpack compatibility investigation needed |
+
+---
+
+*End of Roadmap v2.0*

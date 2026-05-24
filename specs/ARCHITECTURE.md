@@ -1,9 +1,11 @@
 # Architecture Design: Corporate Application Shell
-**Version:** 1.1  
-**Status:** Updated  
-**Date:** 2026-05-23  
-**PRD Reference:** `specs/PRD.md` v1.3  
-**Changelog:** Added §10.3 (local dev prerequisites), §17 (CryptoProvider abstraction), §18 (StorageProvider abstraction), §19 (OSS repo infrastructure); updated §3, §4.1, §10.1, §10.2, §12, §14.
+**Version:** 1.1 (v1 current) / 2.0 (v2 planned)  
+**Status:** v1 implemented; v2 documented ahead of implementation  
+**Date:** 2026-05-24  
+**PRD Reference:** `specs/PRD.md` v2.0  
+**Changelog:** v2.0 — Added §20 (v2 Multi-Tenant Architecture design, not yet implemented). v1.1 — Added §10.3 (local dev prerequisites), §17 (CryptoProvider abstraction), §18 (StorageProvider abstraction), §19 (OSS repo infrastructure); updated §3, §4.1, §10.1, §10.2, §12, §14.
+
+> **Sections §1–§19 describe the current v1 implementation (M1–M15).** Section §20 is the v2 design addendum (M16–M19, planned).
 
 ---
 
@@ -837,4 +839,308 @@ A `.shell-version` file at the instance repo root records the installed version:
 
 ---
 
-*End of Architecture Design v1.2*
+## 20. v2 Multi-Tenant Architecture (Planned — M16–M19)
+
+> **This section describes the planned v2 design, not the current implementation.** Implementation begins after M15 is complete. All sections above (§1–§19) remain the authoritative description of the running system.
+
+### 20.1 Overview of Changes
+
+v2 adds multi-tenancy to a v1 deployment. The key design choices:
+
+| Concern | v1 | v2 |
+|---------|----|----|
+| Tenant model | Single organization per deployment | Multiple orgs, one deployment |
+| Data isolation | Single PG schema | Schema-per-tenant (`tenant_{slug}`) |
+| Routing | Single domain (`app.corp.com`) | Wildcard subdomain (`*.corp.com`) |
+| Tenant identity | N/A | Signed JWT carries `tenantId` + `tenantSlug` |
+| IDP config | One OIDC provider in `shell_config` | Per-tenant `idpProviders` table |
+| Subscription | Per-user `userSubscriptions` | Per-tenant singleton `tenantSubscription` |
+| Provisioning | Setup wizard (self-service) | Platform admin only (`/platform/tenants`) |
+
+### 20.2 Repository Structure Additions (v2)
+
+New files added on top of the v1 structure:
+
+```
+src/shell/
+├── app/
+│   ├── (platform)/                  # Platform admin routes (tenant_platform schema only)
+│   │   └── platform/
+│   │       └── tenants/             # Tenant list + create form
+│   └── suspended/                   # Shown when tenant status = suspended
+├── api/
+│   ├── admin/
+│   │   └── sso/                     # Extended: multi-IDP CRUD (was read-only in v1)
+│   ├── platform/
+│   │   └── tenants/                 # Tenant provisioning API (platform admin only)
+│   └── internal/
+│       └── subscriptions/assign/    # Updated: tenant-level payload
+├── lib/
+│   ├── auth-config.ts               # getAuthConfig(tenantSlug) — loads IDP providers per tenant
+│   ├── tenant-slug.ts               # getTenantSlug(host) with TENANT_SLUG env override
+│   ├── platform-guard.ts            # isPlatformAdmin(token)
+│   └── db/
+│       ├── tenant.ts                # withTenant(slug) — schema-scoped Drizzle client factory
+│       └── provision.ts             # provisionTenant() — schema creation, migrations, seeding
+└── scripts/
+    └── bootstrap-platform.ts        # One-time: creates tenant_platform schema + platform admin
+```
+
+### 20.3 High-Level Topology (v2)
+
+```
+Browser (acme.corp.com / globocorp.corp.com / platform.corp.com)
+  │
+  │  HTTPS  *.corp.com  (wildcard cert — ACM us-east-1)
+  ▼
+Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
+                │
+                ├──→ Lambda@Edge          ONE Next.js app (same Amplify deployment)
+                │      │  reads Host header at login boundary only
+                │      │  withTenant(slug) scopes all DB queries per request
+                │      ▼
+                │    PostgreSQL (one DB)
+                │      ├── public schema         tenants registry
+                │      ├── tenant_acme schema     isolated per-tenant data
+                │      ├── tenant_globocorp schema
+                │      └── tenant_platform schema  platform super admins
+                │
+                └──→ S3 (shell static assets — shared across all tenants)
+
+  OIDC (PKCE) — per-tenant, loaded from tenant_{slug}.idpProviders at login
+  Callback URL: https://{tenantSlug}.corp.com/api/auth/callback/{providerId}
+```
+
+**CloudFront wildcard DNS setup (manual, one-time):**
+- ACM: request wildcard cert `*.corp.com` in `us-east-1`; validate via DNS
+- Route 53: `*.corp.com` ALIAS → existing CloudFront distribution
+- CloudFront: add `*.corp.com` as alternate domain name; attach wildcard cert
+- Amplify origin unchanged — CloudFront routes all subdomains to the same Next.js app
+
+**Local dev:** Set `TENANT_SLUG=acme` in `.env.local` to bypass host-header parsing. No wildcard DNS needed.
+
+### 20.4 Database Schema (v2)
+
+**`public` schema** — cross-tenant registry only:
+
+| Table | Columns |
+|-------|---------|
+| `public.tenants` | `id` (uuid PK), `slug` (text unique), `displayName` (text), `status` (enum: active\|suspended\|deleted), `createdAt` |
+
+**`tenant_{slug}` schema** — full per-tenant data, created by `provisionTenant()`:
+
+| Table | Notes vs. v1 |
+|-------|-------------|
+| `shellConfig` | Same as v1; OIDC fields (`oidcIssuer`, `oidcClientId`, `oidcClientSecret`) removed — moved to `idpProviders` |
+| `users` | Same as v1 |
+| `roles` | Same as v1 |
+| `userRoles` | Same as v1 |
+| `idpProviders` | **New** — replaces `shell_config` OIDC fields; supports multiple providers per tenant |
+| `idpGroupRoleMappings` | Same as v1; gains `idpProviderId` FK to scope mappings per provider |
+| `subscriptionTiers` | Same as v1 |
+| `tenantSubscription` | **New** — replaces per-user `userSubscriptions`; org-level singleton |
+| `menuSections` | Same as v1 |
+| `menuItems` | Same as v1 |
+| `appRegistry` | Same as v1 |
+| `authEvents` | Same as v1 |
+| `notifications` | Same as v1 |
+| `notificationReads` | Same as v1 |
+
+**`idpProviders` table:**
+```
+id                    uuid PK defaultRandom()
+displayName           text NOT NULL
+issuer                text NOT NULL
+clientId              text NOT NULL
+encryptedClientSecret text NOT NULL        -- CryptoProvider encrypted
+scopes                text[] NOT NULL
+groupClaimName        text
+isEnabled             boolean NOT NULL default true
+createdAt             timestamp defaultNow()
+```
+
+**`tenantSubscription` table (singleton per tenant):**
+```
+tierId      uuid FK → subscriptionTiers.id  NOT NULL
+status      enum: active | trialing | past_due | canceled  NOT NULL default 'active'
+expiresAt   timestamp (nullable)
+assignedAt  timestamp defaultNow()
+```
+
+**`tenant_platform` schema:** Same table structure as a normal tenant schema. Users in this schema are platform super admins. `isPlatformAdmin()` asserts both `super_admin` role AND `token.tenantSlug === "platform"`.
+
+### 20.5 `withTenant(slug)` Drizzle Client Factory
+
+`lib/db/tenant.ts` — all per-tenant DB access goes through this factory:
+
+```typescript
+export function withTenant(slug: string) {
+  const client = postgres(connectionString, {
+    connection: { search_path: `tenant_${slug},public` },
+  });
+  return drizzle(client, { schema });
+}
+```
+
+The global `db` export from `client.ts` remains available only for cross-tenant queries (e.g. looking up `public.tenants` by slug during login). All other application code uses `withTenant(token.tenantSlug)`.
+
+### 20.6 `provisionTenant()` Provisioning Flow
+
+`lib/db/provision.ts` — called exclusively from `POST /api/platform/tenants`:
+
+1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid
+2. Assert slug uniqueness in `public.tenants` — throw if taken
+3. `INSERT public.tenants` (status: active)
+4. `CREATE SCHEMA tenant_{slug}` via raw SQL
+5. Run DDL for all per-tenant tables against the new schema (via `withTenant(slug)`)
+6. Seed: default `shellConfig`, `subscriptionTiers` (free/standard/enterprise), `roles` (super_admin, admin), initial admin `users` row, `userRoles`, `tenantSubscription` (free tier)
+7. Return the created tenant record
+
+No public signup path exists. All tenant creation is platform-admin-only.
+
+### 20.7 Request Lifecycle (v2)
+
+```
+1. Browser → CloudFront → Lambda (Next.js middleware.ts)
+
+2. middleware.ts:
+
+   Unauthenticated login paths (/login, /api/auth/**):
+     a. getTenantSlug(host) → extract slug
+        (or TENANT_SLUG env var for local dev)
+     b. SELECT * FROM public.tenants WHERE slug = ? → 404 if not found
+     c. tenant.status === "suspended" → redirect /suspended
+     d. proceed; getAuthConfig(slug) loads IDP providers for this tenant
+
+   Authenticated paths:
+     a. decode JWT (no DB hit)
+     b. assert token.tenantSlug === getTenantSlug(host) → 401 if mismatch
+     c. /platform/** → assert isPlatformAdmin(token) → 403 if false
+     d. continue with withTenant(token.tenantSlug) for all downstream DB access
+     e. check route RBAC (roles from JWT) — same as v1
+
+3. Server Component (layout.tsx):
+     auth() reads session (no DB hit)
+     withTenant(slug) → fetch menu, filter by roles + subscriptionTier
+     render Sidebar + Header
+
+4. API routes (/api/**):
+     read token.tenantSlug from session
+     all DB calls: withTenant(tenantSlug)
+     platform routes: additionally assert isPlatformAdmin()
+```
+
+### 20.8 Authentication Flow (v2)
+
+```
+User hits acme.corp.com/login (unauthenticated)
+  → middleware: getTenantSlug(host) → "acme"
+  → getAuthConfig("acme"):
+      SELECT * FROM tenant_acme.idpProviders WHERE isEnabled = true
+      → build NextAuth OidcProvider[] from DB rows (secrets decrypted via CryptoProvider)
+      → callback URL per provider: https://acme.corp.com/api/auth/callback/{providerId}
+  → NextAuth v5 factory pattern: NextAuth(async (req) => getAuthConfig(slug))
+  → OIDC login → callback
+  → jwt() callback:
+      1. Extract groups[] from ID token
+      2. withTenant("acme"): map IDP groups → shell roles
+      3. withTenant("acme"): read tenantSubscription → subscriptionTier + subscriptionLevel
+      4. New user? JIT-provision into tenant_acme:
+           INSERT users, INSERT userRoles
+      5. Write tenant_acme.authEvents (LOGIN)
+      6. Embed { userId, roles, tenantId, tenantSlug,
+                 subscriptionTier, subscriptionLevel } in JWT
+  → Encrypted JWT in httpOnly Secure cookie
+  → Redirect to originally requested URL
+
+Subsequent requests: JWT decoded; tenantSlug asserted against host; withTenant() used for all DB access.
+```
+
+### 20.9 `getAuthConfig(tenantSlug)` Dynamic IDP Loading
+
+`lib/auth-config.ts`:
+
+```typescript
+export async function getAuthConfig(tenantSlug: string): Promise<NextAuthConfig> {
+  const db = withTenant(tenantSlug);
+  const providers = await db.select().from(schema.idpProviders)
+    .where(eq(schema.idpProviders.isEnabled, true));
+
+  return {
+    providers: await Promise.all(providers.map(async (p) => ({
+      id: p.id,
+      name: p.displayName,
+      type: "oidc" as const,
+      issuer: p.issuer,
+      clientId: p.clientId,
+      clientSecret: await decrypt(p.encryptedClientSecret),
+      authorization: { params: { scope: p.scopes.join(" ") } },
+    }))),
+  };
+}
+```
+
+`lib/auth.ts` uses the NextAuth v5 factory pattern:
+
+```typescript
+export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
+  const slug = getTenantSlug(req?.headers?.get("host") ?? "");
+  return {
+    ...await getAuthConfig(slug),
+    callbacks: { jwt: tenantJwtCallback(slug) },
+  };
+});
+```
+
+### 20.10 Org-Level Subscription (v2)
+
+v2 removes per-user `userSubscriptions` and replaces it with a per-tenant singleton `tenantSubscription`. All users in the tenant inherit the org tier.
+
+- `jwt()` callback reads `tenantSubscription` (not per-user rows) → writes `subscriptionTier` + `subscriptionLevel` to JWT
+- All existing subscription gating in middleware and Server Components is unchanged — only the data source differs
+- The webhook endpoint (`POST /api/internal/subscriptions/assign`) is updated: payload changes from `{ userId, tierId, expiresAt? }` to `{ tenantSlug, tierId, expiresAt? }`
+- Platform admin assigns tiers via the platform panel UI or the webhook
+
+### 20.11 Platform Admin Panel (v2)
+
+`https://platform.corp.com/platform/tenants` — accessible only to users in `tenant_platform` with `super_admin` role.
+
+**`isPlatformAdmin(token)` guard:**
+```typescript
+export function isPlatformAdmin(token: JWT): boolean {
+  return token.tenantSlug === "platform" && token.roles.includes("super_admin");
+}
+```
+
+**Actions:**
+- List all tenants (reads `public.tenants` + user count per schema)
+- Create tenant → `provisionTenant()` → platform admin sends setup link to tenant admin email
+- Suspend tenant → `UPDATE public.tenants SET status = 'suspended'` → middleware blocks logins
+- Soft-delete tenant → `UPDATE public.tenants SET status = 'deleted'` (schema not dropped)
+- Assign subscription tier → writes to `tenant_{slug}.tenantSubscription`
+
+**Bootstrapping:** `scripts/bootstrap-platform.ts` (run once at initial v2 deployment) creates `tenant_platform` schema and seeds the platform super admin. Not part of application startup.
+
+### 20.12 Security Properties (v2)
+
+| Concern | Mitigation |
+|---------|-----------|
+| Cross-tenant token replay | Middleware asserts `token.tenantSlug === getTenantSlug(host)` on every authenticated request; mismatch → 401 |
+| Tenant data isolation | All DB access via `withTenant(slug)` which sets `search_path = tenant_{slug},public`; application code cannot reach another tenant's schema |
+| Platform admin privilege escalation | `isPlatformAdmin()` requires both `super_admin` role AND `tenantSlug === "platform"` — role alone is insufficient |
+| IDP secret at rest | `encryptedClientSecret` encrypted via `CryptoProvider` before write; same abstraction as v1 OIDC secret |
+| Host header trust | Host header trusted only at unauthenticated login initiation; signed JWT is authoritative for all authenticated requests |
+
+### 20.13 Key Architectural Decisions (v2)
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Schema-per-tenant over separate DBs | PostgreSQL schema-per-tenant | One DB to operate; Drizzle `search_path` scoping; no cross-tenant joins possible; migration tooling unchanged |
+| JWT-authoritative tenant identity | Host trusted only at login; JWT carries `tenantSlug` | Stateless per-request tenant resolution; cross-tenant replay detectable without DB roundtrip |
+| Single Amplify app for all tenants | One CloudFront + one Next.js origin | No per-tenant deployments; wildcard cert handles all subdomains; all tenants updated simultaneously |
+| Platform-admin-only provisioning | No public signup | Prevents arbitrary schema creation; controlled onboarding; defers self-serve to v3 |
+| Org-level subscription | `tenantSubscription` singleton | Simpler billing model; all users in org inherit tier; no per-seat complexity until v3 |
+
+---
+
+*End of Architecture Design (v1.1 implemented / v2.0 planned)*
