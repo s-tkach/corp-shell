@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Moon, Sun, LogOut, User } from "lucide-react";
+import { Moon, Sun, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { signOut } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,12 +19,32 @@ import { ADMIN_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 import { NotificationBell } from "@/components/shell/notifications/notification-bell";
 
+function HeaderDate({ dateFormat }: { dateFormat: string }) {
+  const [date, setDate] = useState(() => new Date());
+
+  useEffect(() => {
+    const tick = () => setDate(new Date());
+    const now = new Date();
+    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    const timeout = setTimeout(() => {
+      tick();
+      const interval = setInterval(tick, 60_000);
+      return () => clearInterval(interval);
+    }, msUntilNextMinute);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return <>{format(date, dateFormat)}</>;
+}
+
 interface HeaderProps {
   menu: MenuSection[];
   appName: string;
   userName: string;
   userEmail: string;
   userRoles: string[];
+  headerShowDate: boolean;
+  headerDateFormat: string;
 }
 
 function buildBreadcrumbs(
@@ -51,7 +73,7 @@ function buildBreadcrumbs(
   return crumbs;
 }
 
-export function Header({ menu, userName, userEmail, userRoles }: HeaderProps) {
+export function Header({ menu, userName, userEmail, userRoles, headerShowDate, headerDateFormat }: HeaderProps) {
   const pathname = usePathname();
   const { setTheme } = useTheme();
 
@@ -87,6 +109,11 @@ export function Header({ menu, userName, userEmail, userRoles }: HeaderProps) {
       </nav>
 
       <div className="flex items-center gap-2 flex-shrink-0">
+        {headerShowDate && (
+          <span className="text-sm text-muted-foreground tabular-nums">
+            <HeaderDate dateFormat={headerDateFormat} />
+          </span>
+        )}
         <NotificationBell />
 
         <DropdownMenu>
@@ -105,9 +132,12 @@ export function Header({ menu, userName, userEmail, userRoles }: HeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="User menu">
-              <User className="h-4 w-4" />
-            </Button>
+            <button
+              aria-label="User menu"
+              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {(userName || userEmail).charAt(0).toUpperCase()}
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-3 py-2">

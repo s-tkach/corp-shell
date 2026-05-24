@@ -74,6 +74,8 @@ CREATE TABLE "shell_config" (
 	"oidc_issuer" text,
 	"oidc_client_id" text,
 	"oidc_client_secret" text,
+	"header_show_date" boolean DEFAULT false NOT NULL,
+	"header_date_format" text DEFAULT 'PPP',
 	"setup_complete" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

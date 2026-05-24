@@ -28,6 +28,8 @@ export async function PATCH(req: NextRequest) {
     loginCardColor: string;
     loginButtonColor: string;
     loginButtonText: string;
+    headerShowDate: boolean;
+    headerDateFormat: string;
   }>;
   const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;

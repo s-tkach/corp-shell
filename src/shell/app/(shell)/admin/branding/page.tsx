@@ -17,6 +17,8 @@ export default async function BrandingPage() {
       loginCardColor: shellConfig.loginCardColor,
       loginButtonColor: shellConfig.loginButtonColor,
       loginButtonText: shellConfig.loginButtonText,
+      headerShowDate: shellConfig.headerShowDate,
+      headerDateFormat: shellConfig.headerDateFormat,
     })
     .from(shellConfig)
     .limit(1);

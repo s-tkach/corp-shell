@@ -131,6 +131,8 @@ export const shellConfig = pgTable("shell_config", {
   oidcIssuer: text("oidc_issuer"),
   oidcClientId: text("oidc_client_id"),
   oidcClientSecret: text("oidc_client_secret"),
+  headerShowDate: boolean("header_show_date").notNull().default(false),
+  headerDateFormat: text("header_date_format").default("PPP"),
   setupComplete: boolean("setup_complete").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

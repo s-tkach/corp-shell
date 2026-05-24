@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useTransition, useRef, useEffect } from "react";
+import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Save, RotateCcw, ChevronDown } from "lucide-react";
+import { Upload, Save, RotateCcw, ChevronDown, Bell, Moon, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -161,6 +164,16 @@ const DEFAULT_DARK: Record<string, string> = {
   "--sidebar-ring": "#3b82f6",
 };
 
+// ── Date format options ───────────────────────────────────────────────────────
+
+const DATE_FORMAT_OPTIONS = [
+  { token: "PPP", label: "Long" },
+  { token: "PP", label: "Medium" },
+  { token: "P", label: "Numeric" },
+  { token: "EEEE, MMM d", label: "Weekday" },
+  { token: "yyyy-MM-dd", label: "ISO" },
+] as const;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Config {
@@ -176,6 +189,8 @@ interface Config {
   loginCardColor: string | null;
   loginButtonColor: string | null;
   loginButtonText: string | null;
+  headerShowDate: boolean | null;
+  headerDateFormat: string | null;
 }
 
 interface Props {
@@ -292,6 +307,10 @@ export function BrandingClient({ config }: Props) {
   const [loginCardColor, setLoginCardColor] = useState(config?.loginCardColor ?? "#ffffff");
   const [loginButtonColor, setLoginButtonColor] = useState(config?.loginButtonColor ?? "#0f172a");
   const [loginButtonText, setLoginButtonText] = useState(config?.loginButtonText ?? "");
+  const [headerShowDate, setHeaderShowDate] = useState(config?.headerShowDate ?? false);
+  const [headerDateFormat, setHeaderDateFormat] = useState(config?.headerDateFormat ?? "PPP");
+  const [savedHeaderShowDate] = useState(config?.headerShowDate ?? false);
+  const [savedHeaderDateFormat] = useState(config?.headerDateFormat ?? "PPP");
   const [uploading, setUploading] = useState(false);
   const [loginBgUploading, setLoginBgUploading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -316,7 +335,9 @@ export function BrandingClient({ config }: Props) {
   const unsavedCount =
     countDiffs(colorOverrides, savedOverrides) +
     countDiffs(colorOverridesDark, savedOverridesDark) +
-    (appName !== savedAppName ? 1 : 0);
+    (appName !== savedAppName ? 1 : 0) +
+    (headerShowDate !== savedHeaderShowDate ? 1 : 0) +
+    (headerDateFormat !== savedHeaderDateFormat ? 1 : 0);
 
   const activeOverrides = activeTheme === "light" ? colorOverrides : colorOverridesDark;
   const setActiveOverrides = activeTheme === "light" ? setColorOverrides : setColorOverridesDark;
@@ -418,6 +439,8 @@ export function BrandingClient({ config }: Props) {
         loginCardColor,
         loginButtonColor,
         loginButtonText,
+        headerShowDate,
+        headerDateFormat,
         ...(primaryHex ? { primaryColor: primaryHex } : {}),
       }),
     });
@@ -477,7 +500,7 @@ export function BrandingClient({ config }: Props) {
 
             {/* Identity tab */}
             <TabsContent value="identity" className="mt-6">
-              <div className="space-y-6">
+              <div className="space-y-6 max-w-sm">
                 <div className="space-y-1">
                   <Label>App Name</Label>
                   <Input
@@ -517,6 +540,37 @@ export function BrandingClient({ config }: Props) {
                       />
                     )}
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="header-show-date"
+                      checked={headerShowDate}
+                      onCheckedChange={setHeaderShowDate}
+                    />
+                    <Label htmlFor="header-show-date">Show date in header</Label>
+                  </div>
+                  {headerShowDate && (
+                    <div className="space-y-1">
+                      <Label>Date format</Label>
+                      <Select value={headerDateFormat} onValueChange={setHeaderDateFormat}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DATE_FORMAT_OPTIONS.map(({ token, label }) => (
+                            <SelectItem key={token} value={token}>
+                              <span className="font-medium">{label}</span>
+                              <span className="ml-2 text-muted-foreground font-mono text-xs">
+                                {format(new Date(), token)}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -891,7 +945,7 @@ export function BrandingClient({ config }: Props) {
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-xs"
                     style={{ color: "hsl(var(--sidebar-foreground) / 0.6)" }}
                   >
-                    <span className="h-3 w-3 flex-shrink-0 rounded-sm opacity-50" style={{ background: "hsl(var(--sidebar-foreground) / 0.3)" }} />
+                    <Settings className="h-3 w-3 flex-shrink-0 opacity-60" style={{ color: "hsl(var(--sidebar-foreground))" }} />
                     Admin
                   </div>
                 </div>
@@ -902,11 +956,24 @@ export function BrandingClient({ config }: Props) {
                 {/* Top bar */}
                 <div className="flex items-center justify-between px-3 py-2 border-b bg-background" style={{ minHeight: "36px" }}>
                   <span className="text-xs text-muted-foreground">Dashboard</span>
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-white text-[10px] font-bold"
-                    style={{ background: previewPrimaryHex }}
-                  >
-                    A
+                  <div className="flex items-center gap-1.5">
+                    {headerShowDate && (
+                      <span className="text-[10px] text-muted-foreground tabular-nums mr-1">
+                        {format(new Date(), headerDateFormat || "PPP")}
+                      </span>
+                    )}
+                    <div className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-70 hover:opacity-100">
+                      <Bell className="h-3 w-3" />
+                    </div>
+                    <div className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-70 hover:opacity-100">
+                      <Moon className="h-3 w-3" />
+                    </div>
+                    <div
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-white text-[9px] font-bold"
+                      style={{ background: previewPrimaryHex }}
+                    >
+                      A
+                    </div>
                   </div>
                 </div>
 

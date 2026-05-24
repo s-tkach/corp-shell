@@ -90,6 +90,8 @@ export default async function ShellGroupLayout({ children }: { children: React.R
       userEmail={userEmail}
       userRoles={roles}
       initialSidebarCollapsed={preferences.sidebarCollapsed ?? false}
+      headerShowDate={config?.headerShowDate ?? false}
+      headerDateFormat={config?.headerDateFormat ?? "PPP"}
     >
       {children}
     </ShellLayoutClient>
