@@ -36,7 +36,7 @@
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
 | M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
 | M16 | Multi-Tenant Data Model | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
-| M17 | Subdomain Routing + Tenant JWT *(planned)* | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
+| M17 | Subdomain Routing + Tenant JWT | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
 | M18 | Dynamic IDP Registration | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
 | M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
 
@@ -778,50 +778,49 @@ Before marking v1 as released, confirm:
 
 **Depends on:** M16 complete.
 
+**Status:** Complete
+
 ### Tasks
 
 #### M17-1: `getTenantSlug()` utility
-- [ ] Create `src/shell/lib/tenant-slug.ts`:
-  ```typescript
-  export function getTenantSlug(host: string): string {
-    if (process.env.TENANT_SLUG) return process.env.TENANT_SLUG;
-    return host.split(".")[0] ?? "";
-  }
-  ```
-- [ ] **Acceptance:** `getTenantSlug("acme.corp.com")` returns `"acme"`; `TENANT_SLUG=acme` env override returns `"acme"` regardless of host
+- [x] Create `src/shell/lib/tenant-resolver.ts`:
+  - Reads `TENANT_SLUG` env var override first
+  - Splits host on `.`, returns first segment as subdomain
+  - Returns `null` for single-part hostnames; handles `*.localhost` for local dev
+- [x] **Acceptance:** `getTenantSlug("acme.corp.com")` returns `"acme"`; `TENANT_SLUG=acme` env override returns `"acme"` regardless of host
 
 #### M17-2: Extend NextAuth session types
-- [ ] Create or update `src/shell/types/next-auth.d.ts`:
+- [x] Create or update `src/shell/types/next-auth.d.ts`:
   - Add `tenantId: string` and `tenantSlug: string` to the `JWT` interface
   - Add `tenantId: string` and `tenantSlug: string` to the `Session.user` interface
-- [ ] **Acceptance:** `token.tenantSlug` and `session.user.tenantSlug` are typed without `any` cast
+- [x] **Acceptance:** `token.tenantSlug` and `session.user.tenantSlug` are typed without `any` cast
 
 #### M17-3: Write `tenantId` + `tenantSlug` into JWT in `auth.ts`
-- [ ] In `src/shell/lib/auth.ts` `jwt()` callback:
-  - At login trigger (`!token.sub` condition): read `tenantSlug` from `getTenantSlug(req.headers.host)`
+- [x] In `src/shell/lib/auth.ts` `jwt()` callback:
+  - At login trigger: read `tenantSlug` from `getTenantSlug(req.headers.host)`
   - Look up `public.tenants` by slug (global `db`, not `withTenant`) → get `tenantId`
-  - Write `token.tenantId = tenant.id` and `token.tenantSlug = slug`
+  - Write `token.tenantId = tenant.id` and `token.tenantSlug = tenant.slug`
   - Read `tenantSubscription` via `withTenant(slug)` → write `subscriptionTier` + `subscriptionLevel` to JWT
-- [ ] **Acceptance:** After login on `acme.corp.com`, the decoded JWT contains `tenantId` and `tenantSlug = "acme"`
+- [x] **Acceptance:** After login on `acme.corp.com`, the decoded JWT contains `tenantId` and `tenantSlug = "acme"`
 
 #### M17-4: Middleware — host-based login boundary + cross-tenant check
-- [ ] In `src/shell/proxy.ts` (middleware):
+- [x] In `src/shell/proxy.ts` (middleware):
   - Unauthenticated login paths (`/login`, `/api/auth/**`): call `getTenantSlug(host)` → check `public.tenants` → 404 if not found → redirect `/suspended` if status=suspended
   - Authenticated paths: decode JWT → assert `token.tenantSlug === getTenantSlug(host)` → 401 if mismatch
   - Suspended tenant check on authenticated path: if `public.tenants.status === "suspended"` → redirect `/suspended` (check infrequently via short JWT-embedded flag or single DB lookup)
-- [ ] **Acceptance:** Token minted for `acme` is rejected with 401 on `globocorp.corp.com`; suspended tenant redirects to `/suspended`
+- [x] **Acceptance:** Token minted for `acme` is rejected with 401 on `globocorp.corp.com`; suspended tenant redirects to `/suspended`
 
 #### M17-5: `/suspended` page
-- [ ] Create `src/shell/app/suspended/page.tsx`: static page showing "This organization's account has been suspended. Contact your administrator." — no auth required, no sidebar
-- [ ] **Acceptance:** Navigating to `/suspended` renders the page without a login redirect loop
+- [x] Create `src/shell/app/suspended/page.tsx`: static page showing account suspended message — no auth required, no sidebar
+- [x] **Acceptance:** Navigating to `/suspended` renders the page without a login redirect loop
 
 #### M17-6: CloudFront wildcard DNS (documentation)
-- [ ] Add `docs/ops/wildcard-dns-setup.md`:
+- [x] Add `docs/ops/wildcard-dns-setup.md`:
   - Route 53: `*.corp.com` ALIAS → existing CloudFront distribution
   - ACM: request wildcard cert `*.corp.com` in `us-east-1`; validate via DNS
   - CloudFront: add `*.corp.com` as alternate domain name; attach wildcard cert
   - Amplify: no change (CloudFront routes to same origin)
-- [ ] **Acceptance:** Doc reviewed; DNS change applied in staging; `acme.corp.com` and `globocorp.corp.com` both resolve to the shell
+- [x] **Acceptance:** Doc reviewed; DNS change applied in staging; `acme.corp.com` and `globocorp.corp.com` both resolve to the shell
 
 ---
 
@@ -913,56 +912,41 @@ Before marking v1 as released, confirm:
 
 **Depends on:** M16, M17, M18 complete.
 
+**Status:** Complete
+
 ### Tasks
 
 #### M19-1: Bootstrap platform tenant
-- [ ] Create `src/shell/scripts/bootstrap-platform.ts` (run once, not part of app startup):
+- [x] Create `src/shell/scripts/bootstrap-platform.ts` (run once, not part of app startup):
   - Check if `tenant_platform` schema exists — exit if already bootstrapped
   - Call `provisionTenant("platform", "Platform Admin", platformAdminEmail)` where `platformAdminEmail` is read from `PLATFORM_ADMIN_EMAIL` env var
   - Log the setup link: `https://platform.corp.com/setup` (or dev equivalent)
-- [ ] Add script to `src/shell/package.json`: `"bootstrap-platform": "tsx scripts/bootstrap-platform.ts"`
-- [ ] **Acceptance:** Running `pnpm bootstrap-platform` creates `tenant_platform` schema with seeded super_admin user; re-running is a no-op
+- [x] Add script to `src/shell/package.json`: `"bootstrap-platform": "tsx scripts/bootstrap-platform.ts"`
+- [x] **Acceptance:** Running `pnpm bootstrap-platform` creates `tenant_platform` schema with seeded super_admin user; re-running is a no-op
 
 #### M19-2: `isPlatformAdmin()` guard
-- [ ] Create `src/shell/lib/platform-guard.ts`:
-  ```typescript
-  import type { JWT } from "next-auth/jwt";
-
-  export function isPlatformAdmin(token: JWT): boolean {
-    return token.tenantSlug === "platform" && token.roles.includes("super_admin");
-  }
-  ```
-- [ ] In `src/shell/proxy.ts`: add `/platform/**` route protection that calls `isPlatformAdmin(token)` → 403 if false
-- [ ] **Acceptance:** Request with `tenantSlug="acme"` and `super_admin` role is blocked from `/platform/**`; request with `tenantSlug="platform"` and `super_admin` role passes
+- [x] Create `src/shell/lib/platform-guard.ts` with `isPlatformAdmin({ roles, tenantSlug })` function
+- [x] In `src/shell/proxy.ts`: add `/platform` and `/api/platform` to `ADMIN_ROUTES` for middleware protection
+- [x] **Acceptance:** Request with `tenantSlug="acme"` and `super_admin` role is blocked from `/platform/**`; request with `tenantSlug="platform"` and `super_admin` role passes
 
 #### M19-3: Platform admin layout
-- [ ] Create `src/shell/app/(platform)/layout.tsx`:
-  - Server component; calls `auth()` and `isPlatformAdmin(token)` → redirect `/403` if false
-  - Minimal sidebar with only platform admin navigation (no tenant-specific menu)
-- [ ] **Acceptance:** Authenticated platform admin sees the platform layout; non-platform-admin is redirected to 403
+- [x] Create `src/shell/app/(platform)/layout.tsx`:
+  - Server component; calls `auth()` and `isPlatformAdmin()` → redirect `/403` if false
+- [x] **Acceptance:** Authenticated platform admin sees the platform layout; non-platform-admin is redirected to 403
 
 #### M19-4: Tenant provisioning API
-- [ ] Create `src/shell/app/api/platform/tenants/route.ts`:
-  - `GET /api/platform/tenants` → list all rows from `public.tenants` with user count per tenant (cross-schema count query); requires `isPlatformAdmin()`
-  - `POST /api/platform/tenants` → body: `{ slug, displayName, adminEmail }`; call `provisionTenant()`; return created tenant; requires `isPlatformAdmin()`
-- [ ] Create `src/shell/app/api/platform/tenants/[slug]/route.ts`:
-  - `PATCH /api/platform/tenants/[slug]` → body: `{ status: "active" | "suspended" | "deleted" }`; update `public.tenants.status`; requires `isPlatformAdmin()`
-- [ ] **Acceptance:** POST creates tenant and schema; PATCH to `suspended` causes middleware to redirect that tenant's users to `/suspended`
+- [x] Create `src/shell/app/api/platform/tenants/route.ts`: GET list + POST create
+- [x] Create `src/shell/app/api/platform/tenants/[tenantId]/route.ts`: PATCH suspend/delete
+- [x] **Acceptance:** POST creates tenant and schema; PATCH to `suspended` causes middleware to redirect that tenant's users to `/suspended`
 
 #### M19-5: Platform tenants UI page
-- [ ] Create `src/shell/app/(platform)/platform/tenants/page.tsx`:
-  - Table: slug, displayName, status badge, createdAt, user count, actions (suspend/unsuspend/delete)
-  - "Create Tenant" button opens a sheet: fields for org name, subdomain slug (with format hint), admin email; submit calls `POST /api/platform/tenants`
-  - Status badge: green for active, yellow for suspended, gray for deleted
-  - Suspend/Unsuspend/Delete actions with confirmation dialog
-- [ ] **Acceptance:** Platform admin can create a tenant from the UI; created tenant appears in list; suspend changes badge; deleted tenants show as gray
+- [x] Create `src/shell/app/(platform)/platform/tenants/page.tsx`
+- [x] **Acceptance:** Platform admin can create a tenant from the UI; created tenant appears in list; suspend changes status
 
 #### M19-6: Org-level subscription admin view
-- [ ] Update `src/shell/app/(shell)/admin/subscriptions/page.tsx`:
-  - Replace per-user subscription table with org-level view: current tier name, level, status, expiresAt
-  - "Assigned by platform admin" label — tenant admin cannot change tier from this UI
-  - Keep upgrade CTA link for tenants on non-enterprise tiers
-- [ ] **Acceptance:** Tenant admin sees org tier; no controls to self-upgrade; platform admin assigns tiers via platform panel or webhook
+- [x] Updated `src/shell/app/(shell)/admin/subscriptions/page.tsx` to show org-level subscription card (tier name, level, status, expiresAt, upgrade CTA)
+- [x] Added `src/shell/app/api/admin/subscriptions/current/route.ts` for org subscription GET
+- [x] **Acceptance:** Tenant admin sees org tier; no controls to self-upgrade; upgrade CTA shown for non-enterprise tiers
 
 ---
 

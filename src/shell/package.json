@@ -24,7 +24,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bootstrap-platform": "tsx scripts/bootstrap-platform.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.1048.0",

@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.0] — 2026-05-24
+
+### Added
+
+- **M16** — Multi-tenant data model: schema-per-tenant; `withTenant()` Drizzle factory; `provisionTenant()` provisioning function; `public.tenants` table; `tenantSubscription` and `idpProviders` per-tenant tables
+- **M17** — Subdomain routing + tenant JWT: host-based login boundary; `tenantSlug` and `tenantId` in signed JWT; cross-tenant token replay protection; `/suspended` page
+- **M18** — Dynamic IDP registration: `getAuthConfig(tenantSlug)` loads enabled OIDC providers from DB at login time; multi-IDP admin UI; per-tenant SSO CRUD API
+- **M19** — Platform admin tenant management: `bootstrap-platform` script; `isPlatformAdmin()` guard; `/platform/tenants` panel with create/suspend/delete; `GET /api/admin/subscriptions/current` org-level subscription endpoint; subscriptions admin page shows org tier with upgrade CTA
+
+---
+
 ## [1.0.0] — 2026-05-23
 
 ### Added

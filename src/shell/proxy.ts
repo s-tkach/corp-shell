@@ -7,7 +7,7 @@ import { getTenantSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
 import { eq } from "drizzle-orm";
 
-const ADMIN_ROUTES = ["/admin", "/api/admin"];
+const ADMIN_ROUTES = ["/admin", "/api/admin", "/platform", "/api/platform"];
 
 async function getSetupComplete(): Promise<boolean> {
   const rows = await db
