@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
 import { withTenant } from "@/lib/db/tenant";
 import {
@@ -10,50 +9,22 @@ import {
   subscriptionTiers,
   tenantSubscription,
   authEvents,
-  idpProviders,
   tenants,
 } from "@/lib/db/schema";
 import { getTenantSlug } from "@/lib/tenant-resolver";
+import { getAuthConfig } from "@/lib/auth-config";
 import { eq, inArray } from "drizzle-orm";
-
-async function getOidcConfig() {
-  const rows = await db
-    .select()
-    .from(idpProviders)
-    .where(eq(idpProviders.isEnabled, true))
-    .limit(1);
-  const provider = rows[0];
-  if (!provider) {
-    throw new Error("No IDP configured — complete setup first");
-  }
-  return {
-    id: provider.id,
-    issuer: provider.issuer,
-    clientId: provider.clientId,
-    clientSecret: await decrypt(provider.encryptedClientSecret),
-  };
-}
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
   const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
-  const tenantSlug = getTenantSlug(host) ?? "default";
+  const tenantSlug = getTenantSlug(host) ?? "platform";
 
-  const { issuer, clientId, clientSecret } = await getOidcConfig();
+  const { providers } = await getAuthConfig(tenantSlug);
 
   return {
     secret: process.env["NEXTAUTH_SECRET"],
     pages: { signIn: "/login" },
-    providers: [
-      {
-        id: "oidc",
-        name: "OIDC",
-        type: "oidc",
-        issuer,
-        clientId,
-        clientSecret,
-        style: { logo: "" },
-      },
-    ],
+    providers,
     callbacks: {
       async jwt({ token, account, profile, trigger }) {
         if (trigger === "signIn" && account && profile) {

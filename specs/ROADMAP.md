@@ -37,7 +37,7 @@
 | M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
 | M16 | Multi-Tenant Data Model | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
 | M17 | Subdomain Routing + Tenant JWT *(planned)* | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
-| M18 | Dynamic IDP Registration *(planned)* | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
+| M18 | Dynamic IDP Registration | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
 | M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
 
 ---
@@ -831,10 +831,12 @@ Before marking v1 as released, confirm:
 
 **Depends on:** M17 complete.
 
+**Status:** Complete
+
 ### Tasks
 
 #### M18-1: `getAuthConfig(tenantSlug)` in `lib/auth-config.ts`
-- [ ] Create `src/shell/lib/auth-config.ts`:
+- [x] Create `src/shell/lib/auth-config.ts`:
   ```typescript
   import { withTenant } from "~/lib/db/tenant";
   import * as schema from "~/lib/db/schema";
@@ -859,10 +861,10 @@ Before marking v1 as released, confirm:
     };
   }
   ```
-- [ ] **Acceptance:** `getAuthConfig("acme")` returns a valid `NextAuthConfig` with providers populated from `tenant_acme.idpProviders`
+- [x] **Acceptance:** `getAuthConfig("acme")` returns a valid `NextAuthConfig` with providers populated from `tenant_acme.idpProviders`
 
 #### M18-2: Replace `getOidcConfig()` in `auth.ts` with factory pattern
-- [ ] Update `src/shell/lib/auth.ts` to use the NextAuth v5 factory pattern:
+- [x] Update `src/shell/lib/auth.ts` to use the NextAuth v5 factory pattern:
   ```typescript
   import { getAuthConfig } from "~/lib/auth-config";
   import { getTenantSlug } from "~/lib/tenant-slug";
@@ -881,28 +883,27 @@ Before marking v1 as released, confirm:
     };
   });
   ```
-- [ ] Remove the old `getOidcConfig()` function and `cachedConfig` variable
-- [ ] **Acceptance:** `pnpm typecheck` passes; login flow works end-to-end with providers from DB
+- [x] Remove the old `getOidcConfig()` function and `cachedConfig` variable
+- [x] **Acceptance:** `pnpm typecheck` passes; login flow works end-to-end with providers from DB
 
 #### M18-3: SSO Admin API — multi-IDP CRUD
-- [ ] Update `src/shell/app/api/admin/sso/route.ts` to support:
+- [x] Update `src/shell/app/api/admin/sso/route.ts` to support:
   - `GET /api/admin/sso` → list all `idpProviders` for the tenant (clientSecret omitted from response)
   - `POST /api/admin/sso` → create new provider; validate `issuer/.well-known/openid-configuration` before insert; encrypt clientSecret; return created record (without secret)
   - `PATCH /api/admin/sso/[id]` → update provider fields; re-validate issuer if changed; re-encrypt secret if changed
   - `DELETE /api/admin/sso/[id]` → delete provider (hard delete)
   - All routes: `requireRoles(["super_admin", "admin"])`; use `withTenant(token.tenantSlug)` for DB access
-- [ ] On save: `fetch(`${issuer}/.well-known/openid-configuration`)` — return 400 with error detail if non-200 or invalid JSON
-- [ ] **Acceptance:** POST with valid issuer persists record; POST with unreachable issuer returns 400; secret in DB is ciphertext not plaintext
+- [x] On save: `fetch(`${issuer}/.well-known/openid-configuration`)` — return 400 with error detail if non-200 or invalid JSON
+- [x] **Acceptance:** POST with valid issuer persists record; POST with unreachable issuer returns 400; secret in DB is ciphertext not plaintext
 
 #### M18-4: SSO Admin UI — multi-IDP list and form
-- [ ] Update `src/shell/app/(shell)/admin/sso/page.tsx`:
+- [x] Update `src/shell/app/(shell)/admin/sso/page.tsx`:
   - Replace single-provider read-only view with a list of configured providers (name, issuer, enabled toggle, edit/delete actions)
   - "Add IDP" button opens a sheet/dialog: fields for displayName, issuer, clientId, clientSecret (password input), scopes (comma-separated), groupClaimName, isEnabled toggle
   - "Test Connection" button calls the discovery validation before submitting
   - Edit: pre-fill form (clientSecret field shows placeholder, not actual value)
   - Delete: confirmation dialog
-- [ ] Create `src/shell/components/shell/sso-idp-form.tsx`: reusable form component for add/edit
-- [ ] **Acceptance:** Admin can add, toggle, edit, and delete IDP providers; invalid issuer shows inline error; secret never echoed back in the UI
+- [x] **Acceptance:** Admin can add, toggle, edit, and delete IDP providers; invalid issuer shows inline error; secret never echoed back in the UI
 
 ---
 
