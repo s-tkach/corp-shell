@@ -25,3 +25,4 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **M12** — Performance and load validation (P95 LCP < 2s; MF cold load < 1.5s; 1000 concurrent sessions)
 - **M13** — Notifications system: bell icon, unread badge, SSE real-time push, toast notifications, admin page, session-auth push API for child apps
 - **M14** — Open-source readiness: local crypto/storage providers; Docker Compose local dev; conditional CSP; OSS contribution files; Vitest test suite
+- **M15** — `src/shell` published as `@corp/shell-app`; CLI extended with `init` and `update` subcommands.

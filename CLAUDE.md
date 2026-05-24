@@ -71,10 +71,10 @@ Each phase must be completed and explicitly confirmed before the next begins. If
 pnpm install
 
 # Run development server (shell app)
-pnpm --filter shell dev
+pnpm --filter @corp/shell-app dev
 
 # Run tests
-pnpm --filter shell test
+pnpm --filter @corp/shell-app test
 
 # Run linter
 pnpm lint
@@ -83,7 +83,7 @@ pnpm lint
 pnpm typecheck
 
 # Build for production
-pnpm --filter shell build
+pnpm --filter @corp/shell-app build
 
 # Deploy to AWS — managed via AWS Amplify (manually configured, not in repo)
 ```
@@ -92,7 +92,7 @@ pnpm --filter shell build
 
 ## Current Status
 
-**Phase: Complete** — All milestones implemented. See [`CHANGELOG.md`](../CHANGELOG.md) for the full milestone list and `specs/ROADMAP.md` Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
+**Phase: Complete** — All milestones implemented. See [`CHANGELOG.md`](CHANGELOG.md) for the full milestone list and `specs/ROADMAP.md` Launch Checklist for remaining operational verification steps (secrets, CloudWatch alarms, cost tagging).
 
 ### Stack (confirmed in M1)
 - Next.js 16 (App Router) in `src/shell/`

@@ -662,42 +662,42 @@ Before marking v1 as released, confirm:
 
 **Depends on:** M9 (SDK & CLI), M14 (OSS readiness / local dev)
 
-**Status:** Planned — not started
+**Status:** Complete
 
 ### Tasks
 
 #### M15-1: Prepare `src/shell` for publication
-- [ ] Set `"name": "@corp/shell-app"` and `"private": false` in `src/shell/package.json`
-- [ ] Add `"files"` array to `src/shell/package.json` (see ARCHITECTURE.md §15.5)
-- [ ] Add `shell-app/vX.Y.Z` tag format and release process to `CONTRIBUTING.md`
-- [ ] **Acceptance:** `pnpm --filter @corp/shell-app pack --dry-run` lists only source files; no `.next/` or `node_modules/`
+- [x] Set `"name": "@corp/shell-app"` and `"private": false` in `src/shell/package.json`
+- [x] Add `"files"` array to `src/shell/package.json` (see ARCHITECTURE.md §15.5)
+- [x] Add `shell-app/vX.Y.Z` tag format and release process to `CONTRIBUTING.md`
+- [x] **Acceptance:** `pnpm --filter @corp/shell-app pack --dry-run` lists only source files; no `.next/` or `node_modules/`
 
 #### M15-2: GitHub Actions publish workflow
-- [ ] Create `.github/workflows/publish-shell-app.yml`
-- [ ] Trigger: tag `shell-app/vX.Y.Z`
-- [ ] Steps: checkout → pnpm install → `pnpm --filter @corp/shell-app build` (validates source compiles) → `npm publish --access restricted`
-- [ ] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@corp/shell-app@1.0.0` to GitHub Packages
+- [x] Create `.github/workflows/publish-shell-app.yml`
+- [x] Trigger: tag `shell-app/vX.Y.Z`
+- [x] Steps: checkout → pnpm install → `pnpm --filter @corp/shell-app build` (validates source compiles) → `npm publish --access restricted`
+- [x] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@corp/shell-app@1.0.0` to GitHub Packages
 
 #### M15-3: `create-shell-app init` subcommand
-- [ ] Refactor `packages/create-shell-app/src/index.ts` to route `init`, `update`, `new` subcommands
-- [ ] `init <name>`: downloads `@corp/shell-app` from GitHub Packages, extracts source tree to `./<name>/`, writes `./<name>/.shell-version`
-- [ ] Existing default behaviour (scaffold child app) moves to `new <name>` subcommand
-- [ ] **Acceptance:** `npx @corp/create-shell-app init my-shell` creates a directory with full shell source and `.shell-version` file; `npx @corp/create-shell-app new my-app` still scaffolds a child app project
+- [x] Refactor `packages/create-shell-app/src/index.ts` to route `init`, `update`, `new` subcommands
+- [x] `init <name>`: downloads `@corp/shell-app` from GitHub Packages, extracts source tree to `./<name>/`, writes `./<name>/.shell-version`
+- [x] Existing default behaviour (scaffold child app) moves to `new <name>` subcommand
+- [x] **Acceptance:** `npx @corp/create-shell-app init my-shell` creates a directory with full shell source and `.shell-version` file; `npx @corp/create-shell-app new my-app` still scaffolds a child app project
 
 #### M15-4: `create-shell-app update` subcommand
-- [ ] `update [--version X.Y.Z]`: reads `.shell-version` from CWD, downloads target `@corp/shell-app` version, fully overwrites shell source files, updates `.shell-version`
-- [ ] Prints list of overwritten files and post-update instructions (`pnpm install`, `pnpm drizzle-kit migrate`)
-- [ ] **Acceptance:** Running `update --version 1.1.0` in a provisioned instance replaces all shell files and updates `.shell-version` to `1.1.0`
+- [x] `update [--version X.Y.Z]`: reads `.shell-version` from CWD, downloads target `@corp/shell-app` version, fully overwrites shell source files, updates `.shell-version`
+- [x] Prints list of overwritten files and post-update instructions (`pnpm install`, `pnpm drizzle-kit migrate`)
+- [x] **Acceptance:** Running `update --version 1.1.0` in a provisioned instance replaces all shell files and updates `.shell-version` to `1.1.0`
 
 #### M15-5: CLI publish pipeline update
-- [ ] Update `publish-cli.yml` to build and publish `@corp/create-shell-app` with the new subcommands
-- [ ] Bump `create-shell-app` version to `1.0.0` (breaking change: bare `npx @corp/create-shell-app <name>` removed)
-- [ ] **Acceptance:** `npx @corp/create-shell-app --help` shows `init`, `update`, `new` subcommands
+- [x] Update `publish-cli.yml` to build and publish `@corp/create-shell-app` with the new subcommands
+- [x] Bump `create-shell-app` version to `1.0.0` (breaking change: bare `npx @corp/create-shell-app <name>` removed)
+- [x] **Acceptance:** `npx @corp/create-shell-app --help` shows `init`, `update`, `new` subcommands
 
 #### M15-6: Documentation
-- [ ] Update `README.md` "Getting started" to show `init` as the primary provisioning path
-- [ ] Update `CONTRIBUTING.md` with versioning and release process for `@corp/shell-app`
-- [ ] **Acceptance:** A new operator can provision a shell instance using only the README without reading source code
+- [x] Update `README.md` "Getting started" to show `init` as the primary provisioning path
+- [x] Update `CONTRIBUTING.md` with versioning and release process for `@corp/shell-app`
+- [x] **Acceptance:** A new operator can provision a shell instance using only the README without reading source code
 
 ---
 

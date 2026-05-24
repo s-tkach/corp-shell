@@ -92,3 +92,37 @@ Before requesting review, verify:
 ## Spec-driven development
 
 No application code is written without an approved spec. See `CLAUDE.md` for the phase gate order.
+
+## Releasing shell packages
+
+### `@corp/shell-app` (shell host)
+
+Tag format: `shell-app/vX.Y.Z`
+
+```bash
+# Bump version in src/shell/package.json, commit, then:
+git tag shell-app/v1.0.0
+git push origin shell-app/v1.0.0
+```
+
+The `publish-shell-app.yml` workflow triggers on this tag, builds the shell, and publishes to GitHub Packages. Operators running `npx @corp/create-shell-app update` will receive this version automatically.
+
+### `@corp/create-shell-app` (CLI)
+
+Tag format: `create-shell-app/vX.Y.Z`
+
+```bash
+# Bump version in packages/create-shell-app/package.json, commit, then:
+git tag create-shell-app/v1.0.0
+git push origin create-shell-app/v1.0.0
+```
+
+### `@corp/shell-sdk` (SDK)
+
+Tag format: `shell-sdk/vX.Y.Z`
+
+```bash
+# Bump version in packages/shell-sdk/package.json, commit, then:
+git tag shell-sdk/v1.0.0
+git push origin shell-sdk/v1.0.0
+```

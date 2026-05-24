@@ -1,7 +1,23 @@
 {
-  "name": "shell",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@corp/shell-app",
+  "version": "1.0.0",
+  "private": false,
+  "files": [
+    "app",
+    "components",
+    "lib",
+    "public",
+    "middleware.ts",
+    "next.config.ts",
+    "tsconfig.json",
+    "postcss.config.mjs",
+    "components.json",
+    "instrumentation.ts",
+    "proxy.ts",
+    ".env.local.example",
+    "types",
+    "package.json"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

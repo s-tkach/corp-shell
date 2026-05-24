@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter shell dev",
-    "build": "pnpm --filter shell build",
-    "start": "pnpm --filter shell start",
-    "typecheck": "pnpm --filter shell typecheck",
-    "lint": "pnpm --filter shell lint",
-    "test": "pnpm --filter shell test",
+    "dev": "pnpm --filter @corp/shell-app dev",
+    "build": "pnpm --filter @corp/shell-app build",
+    "start": "pnpm --filter @corp/shell-app start",
+    "typecheck": "pnpm --filter @corp/shell-app typecheck",
+    "lint": "pnpm --filter @corp/shell-app lint",
+    "test": "pnpm --filter @corp/shell-app test",
     "drizzle-kit": "node --env-file=src/shell/.env.local node_modules/drizzle-kit/bin.cjs"
   },
   "engines": {

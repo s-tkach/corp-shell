@@ -1,7 +1,7 @@
 {
   "name": "@corp/create-shell-app",
-  "version": "0.1.0",
-  "description": "Scaffold a Corp shell child app",
+  "version": "1.0.0",
+  "description": "Scaffold and manage Corp shell instances and child apps",
   "bin": {
     "create-shell-app": "./dist/index.js"
   },
@@ -10,10 +10,12 @@
     "template"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2"
   }
 }

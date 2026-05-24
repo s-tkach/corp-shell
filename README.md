@@ -140,10 +140,37 @@ WEBHOOK_SECRET=<from Secrets Manager>
 4. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
 5. `/setup` returns 404 permanently after completion
 
+## Provisioning a shell instance
+
+New operators can receive a fully configured shell without forking this repository:
+
+```bash
+npx @corp/create-shell-app init my-corp-shell
+cd my-corp-shell
+cp .env.local.example .env.local
+# Fill in NEXTAUTH_SECRET (openssl rand -base64 32) and ENCRYPTION_KEY (openssl rand -hex 32)
+docker compose up -d
+pnpm install
+pnpm drizzle-kit migrate
+pnpm --filter @corp/shell-app dev
+```
+
+Open `http://localhost:3000` → complete the setup wizard.
+
+To update to a newer shell version:
+
+```bash
+npx @corp/create-shell-app update             # latest
+npx @corp/create-shell-app update --version 1.2.0  # pinned
+pnpm install && pnpm drizzle-kit migrate
+```
+
+The `.shell-version` file at the repo root records the installed version. All instance-specific configuration is expressed through environment variables and database records — no source file modifications are needed or supported.
+
 ## Onboarding a child app
 
 ```bash
-npx @corp/create-shell-app my-app
+npx @corp/create-shell-app new my-app
 ```
 
 This scaffolds a React + TypeScript + Webpack 5 project with Module Federation pre-configured, `@corp/shell-sdk` installed, and a GitHub Actions workflow that deploys to S3/CloudFront on push to `main`.
