@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronDown, Settings } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,29 @@ interface SidebarProps {
 export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      for (const section of menu) {
+        const hasActive = section.items.some(
+          (item) => pathname === item.route || pathname.startsWith(item.route + "/")
+        );
+        if (hasActive) next.delete(section.id);
+      }
+      return next;
+    });
+  }, [pathname, menu]);
+
+  function toggleSection(id: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function handleToggle() {
     const next = !sidebarCollapsed;
@@ -70,13 +94,28 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
 
       <ScrollArea className="flex-1">
         <nav className="p-2 space-y-4">
-          {menu.map((section) => (
+          {menu.map((section) => {
+            const isCollapsed = collapsedSections.has(section.id);
+            return (
             <div key={section.id}>
               {!sidebarCollapsed && section.label && (
-                <p className="px-3 py-1 text-xs font-semibold uppercase text-sidebar-foreground/50 tracking-wider">
-                  {section.label}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.id)}
+                  className="flex w-full items-center justify-between px-3 py-1 group cursor-pointer"
+                >
+                  <p className="text-xs font-semibold uppercase text-sidebar-foreground/50 tracking-wider group-hover:text-sidebar-foreground/80 transition-colors">
+                    {section.label}
+                  </p>
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70 transition-all",
+                      isCollapsed && "-rotate-90"
+                    )}
+                  />
+                </button>
               )}
+              {!isCollapsed && (
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const active =
@@ -111,8 +150,10 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
                   );
                 })}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </nav>
       </ScrollArea>
 
