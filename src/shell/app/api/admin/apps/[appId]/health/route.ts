@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { appRegistry } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq } from "drizzle-orm";
@@ -10,8 +10,9 @@ export async function POST(
 ) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { appId } = await params;
-  const rows = await db.select().from(appRegistry).where(eq(appRegistry.id, appId)).limit(1);
+  const rows = await tenantDb.select().from(appRegistry).where(eq(appRegistry.id, appId)).limit(1);
   const app = rows[0];
   if (!app?.healthCheckUrl) {
     return NextResponse.json({ healthy: false, error: "No healthCheckUrl configured" });
@@ -21,7 +22,7 @@ export async function POST(
     const res = await fetch(app.healthCheckUrl, { next: { revalidate: 0 } });
     const healthy = res.ok;
     if (healthy) {
-      await db
+      await tenantDb
         .update(appRegistry)
         .set({ lastHealthyAt: new Date() })
         .where(eq(appRegistry.id, appId));

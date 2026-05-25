@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { notifications, notificationReads } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
@@ -9,13 +9,14 @@ import { pushToEligible } from "@/lib/sse-registry";
 export async function GET(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
 
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const limit = 20;
   const offset = (page - 1) * limit;
 
-  const rows = await db
+  const rows = await tenantDb
     .select({
       id: notifications.id,
       title: notifications.title,
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
 
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title and body are required" }, { status: 400 });
   }
 
-  const [created] = await db
+  const [created] = await tenantDb
     .insert(notifications)
     .values({
       title: body.title,

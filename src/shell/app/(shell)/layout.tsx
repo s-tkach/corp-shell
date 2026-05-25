@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db/client";
+import { withTenant } from "@/lib/db/tenant";
 import { menuSections, menuItems, shellConfig, users } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
@@ -17,16 +17,17 @@ function isVisible(
   return true;
 }
 
-async function getMenuTree(roles: string[], subscriptionLevel: number): Promise<MenuSection[]> {
+async function getMenuTree(tenantSlug: string, roles: string[], subscriptionLevel: number): Promise<MenuSection[]> {
   "use cache";
   cacheTag("menu");
 
-  const sections = await db
+  const tenantDb = withTenant(tenantSlug);
+  const sections = await tenantDb
     .select()
     .from(menuSections)
     .orderBy(asc(menuSections.sortOrder));
 
-  const items = await db
+  const items = await tenantDb
     .select()
     .from(menuItems)
     .orderBy(asc(menuItems.sortOrder));
@@ -73,11 +74,12 @@ async function getMenuTree(roles: string[], subscriptionLevel: number): Promise<
   });
 }
 
-async function getShellConfig() {
+async function getShellConfig(tenantSlug: string) {
   "use cache";
   cacheTag("shell-config");
 
-  const rows = await db.select().from(shellConfig).limit(1);
+  const tenantDb = withTenant(tenantSlug);
+  const rows = await tenantDb.select().from(shellConfig).limit(1);
   return rows[0] ?? null;
 }
 
@@ -86,8 +88,9 @@ interface UserPreferences {
   theme?: string;
 }
 
-async function getUserPreferences(userId: string): Promise<UserPreferences> {
-  const rows = await db
+async function getUserPreferences(tenantSlug: string, userId: string): Promise<UserPreferences> {
+  const tenantDb = withTenant(tenantSlug);
+  const rows = await tenantDb
     .select({ preferences: users.preferences })
     .from(users)
     .where(eq(users.id, userId))
@@ -103,11 +106,12 @@ export default async function ShellGroupLayout({ children }: { children: React.R
   const subscriptionLevel = session?.user.subscriptionLevel ?? 0;
   const userName = session?.user.name ?? "";
   const userEmail = session?.user.email ?? "";
+  const tenantSlug = session?.user.tenantSlug ?? "";
 
   const [menu, config, preferences] = await Promise.all([
-    getMenuTree(roles, subscriptionLevel),
-    getShellConfig(),
-    userId ? getUserPreferences(userId) : Promise.resolve<UserPreferences>({}),
+    getMenuTree(tenantSlug, roles, subscriptionLevel),
+    getShellConfig(tenantSlug),
+    userId ? getUserPreferences(tenantSlug, userId) : Promise.resolve<UserPreferences>({}),
   ]);
 
   return (

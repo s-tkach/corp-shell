@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { subscriptionTiers } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { and, eq, ne } from "drizzle-orm";
@@ -10,6 +10,7 @@ export async function PATCH(
 ) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { tierId } = await params;
   const body = await req.json() as Partial<{
     displayName: string;
@@ -19,7 +20,7 @@ export async function PATCH(
     upgradeCtaLabel: string;
     upgradeUrl: string;
   }>;
-  const [row] = await db
+  const [row] = await tenantDb
     .update(subscriptionTiers)
     .set(body)
     .where(eq(subscriptionTiers.id, tierId))
@@ -33,8 +34,9 @@ export async function DELETE(
 ) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { tierId } = await params;
-  const deleted = await db
+  const deleted = await tenantDb
     .delete(subscriptionTiers)
     .where(and(eq(subscriptionTiers.id, tierId), ne(subscriptionTiers.slug, "free")))
     .returning({ id: subscriptionTiers.id });

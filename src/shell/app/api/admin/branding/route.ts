@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { shellConfig } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { storageProvider } from "@/lib/storage";
@@ -9,13 +9,15 @@ import { eq } from "drizzle-orm";
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
-  const rows = await db.select().from(shellConfig).limit(1);
+  const tenantDb = await getTenantDb();
+  const rows = await tenantDb.select().from(shellConfig).limit(1);
   return NextResponse.json(rows[0] ?? null);
 }
 
 export async function PATCH(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const body = await req.json() as Partial<{
     appName: string;
     logoUrl: string;
@@ -36,12 +38,12 @@ export async function PATCH(req: NextRequest) {
     toastBorderColor: string;
     toastDuration: number;
   }>;
-  const rows = await db.select({ id: shellConfig.id }).from(shellConfig).limit(1);
+  const rows = await tenantDb.select({ id: shellConfig.id }).from(shellConfig).limit(1);
   const id = rows[0]?.id;
   if (!id) {
     return NextResponse.json({ error: "Shell config not initialized" }, { status: 400 });
   }
-  const [row] = await db
+  const [row] = await tenantDb
     .update(shellConfig)
     .set({ ...body, updatedAt: new Date() })
     .where(eq(shellConfig.id, id))

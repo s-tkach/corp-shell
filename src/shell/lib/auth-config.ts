@@ -10,7 +10,7 @@ export interface OidcProviderConfig {
   issuer: string;
   clientId: string;
   clientSecret: string;
-  style: { logo: string };
+  authorization: { params: { scope: string } };
 }
 
 export interface AuthConfig {
@@ -40,7 +40,7 @@ export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
       issuer: row.issuer,
       clientId: row.clientId,
       clientSecret: await decrypt(row.encryptedClientSecret),
-      style: { logo: "" },
+      authorization: { params: { scope: row.scopes.join(" ") } },
     }))
   );
 

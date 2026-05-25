@@ -982,7 +982,7 @@ export function withTenant(slug: string) {
 }
 ```
 
-The global `db` export from `client.ts` remains available only for cross-tenant queries (e.g. looking up `public.tenants` by slug during login). All other application code uses `withTenant(token.tenantSlug)`.
+The global `db` export from `client.ts` is used **only** for `public.tenants` queries (login tenant lookup, platform admin CRUD, health check). All other application code uses either `getTenantDb()` (which reads the tenant slug from the current session) or `withTenant(slug)` (for contexts where the slug is already known, such as login callbacks and cached functions).
 
 ### 20.6 `provisionTenant()` Provisioning Flow
 

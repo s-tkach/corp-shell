@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { menuSections, menuItems } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 import { cacheTag } from "next/cache";
@@ -42,12 +42,14 @@ async function buildMenuTree(
   "use cache";
   cacheTag("menu");
 
-  const sections = await db
+  const tenantDb = await getTenantDb();
+
+  const sections = await tenantDb
     .select()
     .from(menuSections)
     .orderBy(asc(menuSections.sortOrder));
 
-  const items = await db
+  const items = await tenantDb
     .select()
     .from(menuItems)
     .orderBy(asc(menuItems.sortOrder));

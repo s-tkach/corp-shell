@@ -41,10 +41,11 @@ export async function provisionTenant(
     }
 
     // Create schema
-    await sql`CREATE SCHEMA ${ sql(slug, "identifier") }`;
+    const schemaName = `tenant_${slug}`;
+    await sql`CREATE SCHEMA ${ sql(schemaName, "identifier") }`;
 
     // Run DDL for per-tenant tables
-    const ddl = perTenantDDL(slug);
+    const ddl = perTenantDDL(schemaName);
     await sql.unsafe(ddl);
 
     // Seed defaults

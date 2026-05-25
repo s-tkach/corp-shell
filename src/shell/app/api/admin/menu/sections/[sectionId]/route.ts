@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { menuSections } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq } from "drizzle-orm";
@@ -11,9 +11,10 @@ export async function PATCH(
 ) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { sectionId } = await params;
   const body = await req.json() as Partial<{ label: string; icon: string; sortOrder: number }>;
-  const [row] = await db
+  const [row] = await tenantDb
     .update(menuSections)
     .set(body)
     .where(eq(menuSections.id, sectionId))
@@ -28,8 +29,9 @@ export async function DELETE(
 ) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { sectionId } = await params;
-  await db.delete(menuSections).where(eq(menuSections.id, sectionId));
+  await tenantDb.delete(menuSections).where(eq(menuSections.id, sectionId));
   revalidateTag("menu", {});
   return new NextResponse(null, { status: 204 });
 }

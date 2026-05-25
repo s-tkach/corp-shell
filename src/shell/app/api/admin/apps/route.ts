@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { appRegistry } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { isSafeRemoteUrl } from "@/lib/url-guard";
@@ -8,13 +8,15 @@ import { asc } from "drizzle-orm";
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
-  const rows = await db.select().from(appRegistry).orderBy(asc(appRegistry.name));
+  const tenantDb = await getTenantDb();
+  const rows = await tenantDb.select().from(appRegistry).orderBy(asc(appRegistry.name));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const body = await req.json() as {
     name: string;
     remoteUrl: string;
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!body.routePrefix?.startsWith("/") || body.routePrefix.length > 200) {
     return NextResponse.json({ error: "routePrefix must start with / and be ≤ 200 characters" }, { status: 400 });
   }
-  const [row] = await db
+  const [row] = await tenantDb
     .insert(appRegistry)
     .values({
       name: body.name,

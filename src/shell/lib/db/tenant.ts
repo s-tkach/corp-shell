@@ -12,3 +12,11 @@ export function withTenant(slug: string) {
   });
   return drizzle(client, { schema });
 }
+
+export async function getTenantDb() {
+  const { auth } = await import("@/lib/auth");
+  const session = await auth();
+  const slug = session?.user.tenantSlug;
+  if (!slug) throw new Error("No tenant context");
+  return withTenant(slug);
+}

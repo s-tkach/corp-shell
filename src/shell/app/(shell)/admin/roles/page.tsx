@@ -1,10 +1,11 @@
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { roles, userRoles, idpGroupRoleMappings } from "@/lib/db/schema";
 import { asc, sql } from "drizzle-orm";
 import { RoleManagerClient } from "./role-manager-client";
 
 export default async function RoleManagerPage() {
-  const allRoles = await db
+  const tenantDb = await getTenantDb();
+  const allRoles = await tenantDb
     .select({
       id: roles.id,
       slug: roles.slug,
@@ -16,7 +17,7 @@ export default async function RoleManagerPage() {
     .from(roles)
     .orderBy(asc(roles.displayName));
 
-  const mappings = await db.select().from(idpGroupRoleMappings);
+  const mappings = await tenantDb.select().from(idpGroupRoleMappings);
 
   return <RoleManagerClient roles={allRoles} mappings={mappings} />;
 }

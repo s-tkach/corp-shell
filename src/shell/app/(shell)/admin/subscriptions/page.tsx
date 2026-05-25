@@ -1,6 +1,4 @@
-import { auth } from "@/lib/auth";
-import { withTenant } from "@/lib/db/tenant";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { SubscriptionTiersClient } from "./subscription-tiers-client";
@@ -8,13 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SubscriptionTiersPage() {
-  const session = await auth();
-  const tenantSlug = session?.user.tenantSlug ?? "";
-
-  const tenantDb = withTenant(tenantSlug);
+  const tenantDb = await getTenantDb();
 
   const [tiers, orgSubRows] = await Promise.all([
-    db.select().from(subscriptionTiers).orderBy(asc(subscriptionTiers.level)),
+    tenantDb.select().from(subscriptionTiers).orderBy(asc(subscriptionTiers.level)),
     tenantDb
       .select({
         status: tenantSubscription.status,

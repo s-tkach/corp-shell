@@ -5,11 +5,22 @@ import { menuItems, shellConfig, tenants } from "@/lib/db/schema";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { getTenantSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
+import { isPlatformAdmin } from "@/lib/platform-guard";
+import { withTenant } from "@/lib/db/tenant";
 import { eq } from "drizzle-orm";
 
-const ADMIN_ROUTES = ["/admin", "/api/admin", "/platform", "/api/platform"];
+const TENANT_ADMIN_ROUTES = ["/admin", "/api/admin"];
+const PLATFORM_ROUTES = ["/platform", "/api/platform"];
 
-async function getSetupComplete(): Promise<boolean> {
+async function getSetupComplete(tenantSlug: string | null): Promise<boolean> {
+  if (tenantSlug) {
+    const tenantDb = withTenant(tenantSlug);
+    const rows = await tenantDb
+      .select({ setupComplete: shellConfig.setupComplete })
+      .from(shellConfig)
+      .limit(1);
+    return rows[0]?.setupComplete ?? false;
+  }
   const rows = await db
     .select({ setupComplete: shellConfig.setupComplete })
     .from(shellConfig)
@@ -17,8 +28,14 @@ async function getSetupComplete(): Promise<boolean> {
   return rows[0]?.setupComplete ?? false;
 }
 
-function isAdminRoute(pathname: string): boolean {
-  return ADMIN_ROUTES.some(
+function isTenantAdminRoute(pathname: string): boolean {
+  return TENANT_ADMIN_ROUTES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + "/")
+  );
+}
+
+function isPlatformRoute(pathname: string): boolean {
+  return PLATFORM_ROUTES.some(
     (prefix) => pathname === prefix || pathname.startsWith(prefix + "/")
   );
 }
@@ -27,8 +44,9 @@ function hasAdminRole(roles: string[]): boolean {
   return roles.some((r) => ADMIN_ROLES.has(r));
 }
 
-async function getRequiredSubLevel(pathname: string): Promise<number | null> {
-  const rows = await db
+async function getRequiredSubLevel(pathname: string, tenantSlug: string): Promise<number | null> {
+  const tenantDb = withTenant(tenantSlug);
+  const rows = await tenantDb
     .select({ requiredSubLevel: menuItems.requiredSubLevel })
     .from(menuItems)
     .where(eq(menuItems.route, pathname))
@@ -64,7 +82,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const setupComplete = await getSetupComplete();
+  const setupComplete = await getSetupComplete(hostSlug);
 
   if (!setupComplete) {
     if (pathname !== "/setup") {
@@ -93,13 +111,23 @@ export async function proxy(request: NextRequest) {
 
   const roles: string[] = session.user.roles ?? [];
 
-  if (isAdminRoute(pathname) && !hasAdminRole(roles)) {
+  // Platform routes: require platform tenant + super_admin
+  if (isPlatformRoute(pathname)) {
+    if (!isPlatformAdmin({ roles, tenantSlug: session.user.tenantSlug ?? "" })) {
+      return NextResponse.rewrite(new URL("/403", request.url));
+    }
+  }
+
+  // Tenant admin routes: require admin or super_admin role
+  if (isTenantAdminRoute(pathname) && !hasAdminRole(roles)) {
     return NextResponse.rewrite(new URL("/403", request.url));
   }
 
+  const tenantSlug = session.user.tenantSlug ?? "";
+
   // Subscription gate: skip for /upgrade itself to avoid redirect loop
-  if (!pathname.startsWith("/upgrade") && !isAdminRoute(pathname)) {
-    const requiredLevel = await getRequiredSubLevel(pathname);
+  if (tenantSlug && !pathname.startsWith("/upgrade") && !isTenantAdminRoute(pathname) && !isPlatformRoute(pathname)) {
+    const requiredLevel = await getRequiredSubLevel(pathname, tenantSlug);
     if (requiredLevel !== null) {
       const userLevel: number = session.user.subscriptionLevel ?? 0;
       if (userLevel < requiredLevel) {

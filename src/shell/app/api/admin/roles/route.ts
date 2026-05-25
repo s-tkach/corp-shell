@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { roles, userRoles } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { asc, sql } from "drizzle-orm";
@@ -7,7 +7,8 @@ import { asc, sql } from "drizzle-orm";
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
   if (authError) return authError;
-  const rows = await db
+  const tenantDb = await getTenantDb();
+  const rows = await tenantDb
     .select({
       id: roles.id,
       slug: roles.slug,
@@ -24,8 +25,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const body = await req.json() as { slug: string; displayName: string };
-  const [row] = await db
+  const [row] = await tenantDb
     .insert(roles)
     .values({ slug: body.slug, displayName: body.displayName })
     .returning();

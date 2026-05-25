@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { notifications, notificationReads } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const tenantDb = await getTenantDb();
   const userId = session.user.userId;
   const subLevel = session.user.subscriptionLevel ?? 0;
   const { searchParams } = new URL(req.url);
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
   const limit = 20;
   const offset = (page - 1) * limit;
 
-  const rows = await db
+  const rows = await tenantDb
     .select()
     .from(notifications)
     .where(visibilityFilter(userId, subLevel))
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .offset(offset);
 
-  const readRows = await db
+  const readRows = await tenantDb
     .select({ notificationId: notificationReads.notificationId })
     .from(notificationReads)
     .where(eq(notificationReads.userId, userId));
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const tenantDb = await getTenantDb();
   const body = await req.json() as {
     title: string;
     body: string;
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title and body are required" }, { status: 400 });
   }
 
-  const [created] = await db
+  const [created] = await tenantDb
     .insert(notifications)
     .values({
       title: body.title,

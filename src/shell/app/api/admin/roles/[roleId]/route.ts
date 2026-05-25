@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { roles } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { and, eq } from "drizzle-orm";
@@ -10,9 +10,10 @@ export async function PATCH(
 ) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { roleId } = await params;
   const body = await req.json() as Partial<{ displayName: string }>;
-  const [row] = await db
+  const [row] = await tenantDb
     .update(roles)
     .set(body)
     .where(and(eq(roles.id, roleId), eq(roles.isSystem, false)))
@@ -29,8 +30,9 @@ export async function DELETE(
 ) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { roleId } = await params;
-  const deleted = await db
+  const deleted = await tenantDb
     .delete(roles)
     .where(and(eq(roles.id, roleId), eq(roles.isSystem, false)))
     .returning({ id: roles.id });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -20,6 +20,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const tenantDb = await getTenantDb();
   const body = (await request.json()) as Partial<UserPreferences>;
   const patch: UserPreferences = {};
 
@@ -34,7 +35,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "No valid fields" }, { status: 400 });
   }
 
-  const existing = await db
+  const existing = await tenantDb
     .select({ preferences: users.preferences })
     .from(users)
     .where(eq(users.id, userId))
@@ -43,7 +44,7 @@ export async function PATCH(request: NextRequest) {
   const current = (existing[0]?.preferences as UserPreferences | null) ?? {};
   const updated = { ...current, ...patch };
 
-  await db
+  await tenantDb
     .update(users)
     .set({ preferences: updated })
     .where(eq(users.id, userId));

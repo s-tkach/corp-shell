@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { notifications, notificationReads } from "@/lib/db/schema";
 
 export function visibilityFilter(userId: string, subLevel: number) {
@@ -18,13 +18,14 @@ export function visibilityFilter(userId: string, subLevel: number) {
 }
 
 export async function getUnreadCount(userId: string, subLevel: number): Promise<number> {
-  const visible = await db
+  const tenantDb = await getTenantDb();
+  const visible = await tenantDb
     .select({ id: notifications.id })
     .from(notifications)
     .where(visibilityFilter(userId, subLevel));
 
   const readIds = (
-    await db
+    await tenantDb
       .select({ notificationId: notificationReads.notificationId })
       .from(notificationReads)
       .where(eq(notificationReads.userId, userId))

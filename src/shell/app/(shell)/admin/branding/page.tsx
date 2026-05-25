@@ -1,9 +1,10 @@
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { shellConfig } from "@/lib/db/schema";
 import { BrandingClient } from "./branding-client";
 
 export default async function BrandingPage() {
-  const rows = await db
+  const tenantDb = await getTenantDb();
+  const rows = await tenantDb
     .select({
       id: shellConfig.id,
       appName: shellConfig.appName,

@@ -1,12 +1,13 @@
 import { signIn } from "@/lib/auth";
-import { db } from "@/lib/db/client";
 import { shellConfig } from "@/lib/db/schema";
-import { unstable_cacheTag as cacheTag } from "next/cache";
+import { headers } from "next/headers";
+import { getTenantSlug } from "@/lib/tenant-resolver";
+import { withTenant } from "@/lib/db/tenant";
+import { getAuthConfig } from "@/lib/auth-config";
 
-async function getLoginConfig() {
-  "use cache";
-  cacheTag("shell-config");
-  const rows = await db
+async function getLoginConfig(tenantSlug: string) {
+  const tenantDb = withTenant(tenantSlug);
+  const rows = await tenantDb
     .select({
       appName: shellConfig.appName,
       logoUrl: shellConfig.logoUrl,
@@ -24,7 +25,15 @@ async function getLoginConfig() {
 }
 
 export default async function LoginPage(props: { searchParams: Promise<Record<string, string>> }) {
-  const [config, searchParams] = await Promise.all([getLoginConfig(), props.searchParams]);
+  const hdrs = await headers();
+  const host = hdrs.get("host") ?? "";
+  const tenantSlug = getTenantSlug(host) ?? "platform";
+
+  const [config, searchParams, authConfig] = await Promise.all([
+    getLoginConfig(tenantSlug),
+    props.searchParams,
+    getAuthConfig(tenantSlug),
+  ]);
 
   const bgImage = config?.loginBgImageUrl;
   const bgColor = config?.loginBgColor ?? "#0f172a";
@@ -34,17 +43,14 @@ export default async function LoginPage(props: { searchParams: Promise<Record<st
   const logoUrl = config?.logoUrl;
   const cardColor = config?.loginCardColor ?? "#ffffff";
   const buttonColor = config?.loginButtonColor ?? "#0f172a";
-  const buttonText = config?.loginButtonText || "Sign in with SSO";
+  const defaultButtonText = config?.loginButtonText || "Sign in with SSO";
 
   const callbackUrl = searchParams["callbackUrl"] ?? "/";
 
   const justifyClass =
     position === "left" ? "justify-start" : position === "right" ? "justify-end" : "justify-center";
 
-  async function handleSignIn() {
-    "use server";
-    await signIn("oidc", { redirectTo: callbackUrl });
-  }
+  const providers = authConfig.providers;
 
   return (
     <div
@@ -83,16 +89,31 @@ export default async function LoginPage(props: { searchParams: Promise<Record<st
           </div>
         )}
 
-        {/* Sign-in form */}
-        <form action={handleSignIn}>
-          <button
-            type="submit"
-            className="w-full cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors"
-            style={{ backgroundColor: buttonColor }}
-          >
-            {buttonText}
-          </button>
-        </form>
+        {/* Sign-in buttons — one per configured provider */}
+        <div className="flex flex-col gap-3">
+          {providers.map((provider) => {
+            async function handleSignIn() {
+              "use server";
+              await signIn(provider.id, { redirectTo: callbackUrl });
+            }
+            return (
+              <form key={provider.id} action={handleSignIn}>
+                <button
+                  type="submit"
+                  className="w-full cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors"
+                  style={{ backgroundColor: buttonColor }}
+                >
+                  {providers.length === 1 ? defaultButtonText : `Sign in with ${provider.name}`}
+                </button>
+              </form>
+            );
+          })}
+          {providers.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center">
+              No identity providers configured. Contact your administrator.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

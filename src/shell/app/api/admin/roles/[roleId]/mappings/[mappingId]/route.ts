@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { getTenantDb } from "@/lib/db/tenant";
 import { idpGroupRoleMappings } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq } from "drizzle-orm";
@@ -10,7 +10,8 @@ export async function DELETE(
 ) {
   const authError = await requireRoles(["super_admin"]);
   if (authError) return authError;
+  const tenantDb = await getTenantDb();
   const { mappingId } = await params;
-  await db.delete(idpGroupRoleMappings).where(eq(idpGroupRoleMappings.id, mappingId));
+  await tenantDb.delete(idpGroupRoleMappings).where(eq(idpGroupRoleMappings.id, mappingId));
   return new NextResponse(null, { status: 204 });
 }
