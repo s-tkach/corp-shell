@@ -63,6 +63,7 @@ CREATE TABLE "subscription_tiers" (
 --> statement-breakpoint
 CREATE TABLE "idp_providers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"slug" text NOT NULL,
 	"display_name" text NOT NULL,
 	"issuer" text NOT NULL,
 	"client_id" text NOT NULL,
@@ -70,7 +71,8 @@ CREATE TABLE "idp_providers" (
 	"scopes" text[] NOT NULL,
 	"group_claim_name" text,
 	"is_enabled" boolean DEFAULT true NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "idp_providers_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
 CREATE TABLE "tenant_subscription" (

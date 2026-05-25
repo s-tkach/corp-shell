@@ -12,6 +12,7 @@ export default async function SsoPage() {
   const providers = await tenantDb
     .select({
       id: idpProviders.id,
+      slug: idpProviders.slug,
       displayName: idpProviders.displayName,
       issuer: idpProviders.issuer,
       clientId: idpProviders.clientId,

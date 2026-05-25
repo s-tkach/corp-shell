@@ -23,6 +23,7 @@ export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
   const rows = await tenantDb
     .select({
       id: idpProviders.id,
+      slug: idpProviders.slug,
       displayName: idpProviders.displayName,
       issuer: idpProviders.issuer,
       clientId: idpProviders.clientId,
@@ -34,7 +35,7 @@ export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
 
   const providers: OidcProviderConfig[] = await Promise.all(
     rows.map(async (row) => ({
-      id: row.id,
+      id: row.slug,
       name: row.displayName,
       type: "oidc" as const,
       issuer: row.issuer,

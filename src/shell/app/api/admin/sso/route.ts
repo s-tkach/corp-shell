@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   const body = await req.json() as {
+    slug?: string;
     displayName?: string;
     issuer?: string;
     clientId?: string;
@@ -44,10 +45,17 @@ export async function POST(req: NextRequest) {
     groupClaimName?: string;
   };
 
-  const { displayName, issuer, clientId, clientSecret, scopes, groupClaimName } = body;
-  if (!displayName || !issuer || !clientId || !clientSecret) {
+  const { slug, displayName, issuer, clientId, clientSecret, scopes, groupClaimName } = body;
+  if (!slug || !displayName || !issuer || !clientId || !clientSecret) {
     return NextResponse.json(
-      { error: "displayName, issuer, clientId, clientSecret are required" },
+      { error: "slug, displayName, issuer, clientId, clientSecret are required" },
+      { status: 400 }
+    );
+  }
+
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return NextResponse.json(
+      { error: "slug must contain only lowercase letters, numbers, and hyphens" },
       { status: 400 }
     );
   }
@@ -77,6 +85,7 @@ export async function POST(req: NextRequest) {
   const inserted = await tenantDb
     .insert(idpProviders)
     .values({
+      slug,
       displayName,
       issuer,
       clientId,

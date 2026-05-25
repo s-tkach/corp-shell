@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
     });
 
     await tx.insert(idpProviders).values({
+      slug: "oidc",
       displayName: "Default OIDC",
       issuer: oidcIssuer.trim(),
       clientId: oidcClientId.trim(),

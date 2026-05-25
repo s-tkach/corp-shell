@@ -92,6 +92,7 @@ export const subscriptionTiers = pgTable("subscription_tiers", {
 
 export const idpProviders = pgTable("idp_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
   displayName: text("display_name").notNull(),
   issuer: text("issuer").notNull(),
   clientId: text("client_id").notNull(),

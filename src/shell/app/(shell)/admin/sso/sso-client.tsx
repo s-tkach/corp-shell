@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 
 interface Provider {
   id: string;
+  slug: string;
   displayName: string;
   issuer: string;
   clientId: string;
@@ -23,6 +24,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
   const [providers, setProviders] = useState<Provider[]>(initialProviders);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({
+    slug: "",
     displayName: "",
     issuer: "",
     clientId: "",
@@ -55,6 +57,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
         ...prev,
         {
           id: data.id,
+          slug: form.slug,
           displayName: form.displayName,
           issuer: form.issuer,
           clientId: form.clientId,
@@ -64,7 +67,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
         },
       ]);
       setAdding(false);
-      setForm({ displayName: "", issuer: "", clientId: "", clientSecret: "", scopes: "openid email profile", groupClaimName: "groups" });
+      setForm({ slug: "", displayName: "", issuer: "", clientId: "", clientSecret: "", scopes: "openid email profile", groupClaimName: "groups" });
     } finally {
       setSaving(false);
     }
@@ -107,6 +110,9 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
               <p className="font-medium">{p.displayName}</p>
               <p className="text-sm text-muted-foreground">{p.issuer}</p>
               <p className="text-xs text-muted-foreground">Client ID: {p.clientId}</p>
+              <p className="text-xs text-muted-foreground">
+                Callback URL: {typeof window !== "undefined" ? window.location.origin : ""}/api/auth/callback/{p.slug}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Switch
@@ -125,6 +131,11 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
         <div className="rounded-md border p-4 space-y-3">
           <h3 className="font-medium">New Provider</h3>
           {error && <p className="text-sm text-destructive">{error}</p>}
+          <Input
+            placeholder="Slug (e.g. okta — used in callback URL)"
+            value={form.slug}
+            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))}
+          />
           <Input
             placeholder="Display Name (e.g. Okta)"
             value={form.displayName}
