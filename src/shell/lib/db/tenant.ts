@@ -5,12 +5,19 @@ import { connectionString as _connectionString } from "./client";
 
 const connectionString = _connectionString!;
 
+const tenantPools = new Map<string, ReturnType<typeof drizzle>>();
+
 export function withTenant(slug: string) {
+  const cached = tenantPools.get(slug);
+  if (cached) return cached;
+
   const client = postgres(connectionString, {
     max: 1,
     connection: { search_path: `tenant_${slug},public` },
   });
-  return drizzle(client, { schema });
+  const db = drizzle(client, { schema });
+  tenantPools.set(slug, db);
+  return db;
 }
 
 export async function getTenantDb() {

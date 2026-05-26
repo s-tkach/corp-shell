@@ -21,34 +21,23 @@ function hasAdminRole(roles: string[]): boolean {
 
 function resolveMiddleware(
   pathname: string,
-  setupComplete: boolean,
+  tenantReady: boolean,
   session: { roles: string[]; subscriptionLevel: number } | null
-): "redirect:/setup" | "404" | "redirect:/api/auth/signin" | "403" | "next" {
-  if (!setupComplete) {
-    return pathname === "/setup" ? "next" : "redirect:/setup";
-  }
-  if (pathname === "/setup") return "404";
+): "503" | "redirect:/api/auth/signin" | "403" | "next" {
+  if (!tenantReady) return "503";
   if (!session) return "redirect:/api/auth/signin";
   if (isAdminRoute(pathname) && !hasAdminRole(session.roles)) return "403";
   return "next";
 }
 
-describe("Middleware — setup not complete", () => {
-  it("redirects non-/setup paths to /setup", () => {
-    expect(resolveMiddleware("/dashboard", false, null)).toBe("redirect:/setup");
-    expect(resolveMiddleware("/", false, null)).toBe("redirect:/setup");
-  });
-
-  it("allows /setup through when setup is incomplete", () => {
-    expect(resolveMiddleware("/setup", false, null)).toBe("next");
+describe("Middleware — tenant not ready", () => {
+  it("returns 503 when tenant is not configured", () => {
+    expect(resolveMiddleware("/dashboard", false, null)).toBe("503");
+    expect(resolveMiddleware("/", false, null)).toBe("503");
   });
 });
 
-describe("Middleware — setup complete", () => {
-  it("returns 404 for /setup after completion", () => {
-    expect(resolveMiddleware("/setup", true, null)).toBe("404");
-  });
-
+describe("Middleware — tenant ready", () => {
   it("redirects unauthenticated user to sign-in", () => {
     expect(resolveMiddleware("/dashboard", true, null)).toBe("redirect:/api/auth/signin");
   });

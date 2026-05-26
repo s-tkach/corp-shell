@@ -182,7 +182,7 @@ RootLayout                                   ContentArea (MF mount point)
   ├─ Sidebar (static render)                   Sidebar collapse toggle (Zustand)
   └─ Header (static render)                    Theme toggle (Zustand)
                                                Admin Panel forms (all CRUD)
-                                               Setup Wizard steps
+                                               Platform admin tenant management
 ```
 
 ### 5.2 Shell ↔ Child App Contract
@@ -512,8 +512,8 @@ The published package contains raw TypeScript/TSX source. Consumers receive the 
 | Crypto provider fallback | Local AES-256-GCM provider uses `randomBytes(16)` per-value IV; output prefixed `local:<iv>:<ct>:<tag>` to distinguish from KMS blobs; key rotation requires re-encryption of stored secrets |
 | XSS | Shadcn/ui + React; no `dangerouslySetInnerHTML`; CSP header via CloudFront |
 | Child app crash | React ErrorBoundary per child app mount; shell unaffected |
-| OIDC misconfiguration | Setup wizard validates the OIDC discovery endpoint before proceeding |
-| Lockout prevention | `super_admin` role is system-owned; cannot be deleted or self-revoked via wizard |
+| OIDC misconfiguration | Platform admin validates OIDC discovery endpoint during tenant creation |
+| Lockout prevention | `super_admin` role is system-owned and auto-assigned to the first platform user |
 
 ---
 
@@ -855,7 +855,7 @@ v2 adds multi-tenancy to a v1 deployment. The key design choices:
 | Tenant identity | N/A | Signed JWT carries `tenantId` + `tenantSlug` |
 | IDP config | One OIDC provider in `shell_config` | Per-tenant `idpProviders` table |
 | Subscription | Per-user `userSubscriptions` | Per-tenant singleton `tenantSubscription` |
-| Provisioning | Setup wizard (self-service) | Platform admin only (`/platform/tenants`) |
+| Provisioning | Auto-bootstrap + env-var OIDC | Platform admin only (`/platform/tenants`) |
 
 ### 20.2 Repository Structure Additions (v2)
 
@@ -881,9 +881,7 @@ src/shell/
 │   ├── platform-guard.ts            # isPlatformAdmin(token)
 │   └── db/
 │       ├── tenant.ts                # withTenant(slug) — schema-scoped Drizzle client factory
-│       └── provision.ts             # provisionTenant() — schema creation, migrations, seeding
-└── scripts/
-    └── bootstrap-platform.ts        # One-time: creates tenant_platform schema + platform admin
+│       └── provision.ts             # provisionTenant() + autoBootstrapPlatform() — schema creation, migrations, seeding
 ```
 
 ### 20.3 High-Level Topology (v2)
@@ -1119,7 +1117,7 @@ export function isPlatformAdmin(token: JWT): boolean {
 - Soft-delete tenant → `UPDATE public.tenants SET status = 'deleted'` (schema not dropped)
 - Assign subscription tier → writes to `tenant_{slug}.tenantSubscription`
 
-**Bootstrapping:** `scripts/bootstrap-platform.ts` (run once at initial v2 deployment) creates `tenant_platform` schema and seeds the platform super admin. Not part of application startup.
+**Bootstrapping:** The platform tenant is auto-provisioned on the first request when no tenants exist in the database (`autoBootstrapPlatform()` in `provision.ts`). Platform OIDC is configured via environment variables (`PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`). The first user to log in receives the `super_admin` role automatically.
 
 ### 20.12 Security Properties (v2)
 

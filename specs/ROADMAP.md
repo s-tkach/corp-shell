@@ -22,7 +22,7 @@
 |---|-----------|-------------|
 | M1 | Monorepo & Infrastructure Scaffold | Deployable empty shell on AWS |
 | M2 | Database Schema & Migrations | All tables live; Drizzle migrations running |
-| M3 | First-Run Setup Wizard | Shell becomes operational via wizard |
+| M3 | Platform Auto-Bootstrap | Platform tenant auto-provisioned; first user becomes super admin |
 | M4 | Authentication & Session | OIDC login/logout/JIT provisioning |
 | M5 | RBAC & Middleware | Role-gated routes enforced end-to-end |
 | M6 | Navigation Shell & Menu System | Data-driven sidebar, header, theme toggle |
@@ -101,50 +101,24 @@
 
 ---
 
-## M3 — First-Run Setup Wizard
+## M3 — Platform Auto-Bootstrap
 
-**Goal:** A fresh deployment redirects to `/setup`; completing the wizard writes config to DB, locks the route, and redirects to `/dashboard`.
+**Goal:** A fresh deployment auto-provisions the platform tenant on first request. Platform OIDC is configured via env vars. First user to log in becomes super admin. No setup wizard required.
 
 ### Tasks
 
-#### M3-1: Setup detection middleware
-- [x] In `shell/middleware.ts`: query `shell_config.setup_complete`
-  - If `false` (or no row): redirect all non-`/setup` traffic to `/setup`
-  - If `true`: return 404 for `/setup`
-- [x] Cache the `setup_complete` flag in the JWT once setup is done (avoids DB hit on every request post-setup)
-- [x] **Acceptance:** Visiting any route on a fresh DB redirects to `/setup`; visiting `/setup` after completion returns 404
+#### M3-1: Auto-bootstrap middleware
+- [x] In `proxy.ts`: if no tenants exist in the DB, auto-provision the platform tenant
+- [x] Platform OIDC configured via `PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET` env vars
+- [x] First OIDC login to platform tenant auto-assigns `super_admin` role
+- [x] **Acceptance:** Visiting any route on a fresh DB auto-bootstraps platform tenant and redirects to `/login`
 
-#### M3-2: Wizard UI scaffold (Step 1 — Branding)
-- [x] Multi-step form component at `app/setup/page.tsx` (Client Component, local React state only)
-- [x] Step 1: app name text input, logo image upload (preview), primary color picker (Shadcn color input)
-- [x] Logo upload: `POST /api/setup/upload-logo` → generates S3 presigned PUT URL → client uploads directly to S3
-- [x] **Acceptance:** Logo uploads to S3; preview renders in wizard; step 1 → step 2 navigation works
-
-#### M3-3: Wizard Step 2 — OIDC Connection
-- [x] Fields: Issuer URL, Client ID, Client Secret
-- [x] On "Test Connection": `GET /api/setup/validate-oidc?issuer={issuer}` → server pings `{issuer}/.well-known/openid-configuration`
-- [x] Inline success ("Connected ✓") or error with exact failure message
-- [x] Wizard does not allow proceeding until connection is valid
-- [x] **Acceptance:** Valid domain shows success; invalid domain shows specific error; step cannot advance until valid
-
-#### M3-4: Wizard Step 3 — Super Admin verification
-- [x] Input: email address for the super admin
-- [x] "Verify via OIDC Login" button: triggers NextAuth.js OIDC sign-in inline (uses credentials entered in Step 2)
-- [x] On callback: verify that the authenticated email matches the input; show mismatch error if not
-- [x] **Acceptance:** Correct user verified; mismatch shows error and allows retry; no session persisted until Step 4 launch
-
-#### M3-5: Wizard Step 4 — Review & Launch
-- [x] Summary card displaying all inputs from Steps 1–3
-- [x] "Launch Shell" button: `POST /api/setup/complete` atomically writes:
-  - `shell_config` row (branding, OIDC issuer, `setup_complete = true`)
-  - Default `subscription_tiers` (free level 0, standard level 1, enterprise level 2)
-  - Default `roles` (super_admin `isSystem=true`, admin)
-  - `users` row for super admin (idpSource=oidc, idpSubject from verified session)
-  - `user_roles` (super_admin → super admin user)
-  - `user_subscriptions` (enterprise tier, no expiry)
-  - Stores OIDC Client Secret to Secrets Manager (not in DB)
-- [x] Redirects to `/dashboard` on success
-- [x] **Acceptance:** All DB writes succeed atomically; `/setup` returns 404 after completion; `/dashboard` loads
+#### M3-2: Platform admin tenant management
+- [x] Platform admin creates tenants from `/platform/tenants` with OIDC config (issuer, client ID, client secret), admin email, and optional branding
+- [x] OIDC discovery validated via "Test Connection" button
+- [x] Platform admin invites additional admins from `/platform/admins`
+- [x] Sidebar shows "Tenants" and "Platform Admins" links for platform super admins
+- [x] **Acceptance:** Tenant created with OIDC config; tenant's login page shows SSO button; platform admins can be invited
 
 ---
 

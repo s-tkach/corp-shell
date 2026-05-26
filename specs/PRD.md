@@ -97,10 +97,10 @@ Builds a new internal React application. Runs `npx @corp/create-shell-app new <a
 Manages shell configuration via the Admin Panel. Adds child apps, creates menu items, assigns roles and subscription tiers. Requires **zero engineering involvement** for routine config changes.
 
 ### 5.4 First-Time Setup User (super-admin)
-The person who completes the **first-run wizard** immediately after the shell is first deployed. They set the app name, upload a logo, choose a brand color, and create the initial `super_admin` account linked to their OIDC identity. The wizard is only accessible once; subsequent access requires the `super_admin` role.
+The **first user to log in** to the platform tenant (via OIDC configured through environment variables) automatically receives the `super_admin` role. 
 
 ### 5.5 Platform Administrator (v2)
-The operator who manages all tenants. Accesses `/platform/tenants` (requires `super_admin` role in the `tenant_platform` schema). Creates new tenants, assigns subdomain slugs, provisions schemas, and sends setup links to tenant admins. Can suspend or soft-delete tenants.
+The operator who manages all tenants (requires `super_admin` role in the `tenant_platform` schema). Accesses `/platform/tenants` and `/platform/admins` to create tenants (with full OIDC configuration), suspend/delete tenants, and invite additional platform admins.
 
 ### 5.6 Tenant Administrator (v2)
 An org admin within a specific tenant subdomain. Configures their own OIDC provider(s) via `/admin/sso`, manages users and roles within their org, and views their org's subscription tier. Cannot see or affect other tenants.
@@ -109,36 +109,31 @@ An org admin within a specific tenant subdomain. Configures their own OIDC provi
 
 ## 6. Functional Requirements
 
-### 6.1 First-Run Setup Wizard
+### 6.1 Platform Bootstrap (Auto-Provisioning)
 
-**FR-SETUP-1:** On first deployment, the shell detects that no `shell_config` record exists in the database and redirects all traffic to `/setup`.
+**FR-SETUP-1:** On first deployment, when no tenants exist in the database, the platform tenant (`slug: "platform"`) is automatically provisioned on the first request. No CLI script or setup wizard is required.
 
-**FR-SETUP-2:** The wizard is a multi-step flow:
+**FR-SETUP-2:** The platform tenant's OIDC provider is configured via environment variables:
+- `PLATFORM_OIDC_ISSUER` — OIDC issuer URL
+- `PLATFORM_OIDC_CLIENT_ID` — client ID
+- `PLATFORM_OIDC_CLIENT_SECRET` — client secret
 
-| Step | Fields |
-|------|--------|
-| 1 — Branding | App name (text), Logo (image upload → S3 or local disk depending on `STORAGE_PROVIDER`), Primary brand color (color picker) |
-| 2 — OIDC Connection | Issuer URL, Client ID, Client Secret |
-| 3 — Super Admin | Enter the email address that will be granted `super_admin` — verified by completing an OIDC login within the wizard |
-| 4 — Review & Launch | Summary of all inputs; "Launch" button writes config to DB and marks setup as complete |
+If these are set, the platform tenant uses them directly (no DB-stored OIDC config needed). If unset, it falls back to DB-stored providers.
 
-**FR-SETUP-3:** Once the wizard is completed, `/setup` returns 404 for all users — including `super_admin`. The route is permanently closed.
+**FR-SETUP-3:** The first user to log in to the platform tenant is automatically granted the `super_admin` role. Additional platform admins can be invited from `/platform/admins`.
 
-**FR-SETUP-4:** If the OIDC provider cannot be reached during Step 2 (discovery check fails), the wizard shows an inline error with the exact failure reason. The wizard does not proceed until the connection is valid.
+**FR-SETUP-4:** There is no setup wizard. Tenants are fully configured by the platform admin from `/platform/tenants`, including OIDC provider, admin email, and optional branding.
 
-**FR-SETUP-5:** Logo uploaded in the wizard is stored via the configured storage provider. When `STORAGE_PROVIDER=s3` (production default), the file is stored in a private S3 bucket and served via CloudFront with a signed URL. When `STORAGE_PROVIDER=local` (default for local dev and self-hosted deployments), the file is saved to `public/uploads/logos/` on the server and served as a static path. Branding is thereafter editable in Admin Panel → Theme.
+**FR-SETUP-5:** When creating a tenant, the platform admin provides OIDC credentials (issuer, client ID, client secret). The OIDC discovery endpoint is validated before tenant creation. The client secret is encrypted at rest.
 
 ### 6.2 Authentication & SSO
 
 **FR-AUTH-1:** The shell authenticates via **OIDC (authorization code + PKCE)**. NextAuth.js v5 handles the full flow via a generic OIDC provider.
 
-**OIDC configuration (set during wizard, stored in the `shell_config` DB row):**
+**OIDC configuration:**
 
-- `oidcIssuer` — OIDC issuer URL
-- `oidcClientId` — client ID (plaintext)
-- `oidcClientSecret` — client secret, encrypted at rest; decrypted at runtime via `decrypt()` from `lib/crypto.ts`
-
-The setup wizard collects these values in Step 2. On "Launch", the client secret is encrypted using the configured crypto provider (KMS when `KMS_KEY_ID` is set; AES-256-GCM local encryption otherwise) and all three values are written to the `shell_config` table. No OIDC credentials are stored as environment variables.
+- **Platform tenant:** Configured via environment variables (`PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`).
+- **Other tenants:** Configured by the platform admin during tenant creation. Stored in the per-tenant `idp_providers` table with the client secret encrypted at rest via the configured crypto provider (KMS when `KMS_KEY_ID` is set; AES-256-GCM otherwise).
 
 **OIDC app registration requirements (documented for the admin):**
 - Application type: Web, OIDC

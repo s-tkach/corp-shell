@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { getTenantSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, count } from "drizzle-orm";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
   const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
@@ -88,6 +88,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             if (!newUser) throw new Error("Failed to insert user");
             userId = newUser.id;
 
+            // First user on platform tenant becomes super admin
+            if (tenantSlug === "platform") {
+              const [userCount] = await tenantDb
+                .select({ total: count() })
+                .from(users);
+              if (userCount && userCount.total === 1) {
+                roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
+              }
+            }
+
             if (roleSlugs.length > 0) {
               const roleRows = await tenantDb
                 .select({ id: roles.id })
@@ -103,7 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             await tenantDb.insert(authEvents).values({
               userId,
               email,
-              eventType: "JIT_PROVISION",
+              eventType: tenantSlug === "platform" ? "FIRST_ADMIN_PROVISION" : "JIT_PROVISION",
             });
           } else {
             userId = existingUsers[0].id;

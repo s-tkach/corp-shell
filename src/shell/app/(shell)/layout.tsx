@@ -122,6 +122,7 @@ export default async function ShellGroupLayout({ children }: { children: React.R
       userName={userName}
       userEmail={userEmail}
       userRoles={roles}
+      tenantSlug={tenantSlug}
       initialSidebarCollapsed={preferences.sidebarCollapsed ?? false}
       headerShowDate={config?.headerShowDate ?? false}
       headerDateFormat={config?.headerDateFormat ?? "PPP"}

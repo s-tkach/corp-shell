@@ -7,16 +7,23 @@ import { getTenantSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { withTenant } from "@/lib/db/tenant";
+import { autoBootstrapPlatform } from "@/lib/db/provision";
 import { eq } from "drizzle-orm";
 
 const TENANT_ADMIN_ROUTES = ["/admin", "/api/admin"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
 
-async function getSetupComplete(tenantSlug: string | null): Promise<boolean> {
-  if (!tenantSlug) {
-    const rows = await db.select({ id: tenants.id }).from(tenants).limit(1);
-    return rows.length > 0;
-  }
+async function ensurePlatformTenant(): Promise<boolean> {
+  const rows = await db.select({ id: tenants.id }).from(tenants).limit(1);
+  if (rows.length > 0) return true;
+
+  await autoBootstrapPlatform();
+
+  const check = await db.select({ id: tenants.id }).from(tenants).limit(1);
+  return check.length > 0;
+}
+
+async function isTenantReady(tenantSlug: string): Promise<boolean> {
   try {
     const tenantDb = withTenant(tenantSlug);
     const rows = await tenantDb
@@ -24,7 +31,8 @@ async function getSetupComplete(tenantSlug: string | null): Promise<boolean> {
       .from(shellConfig)
       .limit(1);
     return rows[0]?.setupComplete ?? false;
-  } catch {
+  } catch (e) {
+    console.error(`[proxy] isTenantReady("${tenantSlug}") error:`, e instanceof Error ? e.message : e);
     return false;
   }
 }
@@ -83,18 +91,32 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const setupComplete = await getSetupComplete(hostSlug);
-
-  if (!setupComplete) {
-    if (pathname !== "/setup") {
-      return NextResponse.redirect(new URL("/setup", request.url));
+  // Always ensure the platform tenant exists (auto-bootstrap on first visit)
+  try {
+    const bootstrapped = await ensurePlatformTenant();
+    if (!bootstrapped) {
+      return new NextResponse("Platform bootstrap failed — tenant not created", { status: 500 });
     }
-    return NextResponse.next();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[proxy] Platform bootstrap error:", msg);
+    return new NextResponse(`Platform bootstrap error: ${msg}`, { status: 500 });
   }
 
-  // Setup is complete — /setup is now inaccessible
-  if (pathname === "/setup") {
-    return new NextResponse(null, { status: 404 });
+  const resolvedSlug = hostSlug ?? "platform";
+
+  // Verify the resolved tenant exists and is ready
+  const tenantRows = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.slug, resolvedSlug))
+    .limit(1);
+  if (tenantRows.length === 0) {
+    return new NextResponse("Tenant not found", { status: 404 });
+  }
+
+  if (!await isTenantReady(resolvedSlug)) {
+    return new NextResponse("Tenant not configured", { status: 503 });
   }
 
   const session = await auth();
@@ -145,6 +167,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|suspended|setup|api/auth|api/setup|api/internal|api/health|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
+    "/((?!login|suspended|api/auth|api/internal|api/health|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)",
   ],
 };

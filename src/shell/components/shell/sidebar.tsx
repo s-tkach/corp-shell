@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, ChevronRight, Settings } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,10 @@ interface SidebarProps {
   appName: string;
   logoUrl: string | null;
   userRoles: string[];
+  tenantSlug: string;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, tenantSlug }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -305,6 +306,36 @@ export function Sidebar({ menu, appName, logoUrl, userRoles }: SidebarProps) {
                 })}
               </div>
             )}
+          </>
+        )}
+        {tenantSlug === "platform" && userRoles.includes("super_admin") && (
+          <>
+            <Link
+              href="/platform/tenants"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/platform/tenants")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Tenants" : undefined}
+            >
+              <Building2 className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Tenants</span>}
+            </Link>
+            <Link
+              href="/platform/admins"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/platform/admins")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Platform Admins" : undefined}
+            >
+              <UserCog className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Platform Admins</span>}
+            </Link>
           </>
         )}
         <div

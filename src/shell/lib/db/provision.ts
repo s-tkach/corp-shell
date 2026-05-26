@@ -6,6 +6,19 @@ import { withTenant } from "./tenant";
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
+export async function autoBootstrapPlatform(): Promise<void> {
+  const existing = await db.select({ id: tenants.id }).from(tenants).limit(1);
+  if (existing.length > 0) return;
+
+  try {
+    await provisionTenant("platform", "Platform Admin", "");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("already exists")) return;
+    throw e;
+  }
+}
+
 export async function provisionTenant(
   slug: string,
   displayName: string,
@@ -228,12 +241,6 @@ async function seedTenant(
   tenantId: string,
   adminEmail: string
 ): Promise<void> {
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(adminEmail)) {
-    throw new Error(`Invalid email format: "${adminEmail}"`);
-  }
-
   // Insert default roles
   const superAdminRoles = await tenantDb
     .insert(roles)
@@ -304,30 +311,35 @@ async function seedTenant(
       setupComplete: true,
     });
 
-  // Insert admin user
-  const adminUsers = await tenantDb
-    .insert(users)
-    .values({
-      email: adminEmail,
-      displayName: adminEmail.split("@")[0] ?? "admin",
-      idpSource: "pending",
-      idpSubject: "pending",
-      isActive: true,
-    })
-    .returning();
+  if (adminEmail) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(adminEmail)) {
+      throw new Error(`Invalid email format: "${adminEmail}"`);
+    }
 
-  const adminUser = adminUsers[0];
-  if (!adminUser) {
-    throw new Error("Failed to create admin user");
+    const adminUsers = await tenantDb
+      .insert(users)
+      .values({
+        email: adminEmail,
+        displayName: adminEmail.split("@")[0] ?? "admin",
+        idpSource: "pending",
+        idpSubject: "pending",
+        isActive: true,
+      })
+      .returning();
+
+    const adminUser = adminUsers[0];
+    if (!adminUser) {
+      throw new Error("Failed to create admin user");
+    }
+
+    await tenantDb
+      .insert(userRoles)
+      .values({
+        userId: adminUser.id,
+        roleId: superAdminRole.id,
+      });
   }
-
-  // Assign super_admin role to admin user
-  await tenantDb
-    .insert(userRoles)
-    .values({
-      userId: adminUser.id,
-      roleId: superAdminRole.id,
-    });
 
   // Assign free tier subscription
   await tenantDb

@@ -10,9 +10,19 @@ vi.mock("@/lib/db/client", () => ({
     limit: vi.fn().mockResolvedValue([]),
     orderBy: vi.fn().mockResolvedValue([]),
   },
+  connectionString: "postgres://localhost/test",
 }));
 vi.mock("@/lib/db/provision", () => ({ provisionTenant: vi.fn() }));
-vi.mock("@/lib/db/schema", () => ({ tenants: {} }));
+vi.mock("@/lib/db/schema", () => ({ tenants: {}, idpProviders: {}, shellConfig: {} }));
+vi.mock("@/lib/db/tenant", () => ({
+  withTenant: vi.fn(() => ({
+    insert: vi.fn().mockReturnThis(),
+    values: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+vi.mock("@/lib/crypto", () => ({ encrypt: vi.fn(async (pt: string) => `encrypted:${pt}`) }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), asc: vi.fn() }));
 
 describe("POST /api/platform/tenants", () => {
@@ -29,7 +39,7 @@ describe("POST /api/platform/tenants", () => {
     const { POST } = await import("@/app/api/platform/tenants/route");
     const req = new Request("http://localhost/api/platform/tenants", {
       method: "POST",
-      body: JSON.stringify({ slug: "new", displayName: "New", adminEmail: "a@b.com" }),
+      body: JSON.stringify({ slug: "new", displayName: "New", adminEmail: "a@b.com", oidcIssuer: "https://example.com", oidcClientId: "id", oidcClientSecret: "secret" }),
       headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req as Parameters<typeof POST>[0]);
@@ -45,7 +55,7 @@ describe("POST /api/platform/tenants", () => {
     const { POST } = await import("@/app/api/platform/tenants/route");
     const req = new Request("http://localhost/api/platform/tenants", {
       method: "POST",
-      body: JSON.stringify({ slug: "INVALID SLUG!", displayName: "New", adminEmail: "a@b.com" }),
+      body: JSON.stringify({ slug: "INVALID SLUG!", displayName: "New", adminEmail: "a@b.com", oidcIssuer: "https://example.com", oidcClientId: "id", oidcClientSecret: "secret" }),
       headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req as Parameters<typeof POST>[0]);

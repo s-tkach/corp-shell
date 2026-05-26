@@ -7,6 +7,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.1.0] — 2026-05-26
+
+### Changed
+
+- **M3** — Replaced first-run setup wizard with auto-bootstrap: platform tenant auto-provisions on first visit; platform OIDC configured via env vars (`PLATFORM_OIDC_ISSUER`, `PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`); first user to log in becomes super admin
+- **M19** — Platform tenant creation now includes full OIDC configuration (issuer, client ID, client secret) and optional branding; removed per-tenant setup wizard
+
+### Added
+
+- Platform admin invite capability (`/platform/admins` page + API)
+- Sidebar links to "Tenants" and "Platform Admins" for platform super admins
+- OIDC connection validation during tenant creation
+
+### Removed
+
+- Setup wizard (`/setup` route and all associated API endpoints)
+- `bootstrap-platform.ts` CLI script — no longer needed
+
+---
+
 ## [2.0.0] — 2026-05-24
 
 ### Added
@@ -14,7 +34,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **M16** — Multi-tenant data model: schema-per-tenant; `withTenant()` Drizzle factory; `provisionTenant()` provisioning function; `public.tenants` table; `tenantSubscription` and `idpProviders` per-tenant tables
 - **M17** — Subdomain routing + tenant JWT: host-based login boundary; `tenantSlug` and `tenantId` in signed JWT; cross-tenant token replay protection; `/suspended` page
 - **M18** — Dynamic IDP registration: `getAuthConfig(tenantSlug)` loads enabled OIDC providers from DB at login time; multi-IDP admin UI; per-tenant SSO CRUD API
-- **M19** — Platform admin tenant management: `bootstrap-platform` script; `isPlatformAdmin()` guard; `/platform/tenants` panel with create/suspend/delete; `GET /api/admin/subscriptions/current` org-level subscription endpoint; subscriptions admin page shows org tier with upgrade CTA
+- **M19** — Platform admin tenant management: `isPlatformAdmin()` guard; `/platform/tenants` panel with create/suspend/delete; `GET /api/admin/subscriptions/current` org-level subscription endpoint; subscriptions admin page shows org tier with upgrade CTA
 
 ---
 
@@ -24,7 +44,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **M1** — pnpm monorepo scaffold; Next.js 16 shell app; TypeScript strict mode; AWS Amplify hosting
 - **M2** — Drizzle ORM; PostgreSQL schema (11 tables); automated migrations
-- **M3** — First-run setup wizard: branding, OIDC connection, super-admin verification, atomic launch
+- **M3** — First-run setup (superseded in v2.1.0 by auto-bootstrap)
 - **M4** — NextAuth.js v5 OIDC authentication; JIT user provisioning; JWT callbacks; RP-initiated logout
 - **M5** — RBAC middleware; admin route guard; `requireRoles()` helper; 403 page
 - **M6** — Data-driven sidebar (DB-backed, role/tier-filtered); header with breadcrumbs, user dropdown, theme toggle; collapse state persistence

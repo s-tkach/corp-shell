@@ -18,7 +18,30 @@ export interface AuthConfig {
   providers: OidcProviderConfig[];
 }
 
+function getPlatformEnvProvider(): OidcProviderConfig | null {
+  const issuer = process.env["PLATFORM_OIDC_ISSUER"];
+  const clientId = process.env["PLATFORM_OIDC_CLIENT_ID"];
+  const clientSecret = process.env["PLATFORM_OIDC_CLIENT_SECRET"];
+  if (!issuer || !clientId || !clientSecret) return null;
+
+  return {
+    id: "platform-oidc",
+    name: "Platform SSO",
+    type: "oidc",
+    issuer,
+    clientId,
+    clientSecret,
+    client: { token_endpoint_auth_method: "client_secret_post" },
+    authorization: { params: { scope: "openid profile email" } },
+  };
+}
+
 export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
+  if (tenantSlug === "platform") {
+    const envProvider = getPlatformEnvProvider();
+    if (envProvider) return { providers: [envProvider] };
+  }
+
   const tenantDb = withTenant(tenantSlug);
 
   const rows = await tenantDb
