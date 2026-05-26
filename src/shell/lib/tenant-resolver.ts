@@ -1,3 +1,7 @@
+export function getPlatformSlug(): string {
+  return process.env["TENANT_SLUG"] ?? "platform";
+}
+
 export function getTenantSlug(host: string): string | null {
   const override = process.env["TENANT_SLUG"];
   if (override) return override;

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
+import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { eq } from "drizzle-orm";
 
 async function guardPlatformAdmin() {
@@ -37,7 +38,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 
-  if (existing[0].slug === "platform") {
+  if (existing[0].slug === getPlatformSlug()) {
     return NextResponse.json({ error: "Cannot modify the platform tenant" }, { status: 400 });
   }
 

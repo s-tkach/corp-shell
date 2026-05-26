@@ -917,6 +917,8 @@ Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
 
 **Local dev:** Set `TENANT_SLUG=acme` in `.env.local` to bypass host-header parsing. No wildcard DNS needed.
 
+`TENANT_SLUG` also sets the platform tenant identity — `getPlatformSlug()` returns `process.env["TENANT_SLUG"] ?? "platform"`. All comparisons against the platform tenant slug must use `getPlatformSlug()`, not the literal string `"platform"`.
+
 ### 20.4 Database Schema (v2)
 
 **`public` schema** — cross-tenant registry only:
@@ -965,7 +967,7 @@ expiresAt   timestamp (nullable)
 assignedAt  timestamp defaultNow()
 ```
 
-**`tenant_platform` schema:** Same table structure as a normal tenant schema. Users in this schema are platform super admins. `isPlatformAdmin()` asserts both `super_admin` role AND `token.tenantSlug === "platform"`.
+**`tenant_platform` schema:** Same table structure as a normal tenant schema. Users in this schema are platform super admins. `isPlatformAdmin()` asserts both `super_admin` role AND `token.tenantSlug === getPlatformSlug()`.
 
 ### 20.5 `withTenant(slug)` Drizzle Client Factory
 
@@ -1106,7 +1108,7 @@ v2 removes per-user `userSubscriptions` and replaces it with a per-tenant single
 **`isPlatformAdmin(token)` guard:**
 ```typescript
 export function isPlatformAdmin(token: JWT): boolean {
-  return token.tenantSlug === "platform" && token.roles.includes("super_admin");
+  return token.tenantSlug === getPlatformSlug() && token.roles.includes("super_admin");
 }
 ```
 
@@ -1125,7 +1127,7 @@ export function isPlatformAdmin(token: JWT): boolean {
 |---------|-----------|
 | Cross-tenant token replay | Middleware asserts `token.tenantSlug === getTenantSlug(host)` on every authenticated request; mismatch → 401 |
 | Tenant data isolation | All DB access via `withTenant(slug)` which sets `search_path = tenant_{slug},public`; application code cannot reach another tenant's schema |
-| Platform admin privilege escalation | `isPlatformAdmin()` requires both `super_admin` role AND `tenantSlug === "platform"` — role alone is insufficient |
+| Platform admin privilege escalation | `isPlatformAdmin()` requires both `super_admin` role AND `tenantSlug === getPlatformSlug()` — role alone is insufficient |
 | IDP secret at rest | `encryptedClientSecret` encrypted via `CryptoProvider` before write; same abstraction as v1 OIDC secret |
 | Host header trust | Host header trusted only at unauthenticated login initiation; signed JWT is authoritative for all authenticated requests |
 

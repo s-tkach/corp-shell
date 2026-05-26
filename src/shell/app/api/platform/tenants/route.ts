@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { tenants, idpProviders, shellConfig } from "@/lib/db/schema";
 import { provisionTenant } from "@/lib/db/provision";
 import { withTenant } from "@/lib/db/tenant";
+import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { encrypt } from "@/lib/crypto";
 import { eq, asc } from "drizzle-orm";
 
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "slug must match ^[a-z0-9-]+$" }, { status: 400 });
   }
 
-  if (slug === "platform") {
-    return NextResponse.json({ error: "Cannot create tenant with slug 'platform'" }, { status: 400 });
+  if (slug === getPlatformSlug()) {
+    return NextResponse.json({ error: `Cannot create tenant with slug '${getPlatformSlug()}'` }, { status: 400 });
   }
 
   const existing = await db

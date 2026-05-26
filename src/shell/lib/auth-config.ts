@@ -1,6 +1,7 @@
 import { decrypt } from "@/lib/crypto";
 import { withTenant } from "@/lib/db/tenant";
 import { idpProviders } from "@/lib/db/schema";
+import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { eq } from "drizzle-orm";
 
 export interface OidcProviderConfig {
@@ -37,7 +38,7 @@ function getPlatformEnvProvider(): OidcProviderConfig | null {
 }
 
 export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
-  if (tenantSlug === "platform") {
+  if (tenantSlug === getPlatformSlug()) {
     const envProvider = getPlatformEnvProvider();
     if (envProvider) return { providers: [envProvider] };
   }

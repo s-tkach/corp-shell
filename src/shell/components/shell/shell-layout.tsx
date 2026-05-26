@@ -18,6 +18,7 @@ interface ShellLayoutClientProps {
   userEmail: string;
   userRoles: string[];
   tenantSlug: string;
+  isPlatformAdmin: boolean;
   initialSidebarCollapsed: boolean;
   headerShowDate: boolean;
   headerDateFormat: string;
@@ -33,6 +34,7 @@ export function ShellLayoutClient({
   userEmail,
   userRoles,
   tenantSlug,
+  isPlatformAdmin,
   initialSidebarCollapsed,
   headerShowDate,
   headerDateFormat,
@@ -47,7 +49,7 @@ export function ShellLayoutClient({
   return (
     <NotificationProvider toastConfig={toastConfig}>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} tenantSlug={tenantSlug} />
+        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} tenantSlug={tenantSlug} isPlatformAdmin={isPlatformAdmin} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header
             menu={menu}

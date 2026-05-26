@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { withTenant } from "@/lib/db/tenant";
+import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { users, roles, userRoles } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
@@ -17,7 +18,7 @@ export async function GET() {
   const guard = await guardPlatformAdmin();
   if (guard) return guard;
 
-  const tenantDb = withTenant("platform");
+  const tenantDb = withTenant(getPlatformSlug());
 
   const superAdminRole = await tenantDb
     .select({ id: roles.id })
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
   }
 
-  const tenantDb = withTenant("platform");
+  const tenantDb = withTenant(getPlatformSlug());
 
   const existing = await tenantDb
     .select({ id: users.id })

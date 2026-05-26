@@ -1,7 +1,7 @@
 import { signIn } from "@/lib/auth";
 import { shellConfig } from "@/lib/db/schema";
 import { headers } from "next/headers";
-import { getTenantSlug } from "@/lib/tenant-resolver";
+import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { withTenant } from "@/lib/db/tenant";
 import { getAuthConfig } from "@/lib/auth-config";
 
@@ -27,7 +27,7 @@ async function getLoginConfig(tenantSlug: string) {
 export default async function LoginPage(props: { searchParams: Promise<Record<string, string>> }) {
   const hdrs = await headers();
   const host = hdrs.get("host") ?? "";
-  const tenantSlug = getTenantSlug(host) ?? "platform";
+  const tenantSlug = getTenantSlug(host) ?? getPlatformSlug();
 
   const [config, searchParams, authConfig] = await Promise.all([
     getLoginConfig(tenantSlug),

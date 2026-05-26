@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { menuItems, shellConfig, tenants } from "@/lib/db/schema";
 import { ADMIN_ROLES } from "@/lib/roles";
-import { getTenantSlug } from "@/lib/tenant-resolver";
+import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { withTenant } from "@/lib/db/tenant";
@@ -103,7 +103,7 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(`Platform bootstrap error: ${msg}`, { status: 500 });
   }
 
-  const resolvedSlug = hostSlug ?? "platform";
+  const resolvedSlug = hostSlug ?? getPlatformSlug();
 
   // Verify the resolved tenant exists and is ready
   const tenantRows = await db

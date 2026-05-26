@@ -3,6 +3,7 @@ import { db, connectionString } from "./client";
 import { tenants, roles, users, userRoles, subscriptionTiers, tenantSubscription, shellConfig } from "./schema";
 import { eq } from "drizzle-orm";
 import { withTenant } from "./tenant";
+import { getPlatformSlug } from "@/lib/tenant-resolver";
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
@@ -11,7 +12,7 @@ export async function autoBootstrapPlatform(): Promise<void> {
   if (existing.length > 0) return;
 
   try {
-    await provisionTenant("platform", "Platform Admin", "");
+    await provisionTenant(getPlatformSlug(), "Platform Admin", "");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists")) return;

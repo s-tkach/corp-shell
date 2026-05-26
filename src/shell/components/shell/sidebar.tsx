@@ -21,9 +21,10 @@ interface SidebarProps {
   logoUrl: string | null;
   userRoles: string[];
   tenantSlug: string;
+  isPlatformAdmin: boolean;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, tenantSlug }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, tenantSlug, isPlatformAdmin }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -308,7 +309,7 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, tenantSlug }: Sideb
             )}
           </>
         )}
-        {tenantSlug === "platform" && userRoles.includes("super_admin") && (
+        {isPlatformAdmin && (
           <>
             <Link
               href="/platform/tenants"

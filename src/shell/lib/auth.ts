@@ -11,13 +11,13 @@ import {
   authEvents,
   tenants,
 } from "@/lib/db/schema";
-import { getTenantSlug } from "@/lib/tenant-resolver";
+import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
 import { eq, inArray, count } from "drizzle-orm";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
   const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
-  const tenantSlug = getTenantSlug(host) ?? "platform";
+  const tenantSlug = getTenantSlug(host) ?? getPlatformSlug();
 
   const { providers } = await getAuthConfig(tenantSlug);
 
@@ -89,7 +89,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             userId = newUser.id;
 
             // First user on platform tenant becomes super admin
-            if (tenantSlug === "platform") {
+            if (tenantSlug === getPlatformSlug()) {
               const [userCount] = await tenantDb
                 .select({ total: count() })
                 .from(users);
@@ -113,7 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             await tenantDb.insert(authEvents).values({
               userId,
               email,
-              eventType: tenantSlug === "platform" ? "FIRST_ADMIN_PROVISION" : "JIT_PROVISION",
+              eventType: tenantSlug === getPlatformSlug() ? "FIRST_ADMIN_PROVISION" : "JIT_PROVISION",
             });
           } else {
             userId = existingUsers[0].id;
