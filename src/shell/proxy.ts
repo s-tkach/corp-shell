@@ -13,19 +13,20 @@ const TENANT_ADMIN_ROUTES = ["/admin", "/api/admin"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
 
 async function getSetupComplete(tenantSlug: string | null): Promise<boolean> {
-  if (tenantSlug) {
+  if (!tenantSlug) {
+    const rows = await db.select({ id: tenants.id }).from(tenants).limit(1);
+    return rows.length > 0;
+  }
+  try {
     const tenantDb = withTenant(tenantSlug);
     const rows = await tenantDb
       .select({ setupComplete: shellConfig.setupComplete })
       .from(shellConfig)
       .limit(1);
     return rows[0]?.setupComplete ?? false;
+  } catch {
+    return false;
   }
-  const rows = await db
-    .select({ setupComplete: shellConfig.setupComplete })
-    .from(shellConfig)
-    .limit(1);
-  return rows[0]?.setupComplete ?? false;
 }
 
 function isTenantAdminRoute(pathname: string): boolean {
