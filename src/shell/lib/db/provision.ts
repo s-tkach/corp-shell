@@ -12,7 +12,7 @@ export async function autoBootstrapPlatform(): Promise<void> {
   if (existing.length > 0) return;
 
   try {
-    await provisionTenant(getPlatformSlug(), "Platform Admin", "");
+    await provisionTenant(getPlatformSlug(), "Platform Admin", "", { setupComplete: false });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists")) return;
@@ -23,7 +23,8 @@ export async function autoBootstrapPlatform(): Promise<void> {
 export async function provisionTenant(
   slug: string,
   displayName: string,
-  adminEmail: string
+  adminEmail: string,
+  options?: { setupComplete?: boolean }
 ): Promise<{ tenantId: string }> {
   // Validate slug
   if (!SLUG_PATTERN.test(slug)) {
@@ -64,7 +65,7 @@ export async function provisionTenant(
 
     // Seed defaults
     const tenantDb = withTenant(slug);
-    await seedTenant(tenantDb, tenant.id, adminEmail);
+    await seedTenant(tenantDb, tenant.id, adminEmail, options?.setupComplete ?? true);
 
     return { tenantId: tenant.id };
   } finally {
@@ -240,7 +241,8 @@ export function perTenantDDL(schema: string): string {
 async function seedTenant(
   tenantDb: ReturnType<typeof withTenant>,
   tenantId: string,
-  adminEmail: string
+  adminEmail: string,
+  setupComplete = true
 ): Promise<void> {
   // Insert default roles
   const superAdminRoles = await tenantDb
@@ -309,7 +311,7 @@ async function seedTenant(
     .insert(shellConfig)
     .values({
       appName: "Shell",
-      setupComplete: true,
+      setupComplete,
     });
 
   if (adminEmail) {

@@ -25,7 +25,8 @@ corp-shell/                          ← monorepo root (also the @corp/shell-app
 │   └── shell/                       # Next.js 15 application — published as @corp/shell-app
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout (Server Component): auth, menu, sidebar
-│   │   ├── (auth)/                  # /login, /api/auth/callback, /error
+│   │   ├── (auth)/                  # /login, /api/auth/callback, /error, /setup
+│   │   │   └── setup/               # First-run setup page (404 after completion)
 │   │   ├── (shell)/                 # Protected routes (require valid session)
 │   │   │   ├── dashboard/
 │   │   │   ├── admin/
@@ -38,9 +39,10 @@ corp-shell/                          ← monorepo root (also the @corp/shell-app
 │   │   │   │   ├── branding/
 │   │   │   │   └── notifications/
 │   │   │   └── [...slug]/           # Child app catch-all (Client Component)
-│   │   └── setup/                   # First-run wizard (404 after completion)
 │   ├── api/
 │   │   ├── auth/[...nextauth]/      # NextAuth.js v5 handler
+│   │   ├── setup/                   # POST — complete setup; 409 if already done
+│   │   │   └── validate-oidc/       # GET ?issuer= — pings /.well-known/openid-configuration
 │   │   ├── menu/
 │   │   ├── users/
 │   │   ├── roles/
@@ -148,7 +150,8 @@ GitHub Packages
 ```
 1. Browser → CloudFront → Lambda (Next.js middleware.ts)
 2. middleware.ts:
-     a. /setup  → if shell_config.setup_complete: return 404
+     a. setup gate: if !shell_config.setup_complete && path !== '/setup': redirect /setup
+        /setup itself: if shell_config.setup_complete: return 404
      b. all other routes: check NextAuth.js session cookie
         - No session → redirect /api/auth/signin (OIDC provider)
         - Session valid → check route RBAC
@@ -530,9 +533,9 @@ The published package contains raw TypeScript/TSX source. Consumers receive the 
 
 ---
 
-## 14. First-Run Wizard Architecture
+## 14. First-Run Setup Page Architecture
 
-The wizard is a self-contained flow at `/setup`. It is the only route reachable before `shell_config.setup_complete = true`.
+The setup page is a self-contained single-page form at `/setup` (`app/(auth)/setup/page.tsx`). It is the only route reachable before `shell_config.setup_complete = true`.
 
 ```
 middleware.ts:
@@ -541,21 +544,35 @@ middleware.ts:
   if (shell_config.setup_complete && path === '/setup'):
     return 404
 
-Wizard state: React local state only (not persisted until Step 4 "Launch")
+Form state: React local state only (not persisted until submission)
 
-Step 1 — Branding:   POST /api/setup/upload-logo → StorageProvider (S3 presigned PUT when STORAGE_PROVIDER=s3; direct multipart POST to local disk when STORAGE_PROVIDER=local)
-Step 2 — OIDC:       GET /api/setup/validate-oidc → pings /.well-known/openid-configuration
-Step 3 — Super Admin: triggers full OIDC login inline; verifies returned email matches input
-Step 4 — Launch:     POST /api/setup/complete →
-                       INSERT shell_config
-                       INSERT subscription_tiers (free/standard/enterprise defaults)
-                       INSERT roles (super_admin, admin defaults)
-                       INSERT users (super admin)
-                       INSERT user_roles
-                       INSERT user_subscriptions (enterprise, no expiry)
-                       SET shell_config.setup_complete = true
-                     → redirect /dashboard
+Fields:
+  - Admin Email          (required)
+  - OIDC Issuer URL      (required) + inline "Validate" button
+  - Client ID            (required)
+  - Client Secret        (required, password input)
+  - Scopes               (default: "openid profile email")
+  - Token Endpoint Auth Method  (client_secret_post | client_secret_basic)
+
+Validation:  GET /api/setup/validate-oidc?issuer=<url>
+               → fetches /.well-known/openid-configuration
+               → verifies issuer and authorization_endpoint fields present
+               → HTTPS-only; 8 s timeout
+
+Submission:  POST /api/setup
+               → guard: returns 409 if shellConfig.setupComplete already true
+               → validates required fields + email format
+               → looks up super_admin role (must exist from auto-bootstrap)
+               → INSERT users (adminEmail, idpSource="pending", idpSubject="pending")
+               → INSERT userRoles (admin user → super_admin)
+               → encrypt(oidcClientSecret) via CryptoProvider
+               → INSERT idpProviders (slug="oidc", displayName="Platform SSO", ...)
+               → UPDATE shellConfig SET setupComplete = true
+               → 200 { ok: true }
+             → client redirects to /login
 ```
+
+The platform tenant schema (roles, subscriptionTiers, tenantSubscription, shellConfig) is pre-seeded by `autoBootstrapPlatform()` on first request — the setup page only configures the admin user and IDP provider on top of that seed data.
 
 ---
 

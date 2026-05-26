@@ -14,3 +14,18 @@ describe("cross-tenant replay check", () => {
     expect(isTenantMismatch("acme", null)).toBe(false);
   });
 });
+
+describe("setup route bypass", () => {
+  it("identifies setup routes correctly", () => {
+    const SETUP_ROUTES = ["/setup", "/api/setup"];
+    const isSetupRoute = (pathname: string) =>
+      SETUP_ROUTES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+    expect(isSetupRoute("/setup")).toBe(true);
+    expect(isSetupRoute("/api/setup")).toBe(true);
+    expect(isSetupRoute("/api/setup/validate-oidc")).toBe(true);
+    expect(isSetupRoute("/login")).toBe(false);
+    expect(isSetupRoute("/admin")).toBe(false);
+    expect(isSetupRoute("/setupx")).toBe(false);
+  });
+});

@@ -12,6 +12,11 @@ import { eq } from "drizzle-orm";
 
 const TENANT_ADMIN_ROUTES = ["/admin", "/api/admin"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
+const SETUP_ROUTES = ["/setup", "/api/setup"];
+
+function isSetupRoute(pathname: string): boolean {
+  return SETUP_ROUTES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 async function ensurePlatformTenant(): Promise<boolean> {
   const rows = await db.select({ id: tenants.id }).from(tenants).limit(1);
@@ -103,6 +108,9 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(`Platform bootstrap error: ${msg}`, { status: 500 });
   }
 
+  // Setup routes bypass all remaining gates — they run before any tenant is ready
+  if (isSetupRoute(pathname)) return NextResponse.next();
+
   const resolvedSlug = hostSlug ?? getPlatformSlug();
 
   // Verify the resolved tenant exists and is ready
@@ -116,7 +124,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!await isTenantReady(resolvedSlug)) {
-    return new NextResponse("Tenant not configured", { status: 503 });
+    return NextResponse.redirect(new URL("/setup", request.url));
   }
 
   const session = await auth();

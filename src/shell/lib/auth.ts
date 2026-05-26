@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
-import { eq, inArray, count } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
   const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
@@ -74,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
           let userId: string;
 
           if (existingUsers.length === 0 || existingUsers[0] === undefined) {
+            // New user — JIT provision
             const inserted = await tenantDb
               .insert(users)
               .values({
@@ -87,16 +88,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             const newUser = inserted[0];
             if (!newUser) throw new Error("Failed to insert user");
             userId = newUser.id;
-
-            // First user on platform tenant becomes super admin
-            if (tenantSlug === getPlatformSlug()) {
-              const [userCount] = await tenantDb
-                .select({ total: count() })
-                .from(users);
-              if (userCount && userCount.total === 1) {
-                roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
-              }
-            }
 
             if (roleSlugs.length > 0) {
               const roleRows = await tenantDb
@@ -113,14 +104,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             await tenantDb.insert(authEvents).values({
               userId,
               email,
-              eventType: tenantSlug === getPlatformSlug() ? "FIRST_ADMIN_PROVISION" : "JIT_PROVISION",
+              eventType: "JIT_PROVISION",
             });
           } else {
+            // Existing user — update IDP linkage and last login
+            // Handles the case where setup pre-seeded the user with idpSource: "pending"
             userId = existingUsers[0].id;
 
             await tenantDb
               .update(users)
-              .set({ lastLoginAt: new Date() })
+              .set({ idpSource: "oidc", idpSubject: sub, lastLoginAt: new Date() })
               .where(eq(users.id, userId));
 
             const dbRoleRows = await tenantDb
