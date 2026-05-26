@@ -19,11 +19,13 @@ describe("getAuthConfig", () => {
       where: vi.fn().mockResolvedValue([
         {
           id: "provider-1",
+          slug: "okta",
           displayName: "Okta",
           issuer: "https://accounts.google.com",
           clientId: "my-client-id",
           encryptedClientSecret: "encrypted-secret",
           scopes: ["openid", "email"],
+          tokenEndpointAuthMethod: "client_secret_post",
         },
       ]),
     };
@@ -34,9 +36,10 @@ describe("getAuthConfig", () => {
 
     expect(config.providers).toHaveLength(1);
     expect(config.providers[0]).toMatchObject({
-      id: "provider-1",
+      id: "okta",
       issuer: "https://accounts.google.com",
       clientId: "my-client-id",
+      client: { token_endpoint_auth_method: "client_secret_post" },
     });
     expect(mockDecrypt).toHaveBeenCalledWith("encrypted-secret");
   });

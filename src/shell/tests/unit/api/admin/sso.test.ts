@@ -73,7 +73,7 @@ describe("POST /api/admin/sso", () => {
     const { POST } = await import("@/app/api/admin/sso/route");
     const req = new NextRequest("http://localhost/api/admin/sso", {
       method: "POST",
-      body: JSON.stringify({ displayName: "Okta", issuer: "https://bad.example.com", clientId: "cid", clientSecret: "sec" }),
+      body: JSON.stringify({ slug: "okta", displayName: "Okta", issuer: "https://bad.example.com", clientId: "cid", clientSecret: "sec" }),
       headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req);
@@ -87,7 +87,7 @@ describe("POST /api/admin/sso", () => {
     const { POST } = await import("@/app/api/admin/sso/route");
     const req = new NextRequest("http://localhost/api/admin/sso", {
       method: "POST",
-      body: JSON.stringify({ displayName: "Okta", issuer: "https://okta.example.com", clientId: "cid", clientSecret: "secret" }),
+      body: JSON.stringify({ slug: "okta", displayName: "Okta", issuer: "https://okta.example.com", clientId: "cid", clientSecret: "secret" }),
       headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req);

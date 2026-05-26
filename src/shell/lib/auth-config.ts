@@ -10,6 +10,7 @@ export interface OidcProviderConfig {
   issuer: string;
   clientId: string;
   clientSecret: string;
+  client: { token_endpoint_auth_method: string };
   authorization: { params: { scope: string } };
 }
 
@@ -29,6 +30,7 @@ export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
       clientId: idpProviders.clientId,
       encryptedClientSecret: idpProviders.encryptedClientSecret,
       scopes: idpProviders.scopes,
+      tokenEndpointAuthMethod: idpProviders.tokenEndpointAuthMethod,
     })
     .from(idpProviders)
     .where(eq(idpProviders.isEnabled, true));
@@ -41,6 +43,7 @@ export async function getAuthConfig(tenantSlug: string): Promise<AuthConfig> {
       issuer: row.issuer,
       clientId: row.clientId,
       clientSecret: await decrypt(row.encryptedClientSecret),
+      client: { token_endpoint_auth_method: row.tokenEndpointAuthMethod },
       authorization: { params: { scope: row.scopes.join(" ") } },
     }))
   );

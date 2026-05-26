@@ -69,6 +69,7 @@ CREATE TABLE "idp_providers" (
 	"client_id" text NOT NULL,
 	"encrypted_client_secret" text NOT NULL,
 	"scopes" text[] NOT NULL,
+	"token_endpoint_auth_method" text DEFAULT 'client_secret_post' NOT NULL,
 	"group_claim_name" text,
 	"is_enabled" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

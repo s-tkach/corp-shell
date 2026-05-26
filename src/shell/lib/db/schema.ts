@@ -98,6 +98,7 @@ export const idpProviders = pgTable("idp_providers", {
   clientId: text("client_id").notNull(),
   encryptedClientSecret: text("encrypted_client_secret").notNull(),
   scopes: text("scopes").array().notNull(),
+  tokenEndpointAuthMethod: text("token_endpoint_auth_method").notNull().default("client_secret_post"),
   groupClaimName: text("group_claim_name"),
   isEnabled: boolean("is_enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

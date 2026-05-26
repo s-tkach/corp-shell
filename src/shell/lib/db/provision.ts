@@ -126,6 +126,7 @@ export function perTenantDDL(schema: string): string {
       client_id text NOT NULL,
       encrypted_client_secret text NOT NULL,
       scopes text[] NOT NULL,
+      token_endpoint_auth_method text NOT NULL DEFAULT 'client_secret_post',
       group_claim_name text,
       is_enabled boolean NOT NULL DEFAULT true,
       created_at timestamp with time zone NOT NULL DEFAULT now()
