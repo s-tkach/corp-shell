@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db/client";
 import { withTenant } from "@/lib/db/tenant";
-import { tenants, shellConfig, subscriptionTiers, roles, users, userRoles, tenantSubscription, idpProviders } from "@/lib/db/schema";
+import { provisionTenant } from "@/lib/db/provision";
+import { tenants, shellConfig, idpProviders } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getTenantSlug } from "@/lib/tenant-resolver";
 
@@ -38,12 +39,6 @@ export async function POST(request: NextRequest) {
   }
 
   const tenantSlug = getTenantSlug(request.headers.get("host") ?? "") ?? "default";
-  const tenantDb = withTenant(tenantSlug);
-
-  const existing = await tenantDb.select().from(shellConfig).limit(1);
-  if (existing[0]?.setupComplete) {
-    return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
-  }
 
   const tenantExists = await db
     .select()
@@ -51,18 +46,25 @@ export async function POST(request: NextRequest) {
     .where(eq(tenants.slug, tenantSlug))
     .limit(1);
 
-  if (!tenantExists.length) {
-    await db.insert(tenants).values({
-      slug: tenantSlug,
-      displayName: appName.trim(),
-      status: "active",
-    });
+  if (tenantExists.length) {
+    const tenantDb = withTenant(tenantSlug);
+    const existing = await tenantDb.select().from(shellConfig).limit(1);
+    if (existing[0]?.setupComplete) {
+      return NextResponse.json({ error: "Setup already complete" }, { status: 409 });
+    }
   }
 
   const encryptedSecret = await encrypt(oidcClientSecret.trim());
 
-  await tenantDb.transaction(async (tx) => {
-    await tx.insert(shellConfig).values({
+  if (!tenantExists.length) {
+    await provisionTenant(tenantSlug, appName.trim(), superAdminEmail.trim());
+  }
+
+  const tenantDb = withTenant(tenantSlug);
+
+  await tenantDb
+    .update(shellConfig)
+    .set({
       appName: appName.trim(),
       logoUrl: logoUrl || null,
       colorOverrides: {
@@ -75,66 +77,15 @@ export async function POST(request: NextRequest) {
       setupComplete: true,
     });
 
-    const [freeTier] = await tx
-      .insert(subscriptionTiers)
-      .values([
-        { slug: "free", displayName: "Free", level: 0 },
-        { slug: "standard", displayName: "Standard", level: 1 },
-        { slug: "enterprise", displayName: "Enterprise", level: 2 },
-      ])
-      .returning();
-
-    const enterpriseTier = await tx
-      .select()
-      .from(subscriptionTiers)
-      .where(eq(subscriptionTiers.slug, "enterprise"))
-      .limit(1);
-
-    const [superAdminRole] = await tx
-      .insert(roles)
-      .values([
-        { slug: "super_admin", displayName: "Super Admin", isSystem: true },
-        { slug: "admin", displayName: "Admin", isSystem: false },
-      ])
-      .returning();
-
-    const [superAdminUser] = await tx
-      .insert(users)
-      .values({
-        email: superAdminEmail.trim().toLowerCase(),
-        displayName: superAdminEmail.split("@")[0] ?? superAdminEmail,
-        idpSource: "oidc",
-        idpSubject: superAdminEmail.trim().toLowerCase(),
-      })
-      .returning();
-
-    if (!superAdminUser || !superAdminRole) {
-      throw new Error("Failed to create super admin user or role");
-    }
-
-    await tx.insert(userRoles).values({
-      userId: superAdminUser.id,
-      roleId: superAdminRole.id,
-    });
-
-    const entTier = enterpriseTier[0] ?? freeTier;
-    if (!entTier) throw new Error("No enterprise tier found");
-
-    await tx.insert(tenantSubscription).values({
-      tierId: entTier.id,
-      status: "active",
-    });
-
-    await tx.insert(idpProviders).values({
-      slug: "oidc",
-      displayName: "Default OIDC",
-      issuer: oidcIssuer.trim(),
-      clientId: oidcClientId.trim(),
-      encryptedClientSecret: encryptedSecret,
-      scopes: ["openid", "profile", "email"],
-      groupClaimName: "groups",
-      isEnabled: true,
-    });
+  await tenantDb.insert(idpProviders).values({
+    slug: "oidc",
+    displayName: "Default OIDC",
+    issuer: oidcIssuer.trim(),
+    clientId: oidcClientId.trim(),
+    encryptedClientSecret: encryptedSecret,
+    scopes: ["openid", "profile", "email"],
+    groupClaimName: "groups",
+    isEnabled: true,
   });
 
   const response = NextResponse.json({ ok: true });

@@ -42,7 +42,7 @@ export async function provisionTenant(
 
     // Create schema
     const schemaName = `tenant_${slug}`;
-    await sql`CREATE SCHEMA ${ sql(schemaName, "identifier") }`;
+    await sql.unsafe(`CREATE SCHEMA "${schemaName}"`);
 
     // Run DDL for per-tenant tables
     const ddl = perTenantDDL(schemaName);
@@ -120,6 +120,7 @@ export function perTenantDDL(schema: string): string {
 
     CREATE TABLE "${schema}".idp_providers (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug text NOT NULL UNIQUE,
       display_name text NOT NULL,
       issuer text NOT NULL,
       client_id text NOT NULL,
