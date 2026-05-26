@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
 
   const idToken = rawToken?.idToken as string | undefined;
 
-  const tenantSlug = session?.user.tenantSlug ?? "default";
+  const tenantSlug = session?.user.tenantSlug;
 
-  if (session?.user) {
+  if (session?.user && tenantSlug) {
     const tenantDb = withTenant(tenantSlug);
     await tenantDb.insert(authEvents).values({
       userId: session.user.userId || null,
@@ -28,13 +28,16 @@ export async function GET(request: NextRequest) {
 
   await signOut({ redirect: false });
 
-  const tenantDb = withTenant(tenantSlug);
-  const configRows = await tenantDb
-    .select({ issuer: idpProviders.issuer })
-    .from(idpProviders)
-    .where(eq(idpProviders.isEnabled, true))
-    .limit(1);
-  const oidcIssuer = configRows[0]?.issuer ?? null;
+  let oidcIssuer: string | null = null;
+  if (tenantSlug) {
+    const tenantDb = withTenant(tenantSlug);
+    const configRows = await tenantDb
+      .select({ issuer: idpProviders.issuer })
+      .from(idpProviders)
+      .where(eq(idpProviders.isEnabled, true))
+      .limit(1);
+    oidcIssuer = configRows[0]?.issuer ?? null;
+  }
   const origin = request.nextUrl.origin;
 
   if (idToken && oidcIssuer) {
