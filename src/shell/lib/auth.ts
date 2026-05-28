@@ -130,7 +130,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             eventType: "LOGIN",
           });
 
-          const subRow = await tenantDb
+          const subRow = await db
             .select({
               slug: subscriptionTiers.slug,
               level: subscriptionTiers.level,
@@ -139,6 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             })
             .from(tenantSubscription)
             .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
+            .where(eq(tenantSubscription.tenantId, tenant.id))
             .limit(1);
 
           const tier = subRow[0];

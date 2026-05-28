@@ -1,4 +1,4 @@
-import { getTenantDb } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { cacheLife } from "next/cache";
@@ -16,9 +16,7 @@ export async function fetchRegisteredApps(): Promise<RegisteredApp[]> {
   "use cache";
   cacheLife("minutes");
 
-  const tenantDb = await getTenantDb();
-
-  const rows = await tenantDb
+  const rows = await db
     .select({
       id: appRegistry.id,
       name: appRegistry.name,

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db/client";
 import { tenantSubscription, tenants } from "@/lib/db/schema";
-import { withTenant } from "@/lib/db/tenant";
 import { eq } from "drizzle-orm";
 
 function verifySignature(body: string, signature: string, secret: string): boolean {
@@ -43,30 +42,32 @@ export async function POST(req: NextRequest) {
     .from(tenants)
     .where(eq(tenants.slug, tenantSlug))
     .limit(1);
-  if (!tenantRows[0]) {
+  const tenant = tenantRows[0];
+  if (!tenant) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 
-  const tenantDb = withTenant(tenantSlug);
-
-  const existing = await tenantDb
+  const existing = await db
     .select()
     .from(tenantSubscription)
+    .where(eq(tenantSubscription.tenantId, tenant.id))
     .limit(1);
 
   if (existing[0]) {
-    await tenantDb
+    await db
       .update(tenantSubscription)
       .set({
         tierId,
         status: "active",
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         assignedAt: new Date(),
-      });
+      })
+      .where(eq(tenantSubscription.tenantId, tenant.id));
   } else {
-    await tenantDb
+    await db
       .insert(tenantSubscription)
       .values({
+        tenantId: tenant.id,
         tierId,
         status: "active",
         expiresAt: expiresAt ? new Date(expiresAt) : null,

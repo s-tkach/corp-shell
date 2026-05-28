@@ -938,27 +938,27 @@ Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
 
 ### 20.4 Database Schema (v2)
 
-**`public` schema** — cross-tenant registry only:
+**`public` schema** — platform-level tables shared across all tenants:
 
 | Table | Columns |
 |-------|---------|
 | `public.tenants` | `id` (uuid PK), `slug` (text unique), `displayName` (text), `status` (enum: active\|suspended\|deleted), `createdAt` |
+| `public.subscription_tiers` | `id` (uuid PK), `slug` (text unique), `displayName`, `level` (int), `upgradeCtaHeadline`, `upgradeCtaBody`, `upgradeCtaLabel`, `upgradeUrl`, `createdAt` |
+| `public.tenant_subscription` | `id` (uuid PK), `tenantId` (FK → tenants, cascade, unique), `tierId` (FK → subscription_tiers), `status` (enum), `expiresAt`, `assignedAt` — singleton per tenant |
+| `public.app_registry` | `id` (uuid PK), `name` (unique), `remoteUrl`, `routePrefix` (unique), `healthCheckUrl`, `isEnabled`, `lastHealthyAt`, `createdAt` |
 
 **`tenant_{slug}` schema** — full per-tenant data, created by `provisionTenant()`:
 
 | Table | Notes vs. v1 |
 |-------|-------------|
-| `shellConfig` | Same as v1; OIDC fields (`oidcIssuer`, `oidcClientId`, `oidcClientSecret`) removed — moved to `idpProviders` |
+| `shellConfig` | Per-tenant branding (logo, colors, login page, app name, header/toast styling) |
 | `users` | Same as v1 |
 | `roles` | Same as v1 |
 | `userRoles` | Same as v1 |
 | `idpProviders` | **New** — replaces `shell_config` OIDC fields; supports multiple providers per tenant |
 | `idpGroupRoleMappings` | Same as v1; gains `idpProviderId` FK to scope mappings per provider |
-| `subscriptionTiers` | Same as v1 |
-| `tenantSubscription` | **New** — replaces per-user `userSubscriptions`; org-level singleton |
 | `menuSections` | Same as v1 |
 | `menuItems` | Same as v1 |
-| `appRegistry` | Same as v1 |
 | `authEvents` | Same as v1 |
 | `notifications` | Same as v1 |
 | `notificationReads` | Same as v1 |

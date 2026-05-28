@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { tenantSubscription, subscriptionTiers } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq } from "drizzle-orm";
@@ -10,10 +10,9 @@ export async function GET() {
   if (authError) return authError;
 
   const session = await auth();
-  const tenantSlug = session?.user.tenantSlug ?? "";
-  const tenantDb = withTenant(tenantSlug);
+  const tenantId = session?.user.tenantId ?? "";
 
-  const rows = await tenantDb
+  const rows = await db
     .select({
       tierId: tenantSubscription.tierId,
       status: tenantSubscription.status,
@@ -29,6 +28,7 @@ export async function GET() {
     })
     .from(tenantSubscription)
     .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
+    .where(eq(tenantSubscription.tenantId, tenantId))
     .limit(1);
 
   return NextResponse.json(rows[0] ?? null);

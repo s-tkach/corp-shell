@@ -24,7 +24,7 @@ interface SidebarProps {
   isPlatformAdmin: boolean;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, tenantSlug, isPlatformAdmin }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());

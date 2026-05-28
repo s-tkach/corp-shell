@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { db, connectionString } from "./client";
-import { tenants, roles, users, userRoles, subscriptionTiers, tenantSubscription, shellConfig } from "./schema";
+import { tenants, subscriptionTiers, tenantSubscription, shellConfig, roles, users, userRoles } from "./schema";
 import { eq } from "drizzle-orm";
 import { withTenant } from "./tenant";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
@@ -18,6 +18,20 @@ export async function autoBootstrapPlatform(): Promise<void> {
     if (msg.includes("already exists")) return;
     throw e;
   }
+
+  // Seed platform-level tables once after first tenant is created
+  await seedPlatformDefaults();
+}
+
+async function seedPlatformDefaults(): Promise<void> {
+  const existingTiers = await db.select({ id: subscriptionTiers.id }).from(subscriptionTiers).limit(1);
+  if (existingTiers.length > 0) return;
+
+  await db.insert(subscriptionTiers).values([
+    { slug: "free", displayName: "Free", level: 0 },
+    { slug: "standard", displayName: "Standard", level: 1 },
+    { slug: "enterprise", displayName: "Enterprise", level: 2 },
+  ]);
 }
 
 export async function provisionTenant(
@@ -55,6 +69,21 @@ export async function provisionTenant(
       throw new Error("Failed to create tenant");
     }
 
+    // Assign free tier subscription in the platform schema
+    const freeTierRows = await db
+      .select({ id: subscriptionTiers.id })
+      .from(subscriptionTiers)
+      .where(eq(subscriptionTiers.slug, "free"))
+      .limit(1);
+    const freeTier = freeTierRows[0];
+    if (freeTier) {
+      await db.insert(tenantSubscription).values({
+        tenantId: tenant.id,
+        tierId: freeTier.id,
+        status: "active",
+      });
+    }
+
     // Create schema
     const schemaName = `tenant_${slug}`;
     await sql.unsafe(`CREATE SCHEMA "${schemaName}"`);
@@ -74,7 +103,6 @@ export async function provisionTenant(
 }
 
 export function perTenantDDL(schema: string): string {
-  // Generate all table creation SQL for the per-tenant schema
   return `
     SET search_path TO "${schema}",public;
 
@@ -113,26 +141,6 @@ export function perTenantDDL(schema: string): string {
       UNIQUE(idp_group_name, role_id)
     );
 
-    CREATE TABLE "${schema}".subscription_tiers (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      slug text NOT NULL UNIQUE,
-      display_name text NOT NULL,
-      level integer NOT NULL,
-      upgrade_cta_headline text,
-      upgrade_cta_body text,
-      upgrade_cta_label text,
-      upgrade_url text,
-      created_at timestamp with time zone NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE "${schema}".tenant_subscription (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      tier_id uuid NOT NULL REFERENCES "${schema}".subscription_tiers(id),
-      status text NOT NULL DEFAULT 'active',
-      expires_at timestamp with time zone,
-      assigned_at timestamp with time zone NOT NULL DEFAULT now()
-    );
-
     CREATE TABLE "${schema}".idp_providers (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       slug text NOT NULL UNIQUE,
@@ -144,17 +152,6 @@ export function perTenantDDL(schema: string): string {
       token_endpoint_auth_method text NOT NULL DEFAULT 'client_secret_post',
       group_claim_name text,
       is_enabled boolean NOT NULL DEFAULT true,
-      created_at timestamp with time zone NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE "${schema}".app_registry (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      name text NOT NULL UNIQUE,
-      remote_url text NOT NULL,
-      route_prefix text NOT NULL UNIQUE,
-      health_check_url text,
-      is_enabled boolean NOT NULL DEFAULT true,
-      last_healthy_at timestamp with time zone,
       created_at timestamp with time zone NOT NULL DEFAULT now()
     );
 
@@ -240,7 +237,7 @@ export function perTenantDDL(schema: string): string {
 
 async function seedTenant(
   tenantDb: ReturnType<typeof withTenant>,
-  tenantId: string,
+  _tenantId: string,
   adminEmail: string,
   setupComplete = true
 ): Promise<void> {
@@ -273,37 +270,6 @@ async function seedTenant(
       slug: "user",
       displayName: "User",
       isSystem: true,
-    });
-
-  // Insert default subscription tiers
-  const freeTiers = await tenantDb
-    .insert(subscriptionTiers)
-    .values({
-      slug: "free",
-      displayName: "Free",
-      level: 0,
-    })
-    .returning();
-
-  const freeTier = freeTiers[0];
-  if (!freeTier) {
-    throw new Error("Failed to create free tier");
-  }
-
-  await tenantDb
-    .insert(subscriptionTiers)
-    .values({
-      slug: "standard",
-      displayName: "Standard",
-      level: 1,
-    });
-
-  await tenantDb
-    .insert(subscriptionTiers)
-    .values({
-      slug: "enterprise",
-      displayName: "Enterprise",
-      level: 2,
     });
 
   // Insert shell config with defaults
@@ -343,12 +309,4 @@ async function seedTenant(
         roleId: superAdminRole.id,
       });
   }
-
-  // Assign free tier subscription
-  await tenantDb
-    .insert(tenantSubscription)
-    .values({
-      tierId: freeTier.id,
-      status: "active",
-    });
 }

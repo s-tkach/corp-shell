@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { asc, desc, eq } from "drizzle-orm";
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "default";
+  const tenantId = session?.user.tenantId ?? "";
   const tenantDb = withTenant(tenantSlug);
 
   const rows = await tenantDb
@@ -32,10 +34,11 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .offset(offset);
 
-  const orgSubRow = await tenantDb
+  const orgSubRow = await db
     .select({ slug: subscriptionTiers.slug, displayName: subscriptionTiers.displayName, level: subscriptionTiers.level, expiresAt: tenantSubscription.expiresAt })
     .from(tenantSubscription)
     .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
+    .where(eq(tenantSubscription.tenantId, tenantId))
     .limit(1);
   const orgSubscription = orgSubRow[0] ?? null;
 

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { UserManagerClient } from "./user-manager-client";
@@ -17,6 +18,7 @@ export default async function UserManagerPage({
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "default";
+  const tenantId = session?.user.tenantId ?? "";
   const tenantDb = withTenant(tenantSlug);
 
   const userRows = await tenantDb
@@ -33,7 +35,7 @@ export default async function UserManagerPage({
     .limit(PAGE_SIZE)
     .offset(offset);
 
-  const orgSubRow = await tenantDb
+  const orgSubRow = await db
     .select({
       tierId: tenantSubscription.tierId,
       slug: subscriptionTiers.slug,
@@ -43,6 +45,7 @@ export default async function UserManagerPage({
     })
     .from(tenantSubscription)
     .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
+    .where(eq(tenantSubscription.tenantId, tenantId))
     .limit(1);
   const orgSubscription = orgSubRow[0] ?? null;
 
@@ -64,7 +67,7 @@ export default async function UserManagerPage({
     .from(roles)
     .orderBy(asc(roles.displayName));
 
-  const allTiers = await tenantDb
+  const allTiers = await db
     .select({ id: subscriptionTiers.id, slug: subscriptionTiers.slug, displayName: subscriptionTiers.displayName, level: subscriptionTiers.level })
     .from(subscriptionTiers)
     .orderBy(asc(subscriptionTiers.level));

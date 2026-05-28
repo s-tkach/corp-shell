@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTenantDb } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { subscriptionTiers } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
@@ -11,8 +11,7 @@ export default async function UpgradePage({ searchParams }: Props) {
   const { from, level } = await searchParams;
   const requiredLevel = level ? parseInt(level, 10) : 1;
 
-  const tenantDb = await getTenantDb();
-  const tiers = await tenantDb
+  const tiers = await db
     .select()
     .from(subscriptionTiers)
     .orderBy(asc(subscriptionTiers.level));

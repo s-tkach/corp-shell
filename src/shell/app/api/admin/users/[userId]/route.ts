@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { users, userRoles, roles, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { eq, inArray } from "drizzle-orm";
@@ -21,6 +22,7 @@ export async function PATCH(
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "default";
+  const tenantId = session?.user.tenantId ?? "";
   const tenantDb = withTenant(tenantSlug);
 
   if (typeof body.isActive === "boolean") {
@@ -41,8 +43,9 @@ export async function PATCH(
   }
 
   if (body.tierId !== undefined) {
-    await tenantDb.delete(tenantSubscription).where(eq(tenantSubscription.tierId, body.tierId));
-    await tenantDb.insert(tenantSubscription).values({
+    await db.delete(tenantSubscription).where(eq(tenantSubscription.tenantId, tenantId));
+    await db.insert(tenantSubscription).values({
+      tenantId,
       tierId: body.tierId,
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
     });
