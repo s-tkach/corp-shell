@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { menuSections, menuItems, shellConfig, users } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
@@ -8,35 +9,35 @@ import { cacheTag } from "next/cache";
 import type { MenuSection } from "@/app/api/menu/route";
 
 function isVisible(
-  item: { requiredSubLevel: number; requiredRoles: unknown },
-  roles: string[],
+  item: { requiredSubLevel: number },
   subscriptionLevel: number
 ): boolean {
-  if (item.requiredSubLevel > subscriptionLevel) return false;
-  const required = item.requiredRoles as string[];
-  if (required.length > 0 && !required.some((r) => roles.includes(r))) return false;
-  return true;
+  return item.requiredSubLevel <= subscriptionLevel;
 }
 
-async function getMenuTree(tenantSlug: string, roles: string[], subscriptionLevel: number): Promise<MenuSection[]> {
+async function getMenuTree(tenantId: string, subscriptionLevel: number): Promise<MenuSection[]> {
   "use cache";
   cacheTag("menu");
 
-  const tenantDb = withTenant(tenantSlug);
-  const sections = await tenantDb
+  const sections = await db
     .select()
     .from(menuSections)
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuSections.sortOrder));
 
-  const items = await tenantDb
+  const allItems = await db
     .select()
     .from(menuItems)
+    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuItems.sortOrder));
 
+  const flatItems = allItems.map((r) => r.menu_items);
+
   return sections.map((section) => {
-    const sectionItems = items.filter((item) => item.sectionId === section.id);
+    const sectionItems = flatItems.filter((item) => item.sectionId === section.id);
     const topLevel = sectionItems.filter(
-      (item) => item.parentItemId === null && isVisible(item, roles, subscriptionLevel)
+      (item) => item.parentItemId === null && isVisible(item, subscriptionLevel)
     );
 
     return {
@@ -57,7 +58,7 @@ async function getMenuTree(tenantSlug: string, roles: string[], subscriptionLeve
               .filter(
                 (child) =>
                   child.parentItemId === item.id &&
-                  isVisible(child, roles, subscriptionLevel)
+                  isVisible(child, subscriptionLevel)
               )
               .map((child) => ({
                 id: child.id,
@@ -108,9 +109,10 @@ export default async function ShellGroupLayout({ children }: { children: React.R
   const userName = session?.user.name ?? "";
   const userEmail = session?.user.email ?? "";
   const tenantSlug = session?.user.tenantSlug ?? "";
+  const tenantId = session?.user.tenantId ?? "";
 
   const [menu, config, preferences] = await Promise.all([
-    getMenuTree(tenantSlug, roles, subscriptionLevel),
+    getMenuTree(tenantId, subscriptionLevel),
     getShellConfig(tenantSlug),
     userId ? getUserPreferences(tenantSlug, userId) : Promise.resolve<UserPreferences>({}),
   ]);

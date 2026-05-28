@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard, Menu } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -362,6 +362,19 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: 
             >
               <CreditCard className="h-4 w-4 flex-shrink-0" />
               {!sidebarCollapsed && <span className="flex-1">Subscriptions</span>}
+            </Link>
+            <Link
+              href="/platform/menu"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/platform/menu")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Menu" : undefined}
+            >
+              <Menu className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Menu</span>}
             </Link>
           </>
         )}

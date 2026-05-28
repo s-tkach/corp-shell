@@ -155,29 +155,6 @@ export function perTenantDDL(schema: string): string {
       created_at timestamp with time zone NOT NULL DEFAULT now()
     );
 
-    CREATE TABLE "${schema}".menu_sections (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      label text NOT NULL,
-      icon text,
-      sort_order integer NOT NULL DEFAULT 0,
-      created_at timestamp with time zone NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE "${schema}".menu_items (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      section_id uuid NOT NULL REFERENCES "${schema}".menu_sections(id) ON DELETE CASCADE,
-      parent_item_id uuid,
-      is_folder boolean NOT NULL DEFAULT false,
-      label text NOT NULL,
-      route text NOT NULL DEFAULT '',
-      icon text,
-      badge text,
-      required_roles jsonb NOT NULL DEFAULT '[]'::jsonb,
-      required_sub_level integer NOT NULL DEFAULT 0,
-      sort_order integer NOT NULL DEFAULT 0,
-      created_at timestamp with time zone NOT NULL DEFAULT now()
-    );
-
     CREATE TABLE "${schema}".shell_config (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       app_name text NOT NULL,

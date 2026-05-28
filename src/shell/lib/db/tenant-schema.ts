@@ -70,30 +70,6 @@ export const idpProviders = pgTable("idp_providers", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const menuSections = pgTable("menu_sections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  label: text("label").notNull(),
-  icon: text("icon"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const menuItems = pgTable("menu_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sectionId: uuid("section_id")
-    .notNull()
-    .references(() => menuSections.id, { onDelete: "cascade" }),
-  parentItemId: uuid("parent_item_id"),
-  isFolder: boolean("is_folder").notNull().default(false),
-  label: text("label").notNull(),
-  route: text("route").notNull().default(""),
-  icon: text("icon"),
-  badge: text("badge"),
-  requiredRoles: jsonb("required_roles").$type<string[]>().notNull().default([]),
-  requiredSubLevel: integer("required_sub_level").notNull().default(0),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
 
 export const shellConfig = pgTable("shell_config", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -60,8 +60,8 @@ function buildBreadcrumbs(
   }
 
   if (pathname.startsWith("/platform")) {
-    const crumbs: { label: string; href: string }[] = [{ label: "Platform", href: "/platform/tenants" }];
-    if (PLATFORM_ROUTE_LABEL_MAP[pathname]) {
+    const crumbs: { label: string; href: string }[] = [{ label: "Platform", href: "/platform" }];
+    if (pathname !== "/platform" && PLATFORM_ROUTE_LABEL_MAP[pathname]) {
       crumbs.push({ label: PLATFORM_ROUTE_LABEL_MAP[pathname]!, href: pathname });
     }
     return crumbs;

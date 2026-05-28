@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getTenantDb } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { menuSections, menuItems } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { cacheTag } from "next/cache";
 
 export interface MenuItem {
@@ -25,39 +25,38 @@ export interface MenuSection {
 }
 
 function isVisible(
-  item: { requiredSubLevel: number; requiredRoles: unknown },
-  roles: string[],
+  item: { requiredSubLevel: number },
   subscriptionLevel: number
 ): boolean {
-  if (item.requiredSubLevel > subscriptionLevel) return false;
-  const required = item.requiredRoles as string[];
-  if (required.length > 0 && !required.some((r) => roles.includes(r))) return false;
-  return true;
+  return item.requiredSubLevel <= subscriptionLevel;
 }
 
 async function buildMenuTree(
-  roles: string[],
+  tenantId: string,
   subscriptionLevel: number
 ): Promise<MenuSection[]> {
   "use cache";
   cacheTag("menu");
 
-  const tenantDb = await getTenantDb();
-
-  const sections = await tenantDb
+  const sections = await db
     .select()
     .from(menuSections)
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuSections.sortOrder));
 
-  const items = await tenantDb
+  const allItems = await db
     .select()
     .from(menuItems)
+    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuItems.sortOrder));
 
+  const flatItems = allItems.map((r) => r.menu_items);
+
   return sections.map((section) => {
-    const sectionItems = items.filter((item) => item.sectionId === section.id);
+    const sectionItems = flatItems.filter((item) => item.sectionId === section.id);
     const topLevel = sectionItems.filter(
-      (item) => item.parentItemId === null && isVisible(item, roles, subscriptionLevel)
+      (item) => item.parentItemId === null && isVisible(item, subscriptionLevel)
     );
 
     return {
@@ -78,7 +77,7 @@ async function buildMenuTree(
               .filter(
                 (child) =>
                   child.parentItemId === item.id &&
-                  isVisible(child, roles, subscriptionLevel)
+                  isVisible(child, subscriptionLevel)
               )
               .map((child) => ({
                 id: child.id,
@@ -102,9 +101,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const roles: string[] = session.user.roles ?? [];
+  const tenantId: string = session.user.tenantId ?? "";
   const subscriptionLevel: number = session.user.subscriptionLevel ?? 0;
 
-  const tree = await buildMenuTree(roles, subscriptionLevel);
+  const tree = await buildMenuTree(tenantId, subscriptionLevel);
   return NextResponse.json(tree);
 }

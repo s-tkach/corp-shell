@@ -47,6 +47,33 @@ CREATE TABLE "app_registry" (
 	CONSTRAINT "app_registry_route_prefix_unique" UNIQUE("route_prefix")
 );
 --> statement-breakpoint
+CREATE TABLE "menu_sections" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"label" text NOT NULL,
+	"icon" text,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "menu_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"section_id" uuid NOT NULL,
+	"parent_item_id" uuid,
+	"is_folder" boolean DEFAULT false NOT NULL,
+	"label" text NOT NULL,
+	"route" text DEFAULT '' NOT NULL,
+	"icon" text,
+	"badge" text,
+	"required_sub_level" integer DEFAULT 0 NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "tenant_subscription" ADD CONSTRAINT "tenant_subscription_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "tenant_subscription" ADD CONSTRAINT "tenant_subscription_tier_id_subscription_tiers_id_fk" FOREIGN KEY ("tier_id") REFERENCES "public"."subscription_tiers"("id") ON DELETE no action ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "menu_sections" ADD CONSTRAINT "menu_sections_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "menu_items" ADD CONSTRAINT "menu_items_section_id_menu_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."menu_sections"("id") ON DELETE cascade ON UPDATE no action;

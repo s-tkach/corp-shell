@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { withTenant } from "@/lib/db/tenant";
+import { db } from "@/lib/db/client";
 import { notifications, notificationReads, menuSections, menuItems } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
@@ -11,32 +12,34 @@ import { AppsGrid } from "./_components/apps-grid";
 import { ProfileCard } from "./_components/profile-card";
 import { NotificationsCard } from "./_components/notifications-card";
 
-async function getMenuItems(tenantSlug: string, roles: string[], subscriptionLevel: number): Promise<MenuItem[]> {
+async function getMenuItems(tenantId: string, subscriptionLevel: number): Promise<MenuItem[]> {
   "use cache";
   cacheTag("menu");
 
-  const tenantDb = withTenant(tenantSlug);
-  const sections = await tenantDb
+  const sections = await db
     .select()
     .from(menuSections)
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuSections.sortOrder));
 
-  const items = await tenantDb
+  const allItems = await db
     .select()
     .from(menuItems)
+    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
+    .where(eq(menuSections.tenantId, tenantId))
     .orderBy(asc(menuItems.sortOrder));
+
+  const flatItems = allItems.map((r) => r.menu_items);
 
   const tree: MenuSection[] = sections.map((section) => ({
     id: section.id,
     label: section.label,
     icon: section.icon,
     sortOrder: section.sortOrder,
-    items: items
+    items: flatItems
       .filter((item) => {
         if (item.sectionId !== section.id) return false;
         if (item.requiredSubLevel > subscriptionLevel) return false;
-        const required = item.requiredRoles as string[];
-        if (required.length > 0 && !required.some((r) => roles.includes(r))) return false;
         return true;
       })
       .map((item) => ({
@@ -94,9 +97,10 @@ export default async function DashboardPage() {
   const roles = session.user.roles ?? [];
   const subscriptionLevel = session.user.subscriptionLevel ?? 0;
   const tenantSlug = session.user.tenantSlug ?? "";
+  const tenantId = session.user.tenantId ?? "";
 
   const [appMenuItems, { notifications: recentNotifications, unreadCount }] = await Promise.all([
-    getMenuItems(tenantSlug, roles, subscriptionLevel),
+    getMenuItems(tenantId, subscriptionLevel),
     getRecentNotifications(tenantSlug, userId, subscriptionLevel),
   ]);
 

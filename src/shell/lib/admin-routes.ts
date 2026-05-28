@@ -1,6 +1,5 @@
 import {
   Palette,
-  Menu,
   Shield,
   Users,
   KeyRound,
@@ -17,7 +16,6 @@ export interface AdminRoute {
 
 export const ADMIN_ROUTES: AdminRoute[] = [
   { href: "/admin/branding",      label: "Branding",      description: "App name, logo, and brand color",            icon: Palette },
-  { href: "/admin/menu",          label: "Menu",          description: "CRUD and reorder nav sections and items",    icon: Menu },
   { href: "/admin/roles",         label: "Roles",         description: "Manage roles and IDP group mappings",        icon: Shield },
   { href: "/admin/users",         label: "Users",         description: "View users, assign roles and subscriptions", icon: Users },
   { href: "/admin/sso",           label: "SSO",           description: "OIDC connection health",                     icon: KeyRound },
@@ -33,4 +31,5 @@ export const PLATFORM_ROUTE_LABEL_MAP: Record<string, string> = {
   "/platform/admins": "Platform Admins",
   "/platform/apps": "Apps",
   "/platform/subscriptions": "Subscriptions",
+  "/platform/menu": "Menu",
 };
