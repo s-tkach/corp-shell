@@ -27,6 +27,7 @@ export const ADMIN_ROUTE_LABEL_MAP: Record<string, string> = Object.fromEntries(
 );
 
 export const PLATFORM_ROUTE_LABEL_MAP: Record<string, string> = {
+  "/platform": "Platform",
   "/platform/tenants": "Tenants",
   "/platform/admins": "Platform Admins",
   "/platform/apps": "Apps",
