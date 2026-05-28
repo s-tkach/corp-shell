@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ADMIN_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
+import { ADMIN_ROUTE_LABEL_MAP, PLATFORM_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 import { NotificationBell } from "@/components/shell/notifications/notification-bell";
 
@@ -55,6 +55,14 @@ function buildBreadcrumbs(
     const crumbs: { label: string; href: string }[] = [{ label: "Admin", href: "/admin" }];
     if (pathname !== "/admin" && ADMIN_ROUTE_LABEL_MAP[pathname]) {
       crumbs.push({ label: ADMIN_ROUTE_LABEL_MAP[pathname]!, href: pathname });
+    }
+    return crumbs;
+  }
+
+  if (pathname.startsWith("/platform")) {
+    const crumbs: { label: string; href: string }[] = [{ label: "Platform", href: "/platform/tenants" }];
+    if (PLATFORM_ROUTE_LABEL_MAP[pathname]) {
+      crumbs.push({ label: PLATFORM_ROUTE_LABEL_MAP[pathname]!, href: pathname });
     }
     return crumbs;
   }

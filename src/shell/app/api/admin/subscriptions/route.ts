@@ -1,28 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
-import { subscriptionTiers } from "@/lib/db/schema";
-import { requireRoles } from "@/lib/auth-guard";
-import { asc } from "drizzle-orm";
+import { NextResponse } from "next/server";
 
-export async function GET() {
-  const authError = await requireRoles(["super_admin", "admin"]);
-  if (authError) return authError;
-  const rows = await db.select().from(subscriptionTiers).orderBy(asc(subscriptionTiers.level));
-  return NextResponse.json(rows);
+export function GET() {
+  return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }
 
-export async function POST(req: NextRequest) {
-  const authError = await requireRoles(["super_admin"]);
-  if (authError) return authError;
-  const body = await req.json() as {
-    slug: string;
-    displayName: string;
-    level: number;
-    upgradeCtaHeadline?: string;
-    upgradeCtaBody?: string;
-    upgradeCtaLabel?: string;
-    upgradeUrl?: string;
-  };
-  const [row] = await db.insert(subscriptionTiers).values(body).returning();
-  return NextResponse.json(row, { status: 201 });
+export function POST() {
+  return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }

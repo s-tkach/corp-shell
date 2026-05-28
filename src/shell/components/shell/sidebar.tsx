@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -336,6 +336,32 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: 
             >
               <UserCog className="h-4 w-4 flex-shrink-0" />
               {!sidebarCollapsed && <span className="flex-1">Platform Admins</span>}
+            </Link>
+            <Link
+              href="/platform/apps"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/platform/apps")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Apps" : undefined}
+            >
+              <AppWindow className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Apps</span>}
+            </Link>
+            <Link
+              href="/platform/subscriptions"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/platform/subscriptions")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
+              )}
+              title={sidebarCollapsed ? "Subscriptions" : undefined}
+            >
+              <CreditCard className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1">Subscriptions</span>}
             </Link>
           </>
         )}
