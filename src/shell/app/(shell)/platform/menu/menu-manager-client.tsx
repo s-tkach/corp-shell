@@ -51,6 +51,7 @@ interface Item {
   icon: string | null;
   badge: string | null;
   requiredSubLevel: number;
+  requiredRoles: string[];
   sortOrder: number;
 }
 
@@ -59,6 +60,12 @@ interface Tier {
   slug: string;
   displayName: string;
   level: number;
+}
+
+interface Role {
+  id: string;
+  slug: string;
+  displayName: string;
 }
 
 interface Props {
@@ -75,6 +82,7 @@ type ItemForm = {
   route: string;
   icon: string;
   requiredSubLevel: string;
+  requiredRoleIds: string[];
 };
 
 const emptySectionForm: SectionForm = { label: "", icon: "" };
@@ -86,6 +94,7 @@ const emptyItemForm: ItemForm = {
   route: "",
   icon: "",
   requiredSubLevel: "none",
+  requiredRoleIds: [],
 };
 
 export function MenuManagerClient({ tenants, allTiers }: Props) {
@@ -93,6 +102,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
   const [sections, setSections] = useState<Section[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [sectionDialog, setSectionDialog] = useState<{ open: boolean; editing: Section | null }>({
@@ -112,22 +122,26 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
 
   async function loadTenantData(tenantId: string) {
     setLoadError(null);
-    const [sectionsRes, itemsRes] = await Promise.all([
+    const [sectionsRes, itemsRes, rolesRes] = await Promise.all([
       fetch(`/api/platform/menu/sections?tenantId=${tenantId}`),
       fetch(`/api/platform/menu/items?tenantId=${tenantId}`),
+      fetch(`/api/platform/menu/roles?tenantId=${tenantId}`),
     ]);
-    if (!sectionsRes.ok || !itemsRes.ok) {
+    if (!sectionsRes.ok || !itemsRes.ok || !rolesRes.ok) {
       setLoadError("Failed to load menu data");
       setSections([]);
       setItems([]);
+      setAvailableRoles([]);
       return;
     }
-    const [sectionsData, itemsData] = await Promise.all([
+    const [sectionsData, itemsData, rolesData] = await Promise.all([
       sectionsRes.json() as Promise<Section[]>,
       itemsRes.json() as Promise<Item[]>,
+      rolesRes.json() as Promise<Role[]>,
     ]);
     setSections(sectionsData);
     setItems(itemsData);
+    setAvailableRoles(rolesData);
   }
 
   useEffect(() => {
@@ -224,6 +238,9 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
       route: item.route,
       icon: item.icon ?? "",
       requiredSubLevel: item.requiredSubLevel > 0 ? String(item.requiredSubLevel) : "none",
+      requiredRoleIds: availableRoles
+        .filter((r) => item.requiredRoles.includes(r.slug))
+        .map((r) => r.id),
     });
     setIconSearch("");
     setItemDialog({ open: true, editing: item });
@@ -240,6 +257,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
       route: itemForm.isFolder ? "" : itemForm.route,
       icon: itemForm.icon || undefined,
       requiredSubLevel: itemForm.requiredSubLevel === "none" ? 0 : Number(itemForm.requiredSubLevel),
+      requiredRoleIds: itemForm.requiredRoleIds,
     };
 
     if (editing) {
@@ -375,6 +393,13 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
                               {item.requiredSubLevel > 0 && (
                                 <Badge variant="secondary" className="text-xs">L{item.requiredSubLevel}+</Badge>
                               )}
+                              {item.requiredRoles.length > 0 && (
+                                <div className="flex gap-1 flex-wrap mt-1">
+                                  {item.requiredRoles.map((slug) => (
+                                    <Badge key={slug} variant="outline" className="text-xs">{slug}</Badge>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <Button variant="ghost" size="icon" disabled={iIdx === 0 || isPending} onClick={() => reorderItem(item, "up")}>
@@ -400,6 +425,13 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
                                     <span className="text-xs text-muted-foreground">{child.route}</span>
                                     {child.requiredSubLevel > 0 && (
                                       <Badge variant="secondary" className="text-xs">L{child.requiredSubLevel}+</Badge>
+                                    )}
+                                    {child.requiredRoles.length > 0 && (
+                                      <div className="flex gap-1 flex-wrap mt-1">
+                                        {child.requiredRoles.map((slug) => (
+                                          <Badge key={slug} variant="outline" className="text-xs">{slug}</Badge>
+                                        ))}
+                                      </div>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -625,6 +657,41 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
                 </SelectContent>
               </Select>
             </div>
+
+            {availableRoles.length > 0 && (
+              <div className="space-y-2">
+                <Label>Required Roles</Label>
+                <div className="flex flex-wrap gap-2">
+                  {availableRoles.map((role) => {
+                    const selected = itemForm.requiredRoleIds.includes(role.id);
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => {
+                          setItemForm((f) => ({
+                            ...f,
+                            requiredRoleIds: selected
+                              ? f.requiredRoleIds.filter((id) => id !== role.id)
+                              : [...f.requiredRoleIds, role.id],
+                          }));
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                          selected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border hover:bg-muted"
+                        }`}
+                      >
+                        {role.displayName}
+                      </button>
+                    );
+                  })}
+                </div>
+                {itemForm.requiredRoleIds.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No roles required — visible to all authenticated users.</p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setItemDialog({ open: false, editing: null })}>Cancel</Button>

@@ -3,6 +3,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -54,6 +55,17 @@ export const idpGroupRoleMappings = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.idpGroupName, t.roleId)],
+);
+
+export const menuItemRoles = pgTable(
+  "menu_item_roles",
+  {
+    menuItemId: uuid("menu_item_id").notNull(),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.menuItemId, t.roleId] })],
 );
 
 export const idpProviders = pgTable("idp_providers", {

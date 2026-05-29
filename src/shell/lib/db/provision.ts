@@ -209,6 +209,12 @@ export function perTenantDDL(schema: string): string {
       read_at timestamp with time zone NOT NULL DEFAULT now(),
       PRIMARY KEY (notification_id, user_id)
     );
+
+    CREATE TABLE "${schema}".menu_item_roles (
+      menu_item_id uuid NOT NULL,
+      role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
+      PRIMARY KEY (menu_item_id, role_id)
+    );
   `;
 }
 

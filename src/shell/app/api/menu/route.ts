@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { menuSections, menuItems } from "@/lib/db/schema";
+import { menuItemRoles, roles } from "@/lib/db/tenant-schema";
+import { withTenant } from "@/lib/db/tenant";
 import { asc, eq } from "drizzle-orm";
 import { cacheTag } from "next/cache";
 
@@ -25,15 +27,20 @@ export interface MenuSection {
 }
 
 function isVisible(
-  item: { requiredSubLevel: number },
-  subscriptionLevel: number
+  item: { requiredSubLevel: number; requiredRoles: string[] },
+  subscriptionLevel: number,
+  userRoles: string[]
 ): boolean {
-  return item.requiredSubLevel <= subscriptionLevel;
+  if (item.requiredSubLevel > subscriptionLevel) return false;
+  if (item.requiredRoles.length === 0) return true;
+  return item.requiredRoles.some((r) => userRoles.includes(r));
 }
 
 async function buildMenuTree(
   tenantId: string,
-  subscriptionLevel: number
+  tenantSlug: string,
+  subscriptionLevel: number,
+  userRoles: string[]
 ): Promise<MenuSection[]> {
   "use cache";
   cacheTag("menu");
@@ -53,10 +60,28 @@ async function buildMenuTree(
 
   const flatItems = allItems.map((r) => r.menu_items);
 
+  const tenantDb = withTenant(tenantSlug);
+  const assignments = await tenantDb
+    .select({ menuItemId: menuItemRoles.menuItemId, slug: roles.slug })
+    .from(menuItemRoles)
+    .innerJoin(roles, eq(menuItemRoles.roleId, roles.id));
+
+  const requiredRolesByItem = new Map<string, string[]>();
+  for (const a of assignments) {
+    const existing = requiredRolesByItem.get(a.menuItemId) ?? [];
+    existing.push(a.slug);
+    requiredRolesByItem.set(a.menuItemId, existing);
+  }
+
+  const withRoles = flatItems.map((item) => ({
+    ...item,
+    requiredRoles: requiredRolesByItem.get(item.id) ?? [],
+  }));
+
   return sections.map((section) => {
-    const sectionItems = flatItems.filter((item) => item.sectionId === section.id);
+    const sectionItems = withRoles.filter((item) => item.sectionId === section.id);
     const topLevel = sectionItems.filter(
-      (item) => item.parentItemId === null && isVisible(item, subscriptionLevel)
+      (item) => item.parentItemId === null && isVisible(item, subscriptionLevel, userRoles)
     );
 
     return {
@@ -77,7 +102,7 @@ async function buildMenuTree(
               .filter(
                 (child) =>
                   child.parentItemId === item.id &&
-                  isVisible(child, subscriptionLevel)
+                  isVisible(child, subscriptionLevel, userRoles)
               )
               .map((child) => ({
                 id: child.id,
@@ -102,8 +127,10 @@ export async function GET() {
   }
 
   const tenantId: string = session.user.tenantId ?? "";
+  const tenantSlug: string = session.user.tenantSlug ?? "";
   const subscriptionLevel: number = session.user.subscriptionLevel ?? 0;
+  const userRoles: string[] = session.user.roles ?? [];
 
-  const tree = await buildMenuTree(tenantId, subscriptionLevel);
+  const tree = await buildMenuTree(tenantId, tenantSlug, subscriptionLevel, userRoles);
   return NextResponse.json(tree);
 }
