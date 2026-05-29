@@ -77,3 +77,12 @@ ALTER TABLE "tenant_subscription" ADD CONSTRAINT "tenant_subscription_tier_id_su
 ALTER TABLE "menu_sections" ADD CONSTRAINT "menu_sections_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "menu_items" ADD CONSTRAINT "menu_items_section_id_menu_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."menu_sections"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+CREATE TABLE "policies" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"slug" text NOT NULL,
+	"display_name" text NOT NULL,
+	"description" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "policies_slug_unique" UNIQUE("slug")
+);

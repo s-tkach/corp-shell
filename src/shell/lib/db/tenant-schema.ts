@@ -68,6 +68,17 @@ export const menuItemRoles = pgTable(
   (t) => [primaryKey({ columns: [t.menuItemId, t.roleId] })],
 );
 
+export const rolePolicies = pgTable(
+  "role_policies",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    policySlug: text("policy_slug").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roleId, t.policySlug] })],
+);
+
 export const idpProviders = pgTable("idp_providers", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),

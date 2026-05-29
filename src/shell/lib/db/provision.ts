@@ -215,6 +215,12 @@ export function perTenantDDL(schema: string): string {
       role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
       PRIMARY KEY (menu_item_id, role_id)
     );
+
+    CREATE TABLE "${schema}".role_policies (
+      role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
+      policy_slug text NOT NULL,
+      PRIMARY KEY (role_id, policy_slug)
+    );
   `;
 }
 

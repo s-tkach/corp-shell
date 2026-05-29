@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard, Menu } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard, Menu, ShieldCheck } from "lucide-react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -332,6 +332,7 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: 
                   { href: "/platform/apps", label: "Apps", icon: AppWindow },
                   { href: "/platform/subscriptions", label: "Subscriptions", icon: CreditCard },
                   { href: "/platform/menu", label: "Menu", icon: Menu },
+                  { href: "/platform/policies", label: "Policies", icon: ShieldCheck },
                 ].map(({ href, label, icon: Icon }) => {
                   const active = pathname.startsWith(href);
                   return (

@@ -31,6 +31,13 @@ interface Mapping {
   idpGroupName: string;
 }
 
+interface PlatformPolicy {
+  id: string;
+  slug: string;
+  displayName: string;
+  description: string | null;
+}
+
 interface Props {
   roles: Role[];
   mappings: Mapping[];
@@ -46,6 +53,13 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
   const [mappingDialog, setMappingDialog] = useState<{ open: boolean; roleId: string | null }>({ open: false, roleId: null });
   const [mappingGroup, setMappingGroup] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const [policyPanel, setPolicyPanel] = useState<{ roleId: string; roleName: string } | null>(null);
+  const [allPolicies, setAllPolicies] = useState<PlatformPolicy[]>([]);
+  const [assignedSlugs, setAssignedSlugs] = useState<string[]>([]);
+  const [policiesLoading, setPoliciesLoading] = useState(false);
+  const [policiesSaving, setPoliciesSaving] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => { router.refresh(); });
@@ -115,6 +129,53 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
     refresh();
   }
 
+  async function openPolicies(roleId: string, roleName: string) {
+    setPolicyPanel({ roleId, roleName });
+    setPoliciesLoading(true);
+    setPolicyError(null);
+    try {
+      const [allRes, assignedRes] = await Promise.all([
+        fetch("/api/platform/policies"),
+        fetch(`/api/admin/roles/${roleId}/policies`),
+      ]);
+      const allData = await allRes.json() as PlatformPolicy[];
+      const assignedData = await assignedRes.json() as { assignedSlugs: string[] };
+      setAllPolicies(allData);
+      setAssignedSlugs(assignedData.assignedSlugs);
+    } catch {
+      setPolicyError("Failed to load policies");
+    } finally {
+      setPoliciesLoading(false);
+    }
+  }
+
+  async function savePolicies() {
+    if (!policyPanel) return;
+    setPoliciesSaving(true);
+    setPolicyError(null);
+    try {
+      const res = await fetch(`/api/admin/roles/${policyPanel.roleId}/policies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ policySlugs: assignedSlugs }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error: string };
+        setPolicyError(data.error ?? "Failed to save");
+        return;
+      }
+      setPolicyPanel(null);
+    } finally {
+      setPoliciesSaving(false);
+    }
+  }
+
+  function togglePolicy(slug: string) {
+    setAssignedSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -176,6 +237,13 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openPolicies(role.id, role.displayName)}
+                      >
+                        Policies
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEditRole(role)} disabled={role.isSystem}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -234,6 +302,42 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
           <DialogFooter>
             <Button variant="outline" onClick={() => setMappingDialog({ open: false, roleId: null })}>Cancel</Button>
             <Button onClick={addMapping} disabled={!mappingGroup.trim() || isPending}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!policyPanel} onOpenChange={(open) => !open && setPolicyPanel(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Policies — {policyPanel?.roleName}</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2 max-h-80 overflow-y-auto">
+            {policiesLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {!policiesLoading && allPolicies.length === 0 && (
+              <p className="text-sm text-muted-foreground">No policies defined yet.</p>
+            )}
+            {allPolicies.map((p) => (
+              <label key={p.slug} className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={assignedSlugs.includes(p.slug)}
+                  onChange={() => togglePolicy(p.slug)}
+                />
+                <div>
+                  <p className="text-sm font-medium">{p.displayName}</p>
+                  <p className="text-xs font-mono text-muted-foreground">{p.slug}</p>
+                  {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
+                </div>
+              </label>
+            ))}
+          </div>
+          {policyError && <p className="text-sm text-destructive">{policyError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPolicyPanel(null)}>Cancel</Button>
+            <Button onClick={savePolicies} disabled={policiesSaving || policiesLoading}>
+              {policiesSaving ? "Saving…" : "Save"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

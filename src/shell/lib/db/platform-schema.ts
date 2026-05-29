@@ -65,6 +65,14 @@ export const appRegistry = pgTable("app_registry", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const policies = pgTable("policies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const menuSections = pgTable("menu_sections", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id")
