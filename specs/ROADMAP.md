@@ -922,6 +922,12 @@ Before marking v1 as released, confirm:
 - [x] Added `src/shell/app/api/admin/subscriptions/current/route.ts` for org subscription GET
 - [x] **Acceptance:** Tenant admin sees org tier; no controls to self-upgrade; upgrade CTA shown for non-enterprise tiers
 
+#### M19-7: Platform menu seeded from database
+- [x] Added `seedPlatformMenu()` to `src/shell/lib/db/provision.ts`; called from `autoBootstrapPlatform()` after tenant and subscription defaults are seeded
+- [x] Seeds one `menu_sections` row ("Platform") and 6 `menu_items` rows for the platform tenant on first bootstrap; idempotent on subsequent runs
+- [x] Removed hardcoded platform submenu block from `src/shell/components/shell/sidebar.tsx`; removed `isPlatformAdmin` prop from `Sidebar`, `ShellLayoutClient`, and `(shell)/layout.tsx`
+- [x] **Acceptance:** Platform menu appears via the standard data-driven sidebar render path; platform admins can manage it via the Menu Manager UI at `/platform/menu`
+
 ---
 
 ## M20 — Company Hierarchy

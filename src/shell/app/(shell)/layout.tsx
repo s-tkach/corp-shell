@@ -5,7 +5,6 @@ import { menuSections, menuItems, shellConfig, users, companies, companyAncestor
 import { asc, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
-import { isPlatformAdmin as checkPlatformAdmin } from "@/lib/platform-guard";
 import { cacheTag } from "next/cache";
 import type { MenuSection } from "@/app/api/menu/route";
 
@@ -185,7 +184,6 @@ export default async function ShellGroupLayout({ children }: { children: React.R
       userEmail={userEmail}
       userRoles={roles}
       tenantSlug={tenantSlug}
-      isPlatformAdmin={checkPlatformAdmin({ roles, tenantSlug })}
       initialSidebarCollapsed={preferences.sidebarCollapsed ?? false}
       headerShowDate={config?.headerShowDate ?? false}
       headerDateFormat={config?.headerDateFormat ?? "PPP"}

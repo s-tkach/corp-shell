@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **M19-7** — Platform menu seeded from database on bootstrap; platform admins can now manage their own navigation via the Menu Manager UI (`/platform/menu`) like any other tenant
 - **M20** — Company hierarchy: unlimited-depth organizational tree per tenant
 - Company switcher dropdown in shell header (top-left, tree-indented, search for >8 companies)
 - Admin UI for managing company tree (`/admin/companies`) and user company assignments

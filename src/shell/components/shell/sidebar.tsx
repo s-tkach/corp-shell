@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Settings, Building2, UserCog, AppWindow, CreditCard, Menu, ShieldCheck, LogOut } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Settings, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
@@ -31,12 +31,11 @@ interface SidebarProps {
   userName: string;
   userEmail: string;
   tenantSlug: string;
-  isPlatformAdmin: boolean;
   accessibleCompanies: { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[];
   activeCompanyId: string | null;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail, isPlatformAdmin, accessibleCompanies, activeCompanyId }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail, accessibleCompanies, activeCompanyId }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed } = useShellStore();
   const activeCompany = accessibleCompanies.find((c) => c.id === activeCompanyId) ?? accessibleCompanies[0] ?? null;
@@ -282,52 +281,6 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail
                 {ADMIN_ROUTES.map(({ href, label, icon: Icon }) => {
                   const active =
                     href === "/admin" ? pathname === "/admin" : pathname === href;
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                        active
-                          ? "font-medium text-sidebar-primary-foreground bg-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                      {label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-        {isPlatformAdmin && (
-          <>
-            <Link
-              href="/platform/tenants"
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                pathname.startsWith("/platform")
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
-              )}
-              title={sidebarCollapsed ? "Platform" : undefined}
-            >
-              <Building2 className="h-4 w-4 flex-shrink-0" />
-              {!sidebarCollapsed && <span className="flex-1">Platform</span>}
-            </Link>
-            {!sidebarCollapsed && pathname.startsWith("/platform") && (
-              <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
-                {[
-                  { href: "/platform/tenants", label: "Tenants", icon: Building2 },
-                  { href: "/platform/admins", label: "Platform Admins", icon: UserCog },
-                  { href: "/platform/apps", label: "Apps", icon: AppWindow },
-                  { href: "/platform/subscriptions", label: "Subscriptions", icon: CreditCard },
-                  { href: "/platform/menu", label: "Menu", icon: Menu },
-                  { href: "/platform/policies", label: "Policies", icon: ShieldCheck },
-                ].map(({ href, label, icon: Icon }) => {
-                  const active = pathname.startsWith(href);
                   return (
                     <Link
                       key={href}

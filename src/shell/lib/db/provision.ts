@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { db, connectionString } from "./client";
-import { tenants, subscriptionTiers } from "./schema";
+import { tenants, subscriptionTiers, menuSections, menuItems } from "./schema";
 import { eq } from "drizzle-orm";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
 
@@ -19,6 +19,7 @@ export async function autoBootstrapPlatform(): Promise<void> {
   }
 
   await seedPlatformDefaults();
+  await seedPlatformMenu();
 }
 
 async function seedPlatformDefaults(): Promise<void> {
@@ -30,6 +31,58 @@ async function seedPlatformDefaults(): Promise<void> {
     { slug: "standard", displayName: "Standard", level: 1 },
     { slug: "enterprise", displayName: "Enterprise", level: 2 },
   ]);
+}
+
+async function seedPlatformMenu(): Promise<void> {
+  const platformTenant = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.slug, getPlatformSlug()))
+    .limit(1);
+  const tenant = platformTenant[0];
+  if (!tenant) return;
+
+  const existing = await db
+    .select({ id: menuSections.id })
+    .from(menuSections)
+    .where(eq(menuSections.tenantId, tenant.id))
+    .limit(1);
+  if (existing.length > 0) return;
+
+  const sectionRows = await db
+    .insert(menuSections)
+    .values({ tenantId: tenant.id, label: "Platform", sortOrder: 0 })
+    .returning({ id: menuSections.id });
+  const section = sectionRows[0];
+  if (!section) return;
+
+  const insertedItems = await db.insert(menuItems).values([
+    { sectionId: section.id, label: "Tenants",          route: "/platform/tenants",       icon: "Globe",           sortOrder: 0 },
+    { sectionId: section.id, label: "Platform Admins",  route: "/platform/admins",        icon: "Users",           sortOrder: 1 },
+    { sectionId: section.id, label: "Apps",             route: "/platform/apps",          icon: "Server",          sortOrder: 2 },
+    { sectionId: section.id, label: "Subscriptions",    route: "/platform/subscriptions", icon: "CreditCard",      sortOrder: 3 },
+    { sectionId: section.id, label: "Menu",             route: "/platform/menu",          icon: "LayoutDashboard", sortOrder: 4 },
+    { sectionId: section.id, label: "Policies",         route: "/platform/policies",      icon: "Shield",          sortOrder: 5 },
+  ]).returning({ id: menuItems.id });
+
+  const platformSlug = getPlatformSlug();
+  const sql = postgres(connectionString!);
+  try {
+    const superAdminRows = await sql<{ id: string }[]>`
+      SELECT id FROM "tenant_${sql.unsafe(platformSlug)}".roles WHERE slug = 'super_admin' LIMIT 1
+    `;
+    const superAdminRole = superAdminRows[0];
+    if (!superAdminRole) return;
+
+    for (const item of insertedItems) {
+      await sql`
+        INSERT INTO "tenant_${sql.unsafe(platformSlug)}".menu_item_roles (menu_item_id, role_id)
+        VALUES (${item.id}, ${superAdminRole.id})
+      `;
+    }
+  } finally {
+    await sql.end();
+  }
 }
 
 export async function provisionTenant(
