@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Moon, Sun, LogOut } from "lucide-react";
+import { Moon, Sun, PanelLeft } from "lucide-react";
 import { useTheme } from "next-themes";
-import { signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -12,12 +11,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ADMIN_ROUTE_LABEL_MAP, PLATFORM_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 import { NotificationBell } from "@/components/shell/notifications/notification-bell";
+import { useShellStore } from "@/lib/store/shell-store";
 
 function HeaderDate({ dateFormat }: { dateFormat: string }) {
   const [date, setDate] = useState(() => new Date());
@@ -39,10 +38,6 @@ function HeaderDate({ dateFormat }: { dateFormat: string }) {
 
 interface HeaderProps {
   menu: MenuSection[];
-  appName: string;
-  userName: string;
-  userEmail: string;
-  userRoles: string[];
   headerShowDate: boolean;
   headerDateFormat: string;
 }
@@ -81,9 +76,10 @@ function buildBreadcrumbs(
   return crumbs;
 }
 
-export function Header({ menu, userName, userEmail, userRoles, headerShowDate, headerDateFormat }: HeaderProps) {
+export function Header({ menu, headerShowDate, headerDateFormat }: HeaderProps) {
   const pathname = usePathname();
   const { setTheme } = useTheme();
+  const { sidebarCollapsed, toggleSidebar } = useShellStore();
 
   const breadcrumbs = buildBreadcrumbs(pathname, menu);
 
@@ -96,8 +92,27 @@ export function Header({ menu, userName, userEmail, userRoles, headerShowDate, h
     }).catch(() => undefined);
   }
 
+  function handleToggle() {
+    const next = !sidebarCollapsed;
+    toggleSidebar();
+    fetch("/api/users/me/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sidebarCollapsed: next }),
+    }).catch(() => undefined);
+  }
+
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-4">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleToggle}
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className="shrink-0"
+      >
+        <PanelLeft className="h-4 w-4" />
+      </Button>
       <nav className="flex items-center gap-1 text-sm text-muted-foreground flex-1 min-w-0">
         {breadcrumbs.map((crumb, i) => {
           const isLast = i === breadcrumbs.length - 1;
@@ -138,42 +153,6 @@ export function Header({ menu, userName, userEmail, userRoles, headerShowDate, h
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label="User menu"
-              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {(userName || userEmail).charAt(0).toUpperCase()}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-3 py-2">
-              <p className="text-sm font-medium truncate">{userName || userEmail}</p>
-              <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-              {userRoles.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {userRoles.map((role) => (
-                    <span
-                      key={role}
-                      className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground"
-                    >
-                      {role}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/api/auth/logout" })}
-              className="text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </header>
   );

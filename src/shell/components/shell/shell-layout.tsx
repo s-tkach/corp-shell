@@ -53,14 +53,10 @@ export function ShellLayoutClient({
   return (
     <NotificationProvider toastConfig={toastConfig}>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} tenantSlug={tenantSlug} isPlatformAdmin={isPlatformAdmin} accessibleCompanies={accessibleCompanies} activeCompanyId={activeCompanyId} />
+        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} userName={userName} userEmail={userEmail} tenantSlug={tenantSlug} isPlatformAdmin={isPlatformAdmin} accessibleCompanies={accessibleCompanies} activeCompanyId={activeCompanyId} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header
             menu={menu}
-            appName={appName}
-            userName={userName}
-            userEmail={userEmail}
-            userRoles={userRoles}
             headerShowDate={headerShowDate}
             headerDateFormat={headerDateFormat}
           />

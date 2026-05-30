@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Check, ChevronsUpDown, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,16 +48,29 @@ export function CompanySwitcher({ companies, activeCompanyId }: Props) {
     });
   }
 
+  const avatar = activeCompany ? (
+    activeCompany.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={activeCompany.logoUrl} alt="" className="h-8 w-8 rounded-full object-contain flex-shrink-0" />
+    ) : (
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+        {activeCompany.name.charAt(0).toUpperCase()}
+      </span>
+    )
+  ) : (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+      <Building2 className="h-4 w-4 text-muted-foreground" />
+    </span>
+  );
+
   if (companies.length === 1 && activeCompany) {
     return (
-      <div className="flex items-center gap-1.5 text-sm font-medium px-2">
-        {activeCompany.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={activeCompany.logoUrl} alt="" className="h-4 w-4 rounded object-contain" />
-        ) : (
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-        )}
-        <span className="max-w-[140px] truncate">{activeCompany.name}</span>
+      <div className="flex w-full items-center gap-3 rounded-md px-3 py-2">
+        {avatar}
+        <span className="flex min-w-0 flex-1 flex-col text-left">
+          <span className="truncate text-sm font-medium text-sidebar-foreground">{activeCompany.name}</span>
+          <span className="truncate text-xs text-sidebar-foreground/60">Company</span>
+        </span>
       </div>
     );
   }
@@ -66,20 +78,18 @@ export function CompanySwitcher({ companies, activeCompanyId }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="h-8 gap-1.5 px-2 text-sm font-medium max-w-[200px]"
+        <button
+          aria-label="Switch company"
           disabled={isPending}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {activeCompany?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={activeCompany.logoUrl} alt="" className="h-4 w-4 rounded object-contain flex-shrink-0" />
-          ) : (
-            <Building2 className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          )}
-          <span className="truncate">{activeCompany?.name ?? "Select company"}</span>
-          <ChevronsUpDown className="h-3 w-3 flex-shrink-0 opacity-50" />
-        </Button>
+          {avatar}
+          <span className="flex min-w-0 flex-1 flex-col text-left">
+            <span className="truncate text-sm font-medium text-sidebar-foreground">{activeCompany?.name ?? "Select company"}</span>
+            <span className="truncate text-xs text-sidebar-foreground/60">Company</span>
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 text-sidebar-foreground/40" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         {companies.length > 8 && (

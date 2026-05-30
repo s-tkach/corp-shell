@@ -4,12 +4,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronDown, ChevronRight, Settings, Building2, UserCog, AppWindow, CreditCard, Menu, ShieldCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Settings, Building2, UserCog, AppWindow, CreditCard, Menu, ShieldCheck, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { ICON_MAP } from "@/lib/icon-map";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useShellStore } from "@/lib/store/shell-store";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { ADMIN_ROUTES } from "@/lib/admin-routes";
@@ -21,15 +28,18 @@ interface SidebarProps {
   appName: string;
   logoUrl: string | null;
   userRoles: string[];
+  userName: string;
+  userEmail: string;
   tenantSlug: string;
   isPlatformAdmin: boolean;
   accessibleCompanies: { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[];
   activeCompanyId: string | null;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin, accessibleCompanies, activeCompanyId }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail, isPlatformAdmin, accessibleCompanies, activeCompanyId }: SidebarProps) {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebar } = useShellStore();
+  const { sidebarCollapsed } = useShellStore();
+  const activeCompany = accessibleCompanies.find((c) => c.id === activeCompanyId) ?? accessibleCompanies[0] ?? null;
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => {
     const ids = new Set<string>();
@@ -91,16 +101,6 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin, ac
     });
   }
 
-  function handleToggle() {
-    const next = !sidebarCollapsed;
-    toggleSidebar();
-    fetch("/api/users/me/preferences", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sidebarCollapsed: next }),
-    }).catch(() => undefined);
-  }
-
   return (
     <aside
       className={cn(
@@ -110,8 +110,12 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin, ac
     >
       <div className="flex h-14 items-center px-4 border-b border-sidebar-border">
         {sidebarCollapsed ? (
-          logoUrl && (
-            <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0 mx-auto" />
+          activeCompany?.logoUrl ? (
+            <Image src={activeCompany.logoUrl} alt={activeCompany.name} width={28} height={28} className="rounded-full object-contain flex-shrink-0 mx-auto" />
+          ) : (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mx-auto">
+              {(activeCompany?.name ?? appName).charAt(0).toUpperCase()}
+            </span>
           )
         ) : (
           <div className="flex items-center min-w-0 flex-1">
@@ -344,27 +348,56 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin, ac
             )}
           </>
         )}
-        <div
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 text-xs text-sidebar-foreground/60",
-            "justify-end"
-          )}
-        >
-          {!sidebarCollapsed && process.env.NEXT_PUBLIC_APP_VERSION && (
-            <span>{process.env.NEXT_PUBLIC_APP_VERSION}</span>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleToggle}
-            className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-7 w-7"
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <ChevronLeft
-              className={cn("h-4 w-4 transition-transform", sidebarCollapsed && "rotate-180")}
-            />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label="User menu"
+              className={cn(
+                "flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                sidebarCollapsed ? "justify-center" : "gap-3"
+              )}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {(userName || userEmail).charAt(0).toUpperCase()}
+              </span>
+              {!sidebarCollapsed && (
+                <>
+                  <span className="flex min-w-0 flex-1 flex-col text-left">
+                    <span className="truncate text-sm font-medium text-sidebar-foreground">{userName || userEmail}</span>
+                    <span className="truncate text-xs text-sidebar-foreground/60">{userEmail}</span>
+                  </span>
+                  <ChevronUp className="h-4 w-4 shrink-0 text-sidebar-foreground/40" />
+                </>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align={sidebarCollapsed ? "center" : "start"} className="w-64">
+            <div className="px-3 py-2">
+              <p className="text-sm font-medium truncate">{userName || userEmail}</p>
+              <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+              {userRoles.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {userRoles.map((role) => (
+                    <span
+                      key={role}
+                      className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/api/auth/logout" })}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );
