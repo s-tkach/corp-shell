@@ -9,6 +9,24 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U corpshell -d corpshell"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: sh -c "npm install -g pnpm@10 --quiet && pnpm install --frozen-lockfile && pnpm drizzle-kit migrate"
+    environment:
+      DATABASE_URL: postgresql://corpshell:corpshell@postgres:5432/corpshell
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   postgres_data:

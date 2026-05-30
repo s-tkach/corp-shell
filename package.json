@@ -9,7 +9,8 @@
     "typecheck": "pnpm --filter @corp/shell-app typecheck",
     "lint": "pnpm --filter @corp/shell-app lint",
     "test": "pnpm --filter @corp/shell-app test",
-    "drizzle-kit": "node --env-file=src/shell/.env.local node_modules/drizzle-kit/bin.cjs"
+    "drizzle-kit": "node --env-file=src/shell/.env.local node_modules/drizzle-kit/bin.cjs",
+    "dev:fresh": "pnpm --filter @corp/shell-app dev:fresh"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0",

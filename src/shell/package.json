@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "bootstrap-platform": "tsx scripts/bootstrap-platform.ts"
+    "bootstrap-platform": "tsx scripts/bootstrap-platform.ts",
+    "dev:fresh": "tsx --tsconfig tsconfig.json scripts/dev-fresh.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.1048.0",
