@@ -412,7 +412,7 @@ export function BrandingClient({ config }: Props) {
     setUploading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/branding", {
+      const res = await fetch("/api/settings/branding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName: file.name, contentType: file.type }),
@@ -432,7 +432,7 @@ export function BrandingClient({ config }: Props) {
     setLoginBgUploading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/branding", {
+      const res = await fetch("/api/settings/branding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName: file.name, contentType: file.type, uploadType: "login-bg" }),
@@ -452,7 +452,7 @@ export function BrandingClient({ config }: Props) {
     setError(null);
     setSaved(false);
     const primaryHex = colorOverrides["--primary"];
-    const res = await fetch("/api/admin/branding", {
+    const res = await fetch("/api/settings/branding", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -53,7 +53,7 @@ export function UserCompaniesClient({ userId, allCompanies, assignedCompanyIds }
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/admin/users/${userId}/companies`, {
+        const res = await fetch(`/api/settings/users/${userId}/companies`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ companyIds: Array.from(selected) }),

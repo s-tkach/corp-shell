@@ -79,7 +79,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
     setError(null);
     const { editing } = roleDialog;
     if (editing) {
-      const res = await fetch(`/api/admin/roles/${editing.id}`, {
+      const res = await fetch(`/api/settings/roles/${editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: roleForm.displayName }),
@@ -87,7 +87,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
       const data = await res.json() as { error?: string };
       if (!res.ok) { setError(data.error ?? "Failed to update role"); return; }
     } else {
-      const res = await fetch("/api/admin/roles", {
+      const res = await fetch("/api/settings/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(roleForm),
@@ -101,7 +101,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
 
   async function deleteRole(id: string) {
     if (!confirm("Delete this role?")) return;
-    const res = await fetch(`/api/admin/roles/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/settings/roles/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json() as { error: string };
       alert(data.error);
@@ -112,7 +112,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
 
   async function addMapping() {
     if (!mappingDialog.roleId || !mappingGroup.trim()) return;
-    const res = await fetch(`/api/admin/roles/${mappingDialog.roleId}/mappings`, {
+    const res = await fetch(`/api/settings/roles/${mappingDialog.roleId}/mappings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idpGroupName: mappingGroup.trim() }),
@@ -125,7 +125,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
   }
 
   async function deleteMapping(roleId: string, mappingId: string) {
-    await fetch(`/api/admin/roles/${roleId}/mappings/${mappingId}`, { method: "DELETE" });
+    await fetch(`/api/settings/roles/${roleId}/mappings/${mappingId}`, { method: "DELETE" });
     refresh();
   }
 
@@ -136,7 +136,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
     try {
       const [allRes, assignedRes] = await Promise.all([
         fetch("/api/platform/policies"),
-        fetch(`/api/admin/roles/${roleId}/policies`),
+        fetch(`/api/settings/roles/${roleId}/policies`),
       ]);
       const allData = await allRes.json() as PlatformPolicy[];
       const assignedData = await assignedRes.json() as { assignedSlugs: string[] };
@@ -154,7 +154,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
     setPoliciesSaving(true);
     setPolicyError(null);
     try {
-      const res = await fetch(`/api/admin/roles/${policyPanel.roleId}/policies`, {
+      const res = await fetch(`/api/settings/roles/${policyPanel.roleId}/policies`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ policySlugs: assignedSlugs }),

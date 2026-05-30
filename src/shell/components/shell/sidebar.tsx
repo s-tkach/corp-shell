@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useShellStore } from "@/lib/store/shell-store";
 import { ADMIN_ROLES } from "@/lib/roles";
-import { ADMIN_ROUTES } from "@/lib/admin-routes";
+import { SETTINGS_ROUTES } from "@/lib/settings-routes";
 import { CompanySwitcher } from "./company-switcher";
 import type { MenuSection } from "@/app/api/menu/route";
 
@@ -264,23 +264,23 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail
         {userRoles.some((r) => ADMIN_ROLES.has(r)) && (
           <>
             <Link
-              href="/admin"
+              href="/settings"
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                pathname === "/admin"
+                pathname === "/settings"
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/60"
               )}
-              title={sidebarCollapsed ? "Admin" : undefined}
+              title={sidebarCollapsed ? "Settings" : undefined}
             >
               <Settings className="h-4 w-4 flex-shrink-0" />
-              {!sidebarCollapsed && <span className="flex-1">Admin</span>}
+              {!sidebarCollapsed && <span className="flex-1">Settings</span>}
             </Link>
-            {!sidebarCollapsed && pathname.startsWith("/admin") && (
+            {!sidebarCollapsed && pathname.startsWith("/settings") && (
               <div className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
-                {ADMIN_ROUTES.map(({ href, label, icon: Icon }) => {
+                {SETTINGS_ROUTES.map(({ href, label, icon: Icon }) => {
                   const active =
-                    href === "/admin" ? pathname === "/admin" : pathname === href;
+                    href === "/settings" ? pathname === "/settings" : pathname === href;
                   return (
                     <Link
                       key={href}

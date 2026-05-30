@@ -102,14 +102,14 @@ export function CompaniesClient({ companies }: Props) {
     startTransition(async () => {
       try {
         if (editingId) {
-          const res = await fetch(`/api/admin/companies/${editingId}`, {
+          const res = await fetch(`/api/settings/companies/${editingId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
           if (!res.ok) throw new Error("Failed to update");
         } else {
-          const res = await fetch("/api/admin/companies", {
+          const res = await fetch("/api/settings/companies", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -127,7 +127,7 @@ export function CompaniesClient({ companies }: Props) {
   async function handleDelete(id: string) {
     if (!confirm("Delete this company? This cannot be undone.")) return;
     startTransition(async () => {
-      const res = await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/settings/companies/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         alert(data.error ?? "Delete failed");

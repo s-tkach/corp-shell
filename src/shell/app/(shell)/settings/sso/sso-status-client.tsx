@@ -20,7 +20,7 @@ export function SsoStatusClient() {
   async function fetchStatus() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/sso");
+      const res = await fetch("/api/settings/sso");
       const data = await res.json() as SsoStatus;
       setStatus(data);
     } finally {

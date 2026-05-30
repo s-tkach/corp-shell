@@ -74,7 +74,7 @@ export async function createCompany(data: {
     return row;
   });
 
-  revalidatePath("/admin/companies");
+  revalidatePath("/settings/companies");
   return company;
 }
 
@@ -84,7 +84,7 @@ export async function updateCompany(
 ) {
   const db = await getTenantDb();
   await db.update(companies).set(data).where(eq(companies.id, companyId));
-  revalidatePath("/admin/companies");
+  revalidatePath("/settings/companies");
 }
 
 export async function deleteCompany(companyId: string) {
@@ -98,7 +98,7 @@ export async function deleteCompany(companyId: string) {
   if (children.length > 0) throw new Error("Cannot delete a company that has children");
 
   await db.delete(companies).where(eq(companies.id, companyId));
-  revalidatePath("/admin/companies");
+  revalidatePath("/settings/companies");
 }
 
 export async function setUserCompanies(userId: string, companyIds: string[]) {
@@ -110,7 +110,7 @@ export async function setUserCompanies(userId: string, companyIds: string[]) {
       companyIds.map((companyId) => ({ userId, companyId }))
     );
   }
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/users");
 }
 
 export async function switchActiveCompany(companyId: string | null) {

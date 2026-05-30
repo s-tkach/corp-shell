@@ -10,7 +10,7 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 const ADMIN_ROLES = new Set(["super_admin", "admin"]);
 
 function isAdminRoute(pathname: string): boolean {
-  return ["/admin", "/api/admin"].some(
+  return ["/settings", "/api/settings"].some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
 }
@@ -42,16 +42,16 @@ describe("Middleware — tenant ready", () => {
     expect(resolveMiddleware("/dashboard", true, null)).toBe("redirect:/api/auth/signin");
   });
 
-  it("allows admin role user through /admin/menu", () => {
-    expect(resolveMiddleware("/admin/menu", true, { roles: ["admin"], subscriptionLevel: 0 })).toBe("next");
+  it("allows admin role user through /settings/menu route", () => {
+    expect(resolveMiddleware("/settings/menu", true, { roles: ["admin"], subscriptionLevel: 0 })).toBe("next");
   });
 
-  it("blocks non-admin role user from /admin/menu with 403", () => {
-    expect(resolveMiddleware("/admin/menu", true, { roles: ["user"], subscriptionLevel: 0 })).toBe("403");
+  it("blocks non-admin role user from /settings/menu with 403", () => {
+    expect(resolveMiddleware("/settings/menu", true, { roles: ["user"], subscriptionLevel: 0 })).toBe("403");
   });
 
   it("allows super_admin through /admin routes", () => {
-    expect(resolveMiddleware("/admin/users", true, { roles: ["super_admin"], subscriptionLevel: 2 })).toBe("next");
+    expect(resolveMiddleware("/settings/users", true, { roles: ["super_admin"], subscriptionLevel: 2 })).toBe("next");
   });
 
   it("allows authenticated non-admin user through non-admin routes", () => {

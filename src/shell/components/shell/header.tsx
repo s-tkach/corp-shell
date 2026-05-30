@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ADMIN_ROUTE_LABEL_MAP, PLATFORM_ROUTE_LABEL_MAP } from "@/lib/admin-routes";
+import { SETTINGS_ROUTE_LABEL_MAP, PLATFORM_ROUTE_LABEL_MAP } from "@/lib/settings-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 import { NotificationBell } from "@/components/shell/notifications/notification-bell";
 import { useShellStore } from "@/lib/store/shell-store";
@@ -46,10 +46,10 @@ function buildBreadcrumbs(
   pathname: string,
   menu: MenuSection[]
 ): { label: string; href: string }[] {
-  if (pathname.startsWith("/admin")) {
-    const crumbs: { label: string; href: string }[] = [{ label: "Admin", href: "/admin" }];
-    if (pathname !== "/admin" && ADMIN_ROUTE_LABEL_MAP[pathname]) {
-      crumbs.push({ label: ADMIN_ROUTE_LABEL_MAP[pathname]!, href: pathname });
+  if (pathname.startsWith("/settings")) {
+    const crumbs: { label: string; href: string }[] = [{ label: "Settings", href: "/settings" }];
+    if (pathname !== "/settings" && SETTINGS_ROUTE_LABEL_MAP[pathname]) {
+      crumbs.push({ label: SETTINGS_ROUTE_LABEL_MAP[pathname]!, href: pathname });
     }
     return crumbs;
   }

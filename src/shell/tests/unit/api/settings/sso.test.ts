@@ -27,7 +27,7 @@ vi.mock("@/lib/db/schema", () => ({
 }));
 vi.mock("drizzle-orm", () => ({ asc: vi.fn((col) => col), eq: vi.fn() }));
 
-describe("GET /api/admin/sso", () => {
+describe("GET /api/settings/sso", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRoles.mockResolvedValue(null);
@@ -40,7 +40,7 @@ describe("GET /api/admin/sso", () => {
   });
 
   it("returns list of providers without secrets", async () => {
-    const { GET } = await import("@/app/api/admin/sso/route");
+    const { GET } = await import("@/app/api/settings/sso/route");
     const res = await GET();
     const data = await res.json() as unknown[];
     expect(Array.isArray(data)).toBe(true);
@@ -52,13 +52,13 @@ describe("GET /api/admin/sso", () => {
   it("returns 401 when auth guard rejects", async () => {
     const { NextResponse } = await import("next/server");
     mockRequireRoles.mockResolvedValue(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
-    const { GET } = await import("@/app/api/admin/sso/route");
+    const { GET } = await import("@/app/api/settings/sso/route");
     const res = await GET();
     expect(res.status).toBe(403);
   });
 });
 
-describe("POST /api/admin/sso", () => {
+describe("POST /api/settings/sso", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRoles.mockResolvedValue(null);
@@ -69,8 +69,8 @@ describe("POST /api/admin/sso", () => {
   });
 
   it("returns 400 when issuer is a private network address", async () => {
-    const { POST } = await import("@/app/api/admin/sso/route");
-    const req = new NextRequest("http://localhost/api/admin/sso", {
+    const { POST } = await import("@/app/api/settings/sso/route");
+    const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
       body: JSON.stringify({ slug: "internal", displayName: "Internal", issuer: "https://10.0.0.1/oidc", clientId: "cid", clientSecret: "sec" }),
       headers: { "Content-Type": "application/json" },
@@ -83,8 +83,8 @@ describe("POST /api/admin/sso", () => {
 
   it("returns 400 when OIDC discovery fails", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response);
-    const { POST } = await import("@/app/api/admin/sso/route");
-    const req = new NextRequest("http://localhost/api/admin/sso", {
+    const { POST } = await import("@/app/api/settings/sso/route");
+    const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
       body: JSON.stringify({ slug: "okta", displayName: "Okta", issuer: "https://bad.example.com", clientId: "cid", clientSecret: "sec" }),
       headers: { "Content-Type": "application/json" },
@@ -97,8 +97,8 @@ describe("POST /api/admin/sso", () => {
 
   it("encrypts client secret and returns 201 on success", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true } as Response);
-    const { POST } = await import("@/app/api/admin/sso/route");
-    const req = new NextRequest("http://localhost/api/admin/sso", {
+    const { POST } = await import("@/app/api/settings/sso/route");
+    const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
       body: JSON.stringify({ slug: "okta", displayName: "Okta", issuer: "https://okta.example.com", clientId: "cid", clientSecret: "secret" }),
       headers: { "Content-Type": "application/json" },
@@ -111,8 +111,8 @@ describe("POST /api/admin/sso", () => {
   });
 
   it("returns 400 when required fields are missing", async () => {
-    const { POST } = await import("@/app/api/admin/sso/route");
-    const req = new NextRequest("http://localhost/api/admin/sso", {
+    const { POST } = await import("@/app/api/settings/sso/route");
+    const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
       body: JSON.stringify({ displayName: "Okta" }),
       headers: { "Content-Type": "application/json" },

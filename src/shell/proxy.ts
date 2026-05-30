@@ -10,7 +10,7 @@ import { withTenant } from "@/lib/db/tenant";
 import { autoBootstrapPlatform } from "@/lib/db/provision";
 import { eq } from "drizzle-orm";
 
-const TENANT_ADMIN_ROUTES = ["/admin", "/api/admin"];
+const TENANT_ADMIN_ROUTES = ["/settings", "/api/settings"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
 const SETUP_ROUTES = ["/setup", "/api/setup"];
 

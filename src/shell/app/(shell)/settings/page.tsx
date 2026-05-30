@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ADMIN_ROUTES } from "@/lib/admin-routes";
+import { SETTINGS_ROUTES } from "@/lib/settings-routes";
 
-const adminSections = ADMIN_ROUTES.filter((r) => r.href !== "/admin");
+const settingsSections = SETTINGS_ROUTES.filter((r) => r.href !== "/settings");
 
-export default function AdminIndexPage() {
+export default function SettingsIndexPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin Panel</h1>
+        <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage all shell configuration</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {adminSections.map(({ href, label, description, icon: Icon }) => (
+        {settingsSections.map(({ href, label, description, icon: Icon }) => (
           <Link key={href} href={href}>
             <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
               <CardHeader>

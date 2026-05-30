@@ -109,7 +109,7 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
       body.expiresAt = form.expiresAt || null;
     }
 
-    const res = await fetch(`/api/admin/users/${user.id}`, {
+    const res = await fetch(`/api/settings/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

@@ -34,7 +34,7 @@ describe("setup route bypass", () => {
     expect(isSetupRoute("/api/setup")).toBe(true);
     expect(isSetupRoute("/api/setup/validate-oidc")).toBe(true);
     expect(isSetupRoute("/login")).toBe(false);
-    expect(isSetupRoute("/admin")).toBe(false);
+    expect(isSetupRoute("/settings")).toBe(false);
     expect(isSetupRoute("/setupx")).toBe(false);
   });
 });

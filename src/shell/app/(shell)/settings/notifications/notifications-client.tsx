@@ -81,7 +81,7 @@ export function NotificationsAdminClient({ initialNotifications }: Props) {
       expiresAt: form.expiresAt || undefined,
     };
 
-    const res = await fetch("/api/admin/notifications", {
+    const res = await fetch("/api/settings/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -94,7 +94,7 @@ export function NotificationsAdminClient({ initialNotifications }: Props) {
   }
 
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/admin/notifications/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/settings/notifications/${id}`, { method: "DELETE" });
     if (!res.ok) return;
     setNotifs((prev) => prev.filter((n) => n.id !== id));
   }

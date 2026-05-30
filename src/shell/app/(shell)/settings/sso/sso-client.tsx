@@ -39,7 +39,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/sso", {
+      const res = await fetch("/api/settings/sso", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +74,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
   }
 
   async function handleToggle(id: string, isEnabled: boolean) {
-    await fetch(`/api/admin/sso/${id}`, {
+    await fetch(`/api/settings/sso/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isEnabled }),
@@ -84,7 +84,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this IDP provider?")) return;
-    await fetch(`/api/admin/sso/${id}`, { method: "DELETE" });
+    await fetch(`/api/settings/sso/${id}`, { method: "DELETE" });
     setProviders((prev) => prev.filter((p) => p.id !== id));
   }
 
