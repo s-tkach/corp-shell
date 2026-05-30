@@ -605,9 +605,9 @@ The platform tenant schema (roles, subscriptionTiers, tenantSubscription, shellC
 | `actionLabel` | text | e.g. "View details" |
 | `actionType` | text | `"url"` or `"download"` |
 | `actionPayload` | text | URL for both action types |
-| `targetType` | text NOT NULL | `"all"` \| `"user"` \| `"subscription"` |
+| `targetType` | text NOT NULL | `"all"` \| `"user"` \| `"sub_level"` |
 | `targetUserId` | uuid FK → users | Set when `targetType = "user"` |
-| `targetSubLevel` | integer | Min subscription level required when `targetType = "subscription"` |
+| `targetSubLevel` | integer | Min subscription level required when `targetType = "sub_level"` |
 | `expiresAt` | timestamp with tz | Nullable; hidden after this time |
 | `createdBy` | uuid FK → users | Admin or SDK caller |
 | `createdAt` | timestamp with tz | defaultNow() |
@@ -624,7 +624,7 @@ Primary key: `(notificationId, userId)`
 
 **Visibility logic** — a notification is visible to a user if:
 1. `expiresAt` is null OR `expiresAt > now()`
-2. One of: `targetType = "all"` / `targetType = "user" AND targetUserId = currentUserId` / `targetType = "subscription" AND userSubLevel >= targetSubLevel`
+2. One of: `targetType = "all"` / `targetType = "user" AND targetUserId = currentUserId` / `targetType = "sub_level" AND userSubLevel >= targetSubLevel`
 
 ### 16.2 API Routes
 
@@ -676,12 +676,17 @@ incrementUnreadCount: () => void
 ### 16.5 SSE Delivery
 
 - Response: `Content-Type: text/event-stream`, `ReadableStream`
-- In-process registry: `Map<userId, Set<ReadableStreamDefaultController>>` keyed by userId; a separate `Set<ReadableStreamDefaultController>` holds connections for subscription-level notifications checked at connection time
-- On new notification: iterate eligible controllers based on `targetType`:
-  - `"all"` — push to all active connections
-  - `"user"` — push to the target user's controllers only
-  - `"subscription"` — push to connections where the stored subscription level satisfies the threshold
+- Delivery is **tenant-isolated and multi-instance-safe** via Postgres `LISTEN/NOTIFY`:
+  - On `POST /api/notifications` or `POST /api/admin/notifications`: after the row is inserted, `NOTIFY notifications_{tenantSlug}` with the serialized notification payload.
+  - `GET /api/notifications/stream` maintains a per-process Postgres `LISTEN` connection per tenant channel. On notification, the process fans out to all in-process SSE subscribers for that tenant, applying the `isEligible` predicate before enqueuing.
+  - The in-process subscriber registry is keyed by `(tenantSlug, connectionId)` — a notification published in tenant `acme` is never delivered to subscribers of tenant `globocorp`, even if both are on the same process.
+  - Cross-instance delivery works because all instances share the same Postgres channel.
+- Eligibility predicate (`isEligible` in `lib/sse-registry.ts`), shared by fan-out and tested in isolation:
+  - `"all"` — push to all active connections in the tenant
+  - `"user"` — push only to the matching `userId`
+  - `"sub_level"` — push to connections where `subLevel >= targetSubLevel`
 - 30-second `": ping"` comment to keep connections alive through proxies
+- Listener connections are bounded per-process: one `postgres` client per tenant channel, created lazily on first subscriber and removed if the connection drops.
 
 ### 16.6 Child App Notification Push
 
@@ -700,7 +705,7 @@ await fetch('/api/notifications', {
 });
 ```
 
-`createdBy` is set server-side from the session. All three targeting modes (`all`, `user`, `subscription`) are available to any authenticated caller.
+`createdBy` is set server-side from the session. All three targeting modes (`all`, `user`, `sub_level`) are available to any authenticated caller.
 
 ---
 
@@ -946,22 +951,25 @@ Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
 | `public.subscription_tiers` | `id` (uuid PK), `slug` (text unique), `displayName`, `level` (int), `upgradeCtaHeadline`, `upgradeCtaBody`, `upgradeCtaLabel`, `upgradeUrl`, `createdAt` |
 | `public.tenant_subscription` | `id` (uuid PK), `tenantId` (FK → tenants, cascade, unique), `tierId` (FK → subscription_tiers), `status` (enum), `expiresAt`, `assignedAt` — singleton per tenant |
 | `public.app_registry` | `id` (uuid PK), `name` (unique), `remoteUrl`, `routePrefix` (unique), `healthCheckUrl`, `isEnabled`, `lastHealthyAt`, `createdAt` |
+| `public.menu_sections` | Top-level nav groupings scoped to a tenant via `tenantId` FK |
+| `public.menu_items` | Nav leaf/folder items; FK → `menu_sections`; `requiredSubLevel`, `sortOrder` |
+| `public.policies` | Platform-managed policy definitions (slug, displayName, description) |
 
 **`tenant_{slug}` schema** — full per-tenant data, created by `provisionTenant()`:
 
-| Table | Notes vs. v1 |
-|-------|-------------|
+| Table | Notes |
+|-------|-------|
 | `shellConfig` | Per-tenant branding (logo, colors, login page, app name, header/toast styling) |
-| `users` | Same as v1 |
-| `roles` | Same as v1 |
-| `userRoles` | Same as v1 |
-| `idpProviders` | **New** — replaces `shell_config` OIDC fields; supports multiple providers per tenant |
-| `idpGroupRoleMappings` | Same as v1; gains `idpProviderId` FK to scope mappings per provider |
-| `menuSections` | Same as v1 |
-| `menuItems` | Same as v1 |
-| `authEvents` | Same as v1 |
-| `notifications` | Same as v1 |
-| `notificationReads` | Same as v1 |
+| `users` | JIT-provisioned user records |
+| `roles` | Role definitions (slug, displayName, isSystem) |
+| `userRoles` | Many-to-many: users ↔ roles |
+| `idpProviders` | Per-tenant OIDC providers (replaces v1 `shell_config` OIDC fields) |
+| `idpGroupRoleMappings` | IDP group name → shell role mappings |
+| `menu_item_roles` | Role-based access control for menu items — cross-schema by design: `menuItemId` references `public.menu_items.id` (no FK enforced at DB level; referential integrity maintained by the DELETE handler in `DELETE /api/platform/menu/items/[itemId]`, which removes `menu_item_roles` rows before deleting the item). The non-transactional gap between the two statements is a known minor risk. |
+| `role_policies` | Tenant role → policy slug assignments |
+| `authEvents` | Login/logout/failure audit events |
+| `notifications` | Notification records (targeting: all/user/sub_level) |
+| `notificationReads` | Per-user read state |
 
 **`idpProviders` table:**
 ```
@@ -988,30 +996,36 @@ assignedAt  timestamp defaultNow()
 
 ### 20.5 `withTenant(slug)` Drizzle Client Factory
 
-`lib/db/tenant.ts` — all per-tenant DB access goes through this factory:
+`lib/db/tenant.ts` — all per-tenant DB access goes through this factory.
+
+The factory maintains a **bounded LRU cache** (max 32 entries) of `postgres` + `drizzle` client pairs keyed by slug. On eviction the oldest client's connection is closed via `client.end()`. This bounds the total number of open connections per process to 32 tenant clients plus the one shared `public` client in `client.ts`.
 
 ```typescript
 export function withTenant(slug: string) {
-  const client = postgres(connectionString, {
-    connection: { search_path: `tenant_${slug},public` },
-  });
-  return drizzle(client, { schema });
+  // Returns cached Drizzle client, or creates one with search_path = tenant_{slug},public
+  // Evicts least-recently-used entry when cache exceeds MAX_CACHED_TENANTS (32)
 }
 ```
 
-The global `db` export from `client.ts` is used **only** for `public.tenants` queries (login tenant lookup, platform admin CRUD, health check). All other application code uses either `getTenantDb()` (which reads the tenant slug from the current session) or `withTenant(slug)` (for contexts where the slug is already known, such as login callbacks and cached functions).
+The global `db` export from `client.ts` is used **only** for `public` schema queries (tenant lookup, platform admin CRUD). All other application code uses either `getTenantDb()` (reads tenant slug from the current session) or `withTenant(slug)` (when the slug is already known, e.g. login callbacks).
 
 ### 20.6 `provisionTenant()` Provisioning Flow
 
-`lib/db/provision.ts` — called exclusively from `POST /api/platform/tenants`:
+`lib/db/provision.ts` — called exclusively from `POST /api/platform/tenants`.
 
-1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid
-2. Assert slug uniqueness in `public.tenants` — throw if taken
-3. `INSERT public.tenants` (status: active)
-4. `CREATE SCHEMA tenant_{slug}` via raw SQL
-5. Run DDL for all per-tenant tables against the new schema (via `withTenant(slug)`)
-6. Seed: default `shellConfig`, `subscriptionTiers` (free/standard/enterprise), `roles` (super_admin, admin), initial admin `users` row, `userRoles`, `tenantSubscription` (free tier)
-7. Return the created tenant record
+All steps run inside a **single Postgres transaction** on one raw `postgres` connection, so a failure at any step leaves no partial state:
+
+1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid (pre-transaction)
+2. Assert slug uniqueness in `public.tenants` — throw if taken (pre-transaction)
+3. `BEGIN`
+4. `INSERT public.tenants` (status: active)
+5. `INSERT public.tenant_subscription` (free tier, if tier exists)
+6. `CREATE SCHEMA tenant_{slug}` — DDL is transactional in Postgres
+7. Run DDL for all per-tenant tables within the transaction
+8. `SET LOCAL search_path` to the new schema; seed `roles`, `shell_config`, optional admin `users` + `user_roles`
+9. `COMMIT`
+
+On any exception: `ROLLBACK`, then `DROP SCHEMA IF EXISTS tenant_{slug} CASCADE` as belt-and-suspenders cleanup. The single connection is closed in a `finally` block.
 
 No public signup path exists. All tenant creation is platform-admin-only.
 

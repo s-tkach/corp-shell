@@ -4,7 +4,7 @@ import { getTenantDb } from "@/lib/db/tenant";
 import { notifications, notificationReads } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
-import { pushToEligible } from "@/lib/sse-registry";
+import { publishNotification } from "@/lib/sse-registry";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -76,12 +76,8 @@ export async function POST(req: NextRequest) {
 
   if (!created) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
 
-  pushToEligible(
-    JSON.stringify(created),
-    created.targetType,
-    created.targetUserId ?? null,
-    created.targetSubLevel ?? null
-  );
+  const tenantSlug = session.user.tenantSlug ?? "";
+  await publishNotification(tenantSlug, JSON.stringify(created));
 
   return NextResponse.json({ id: created.id }, { status: 201 });
 }

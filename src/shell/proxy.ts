@@ -135,8 +135,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Cross-tenant token replay check — runs on every authenticated request
-  if (isTenantMismatch(session.user.tenantSlug, hostSlug)) {
+  // Cross-tenant token replay check — runs on every authenticated request.
+  // Use resolvedSlug (falls back to platform slug at apex) so platform users
+  // served at the root domain are not rejected when hostSlug is null.
+  if (isTenantMismatch(session.user.tenantSlug, resolvedSlug)) {
     return new NextResponse("Unauthorized — tenant mismatch", { status: 401 });
   }
 

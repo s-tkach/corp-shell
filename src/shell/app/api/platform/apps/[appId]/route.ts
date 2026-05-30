@@ -31,6 +31,9 @@ export async function PATCH(
   if (body.remoteUrl !== undefined && !isSafeRemoteUrl(body.remoteUrl)) {
     return NextResponse.json({ error: "remoteUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
   }
+  if (body.healthCheckUrl !== undefined && !isSafeRemoteUrl(body.healthCheckUrl)) {
+    return NextResponse.json({ error: "healthCheckUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  }
   const [row] = await db
     .update(appRegistry)
     .set(body)

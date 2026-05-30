@@ -68,6 +68,19 @@ describe("POST /api/admin/sso", () => {
     mockDb.returning.mockResolvedValue([{ id: "new-id" }]);
   });
 
+  it("returns 400 when issuer is a private network address", async () => {
+    const { POST } = await import("@/app/api/admin/sso/route");
+    const req = new NextRequest("http://localhost/api/admin/sso", {
+      method: "POST",
+      body: JSON.stringify({ slug: "internal", displayName: "Internal", issuer: "https://10.0.0.1/oidc", clientId: "cid", clientSecret: "sec" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json() as { error?: string };
+    expect(data.error).toMatch(/private networks/i);
+  });
+
   it("returns 400 when OIDC discovery fails", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response);
     const { POST } = await import("@/app/api/admin/sso/route");

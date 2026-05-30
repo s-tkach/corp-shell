@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
+import { isSafeRemoteUrl } from "@/lib/url-guard";
 import { eq } from "drizzle-orm";
 
 async function guardPlatformAdmin() {
@@ -24,6 +25,10 @@ export async function POST(
   const app = rows[0];
   if (!app?.healthCheckUrl) {
     return NextResponse.json({ healthy: false, error: "No healthCheckUrl configured" });
+  }
+
+  if (!isSafeRemoteUrl(app.healthCheckUrl)) {
+    return NextResponse.json({ healthy: false, error: "healthCheckUrl is not a safe remote URL" });
   }
 
   try {

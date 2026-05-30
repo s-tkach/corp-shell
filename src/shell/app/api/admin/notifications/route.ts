@@ -4,7 +4,7 @@ import { notifications, notificationReads } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
 import { desc, sql } from "drizzle-orm";
-import { pushToEligible } from "@/lib/sse-registry";
+import { publishNotification } from "@/lib/sse-registry";
 
 export async function GET(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
@@ -84,12 +84,8 @@ export async function POST(req: NextRequest) {
 
   if (!created) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
 
-  pushToEligible(
-    JSON.stringify(created),
-    created.targetType,
-    created.targetUserId ?? null,
-    created.targetSubLevel ?? null
-  );
+  const tenantSlug = session.user.tenantSlug ?? "";
+  await publishNotification(tenantSlug, JSON.stringify(created));
 
   return NextResponse.json({ id: created.id }, { status: 201 });
 }

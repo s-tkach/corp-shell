@@ -10,8 +10,17 @@ describe("cross-tenant replay check", () => {
     expect(isTenantMismatch("acme", "globocorp")).toBe(true);
   });
 
-  it("accepts when host slug is null (no subdomain — dev/platform)", () => {
-    expect(isTenantMismatch("acme", null)).toBe(false);
+  it("rejects when host slug is null (fail-closed: unresolvable host is a mismatch)", () => {
+    expect(isTenantMismatch("acme", null)).toBe(true);
+  });
+
+  it("rejects when token slug is undefined", () => {
+    expect(isTenantMismatch(undefined, "acme")).toBe(true);
+  });
+
+  it("accepts platform tenant at apex (proxy passes resolvedSlug, not raw hostSlug)", () => {
+    // When no subdomain, proxy resolves to platform slug before calling isTenantMismatch
+    expect(isTenantMismatch("platform", "platform")).toBe(false);
   });
 });
 

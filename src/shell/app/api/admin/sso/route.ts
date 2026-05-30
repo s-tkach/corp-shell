@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { idpProviders } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
+import { isSafeRemoteUrl } from "@/lib/url-guard";
 import { asc } from "drizzle-orm";
 
 export async function GET() {
@@ -58,6 +59,10 @@ export async function POST(req: NextRequest) {
       { error: "slug must contain only lowercase letters, numbers, and hyphens" },
       { status: 400 }
     );
+  }
+
+  if (!isSafeRemoteUrl(issuer)) {
+    return NextResponse.json({ error: "issuer must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
   }
 
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;

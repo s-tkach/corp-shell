@@ -25,6 +25,24 @@ describe("GET /api/setup/validate-oidc", () => {
     expect(body.error).toMatch(/https/i);
   });
 
+  it("returns 400 for localhost issuer without leaking the host in error", async () => {
+    const { GET } = await import("@/app/api/setup/validate-oidc/route");
+    const req = new Request("http://localhost/api/setup/validate-oidc?issuer=https://localhost/oidc");
+    const res = await GET(req);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).not.toMatch(/localhost/i);
+  });
+
+  it("returns 400 for internal IP issuer without leaking target details", async () => {
+    const { GET } = await import("@/app/api/setup/validate-oidc/route");
+    const req = new Request("http://localhost/api/setup/validate-oidc?issuer=https://10.0.0.1/oidc");
+    const res = await GET(req);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).not.toMatch(/10\.0\.0\.1/);
+  });
+
   it("returns ok:true when discovery succeeds", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ issuer: "https://example.com", authorization_endpoint: "https://example.com/auth" }), { status: 200 })

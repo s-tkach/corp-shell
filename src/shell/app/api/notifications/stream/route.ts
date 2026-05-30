@@ -9,6 +9,7 @@ export async function GET() {
 
   const userId = session.user.userId;
   const subLevel = session.user.subscriptionLevel ?? 0;
+  const tenantSlug = session.user.tenantSlug ?? "";
   const connectionId = randomUUID();
   const encoder = new TextEncoder();
 
@@ -16,7 +17,7 @@ export async function GET() {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      registerSubscriber(connectionId, userId, subLevel, controller);
+      registerSubscriber(connectionId, tenantSlug, userId, subLevel, controller);
       controller.enqueue(encoder.encode(": ping\n\n"));
 
       intervalId = setInterval(() => {

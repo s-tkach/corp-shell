@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isSafeRemoteUrl } from "@/lib/url-guard";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,15 +9,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "issuer parameter is required" }, { status: 400 });
   }
 
-  let issuerUrl: URL;
-  try {
-    issuerUrl = new URL(issuer);
-  } catch {
-    return NextResponse.json({ error: "Invalid issuer URL" }, { status: 400 });
-  }
-
-  if (issuerUrl.protocol !== "https:") {
-    return NextResponse.json({ error: "Issuer must use HTTPS" }, { status: 400 });
+  // Validate before any network access — blocks private-network probing
+  if (!isSafeRemoteUrl(issuer)) {
+    return NextResponse.json({ error: "issuer must be a valid HTTPS URL" }, { status: 400 });
   }
 
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
@@ -45,8 +40,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ ok: true, issuer: json["issuer"] });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Could not reach ${discoveryUrl}: ${message}` }, { status: 400 });
+  } catch {
+    // Generic message — don't echo resolved host or network error details
+    return NextResponse.json({ error: "Could not reach OIDC discovery endpoint" }, { status: 400 });
   }
 }

@@ -39,6 +39,9 @@ export async function POST(req: NextRequest) {
   if (!body.routePrefix?.startsWith("/") || body.routePrefix.length > 200) {
     return NextResponse.json({ error: "routePrefix must start with / and be ≤ 200 characters" }, { status: 400 });
   }
+  if (body.healthCheckUrl && !isSafeRemoteUrl(body.healthCheckUrl)) {
+    return NextResponse.json({ error: "healthCheckUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  }
   const [row] = await db
     .insert(appRegistry)
     .values({

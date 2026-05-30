@@ -1,8 +1,7 @@
 import postgres from "postgres";
 import { db, connectionString } from "./client";
-import { tenants, subscriptionTiers, tenantSubscription, shellConfig, roles, users, userRoles } from "./schema";
+import { tenants, subscriptionTiers } from "./schema";
 import { eq } from "drizzle-orm";
-import { withTenant } from "./tenant";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
 
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
@@ -19,7 +18,6 @@ export async function autoBootstrapPlatform(): Promise<void> {
     throw e;
   }
 
-  // Seed platform-level tables once after first tenant is created
   await seedPlatformDefaults();
 }
 
@@ -40,63 +38,59 @@ export async function provisionTenant(
   adminEmail: string,
   options?: { setupComplete?: boolean }
 ): Promise<{ tenantId: string }> {
-  // Validate slug
   if (!SLUG_PATTERN.test(slug)) {
     throw new Error("Invalid slug");
   }
 
-  // Check slug uniqueness
   const existing = await db.select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
   if (existing.length > 0) {
     throw new Error(`Slug "${slug}" already exists`);
   }
 
-  // Create postgres connection for raw SQL
+  const schemaName = `tenant_${slug}`;
   const sql = postgres(connectionString!);
 
   try {
-    // Insert tenant row
-    const [tenant] = await db
-      .insert(tenants)
-      .values({
-        slug,
-        displayName,
-        status: "active",
-      })
-      .returning();
+    const result = await sql.begin(async (tx) => {
+      // Insert tenant row
+      const tenantRows = await tx<{ id: string; slug: string }[]>`
+        INSERT INTO public.tenants (slug, display_name, status)
+        VALUES (${slug}, ${displayName}, 'active')
+        RETURNING id, slug
+      `;
+      const tenant = tenantRows[0];
+      if (!tenant) throw new Error("Failed to create tenant");
 
-    if (!tenant) {
-      throw new Error("Failed to create tenant");
+      // Assign free tier subscription
+      const tierRows = await tx<{ id: string }[]>`
+        SELECT id FROM public.subscription_tiers WHERE slug = 'free' LIMIT 1
+      `;
+      if (tierRows[0]) {
+        await tx`
+          INSERT INTO public.tenant_subscription (tenant_id, tier_id, status)
+          VALUES (${tenant.id}, ${tierRows[0].id}, 'active')
+        `;
+      }
+
+      // Create tenant schema and run DDL — transactional in Postgres
+      await tx.unsafe(`CREATE SCHEMA "${schemaName}"`);
+      await tx.unsafe(perTenantDDL(schemaName));
+
+      // Seed tenant data on the same connection with correct search_path
+      await tx.unsafe(`SET LOCAL search_path TO "${schemaName}", public`);
+      await seedTenantOnConnection(tx, tenant.id, adminEmail, options?.setupComplete ?? true);
+
+      return { tenantId: tenant.id };
+    });
+    return result;
+  } catch (err) {
+    // Belt-and-suspenders: drop schema if it was created before the error
+    try {
+      await sql.unsafe(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
+    } catch {
+      // ignore cleanup errors
     }
-
-    // Assign free tier subscription in the platform schema
-    const freeTierRows = await db
-      .select({ id: subscriptionTiers.id })
-      .from(subscriptionTiers)
-      .where(eq(subscriptionTiers.slug, "free"))
-      .limit(1);
-    const freeTier = freeTierRows[0];
-    if (freeTier) {
-      await db.insert(tenantSubscription).values({
-        tenantId: tenant.id,
-        tierId: freeTier.id,
-        status: "active",
-      });
-    }
-
-    // Create schema
-    const schemaName = `tenant_${slug}`;
-    await sql.unsafe(`CREATE SCHEMA "${schemaName}"`);
-
-    // Run DDL for per-tenant tables
-    const ddl = perTenantDDL(schemaName);
-    await sql.unsafe(ddl);
-
-    // Seed defaults
-    const tenantDb = withTenant(slug);
-    await seedTenant(tenantDb, tenant.id, adminEmail, options?.setupComplete ?? true);
-
-    return { tenantId: tenant.id };
+    throw err;
   } finally {
     await sql.end();
   }
@@ -224,50 +218,27 @@ export function perTenantDDL(schema: string): string {
   `;
 }
 
-async function seedTenant(
-  tenantDb: ReturnType<typeof withTenant>,
+async function seedTenantOnConnection(
+  sql: postgres.Sql | postgres.TransactionSql,
   _tenantId: string,
   adminEmail: string,
-  setupComplete = true
+  setupComplete: boolean
 ): Promise<void> {
-  // Insert default roles
-  const superAdminRoles = await tenantDb
-    .insert(roles)
-    .values({
-      slug: "super_admin",
-      displayName: "Super Admin",
-      isSystem: true,
-    })
-    .returning();
+  const superAdminRows = await sql<{ id: string }[]>`
+    INSERT INTO roles (slug, display_name, is_system)
+    VALUES ('super_admin', 'Super Admin', true)
+    RETURNING id
+  `;
+  const superAdminRole = superAdminRows[0];
+  if (!superAdminRole) throw new Error("Failed to create super_admin role");
 
-  const superAdminRole = superAdminRoles[0];
-  if (!superAdminRole) {
-    throw new Error("Failed to create super_admin role");
-  }
+  await sql`INSERT INTO roles (slug, display_name, is_system) VALUES ('admin', 'Admin', true)`;
+  await sql`INSERT INTO roles (slug, display_name, is_system) VALUES ('user', 'User', true)`;
 
-  await tenantDb
-    .insert(roles)
-    .values({
-      slug: "admin",
-      displayName: "Admin",
-      isSystem: true,
-    });
-
-  await tenantDb
-    .insert(roles)
-    .values({
-      slug: "user",
-      displayName: "User",
-      isSystem: true,
-    });
-
-  // Insert shell config with defaults
-  await tenantDb
-    .insert(shellConfig)
-    .values({
-      appName: "Shell",
-      setupComplete,
-    });
+  await sql`
+    INSERT INTO shell_config (app_name, setup_complete)
+    VALUES ('Shell', ${setupComplete})
+  `;
 
   if (adminEmail) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -275,27 +246,23 @@ async function seedTenant(
       throw new Error(`Invalid email format: "${adminEmail}"`);
     }
 
-    const adminUsers = await tenantDb
-      .insert(users)
-      .values({
-        email: adminEmail,
-        displayName: adminEmail.split("@")[0] ?? "admin",
-        idpSource: "pending",
-        idpSubject: "pending",
-        isActive: true,
-      })
-      .returning();
-
+    const adminUsers = await sql<{ id: string }[]>`
+      INSERT INTO users (email, display_name, idp_source, idp_subject, is_active)
+      VALUES (
+        ${adminEmail},
+        ${adminEmail.split("@")[0] ?? "admin"},
+        'pending',
+        'pending',
+        true
+      )
+      RETURNING id
+    `;
     const adminUser = adminUsers[0];
-    if (!adminUser) {
-      throw new Error("Failed to create admin user");
-    }
+    if (!adminUser) throw new Error("Failed to create admin user");
 
-    await tenantDb
-      .insert(userRoles)
-      .values({
-        userId: adminUser.id,
-        roleId: superAdminRole.id,
-      });
+    await sql`
+      INSERT INTO user_roles (user_id, role_id)
+      VALUES (${adminUser.id}, ${superAdminRole.id})
+    `;
   }
 }
