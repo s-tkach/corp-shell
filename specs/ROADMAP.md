@@ -924,6 +924,40 @@ Before marking v1 as released, confirm:
 
 ---
 
+## M20 — Company Hierarchy
+
+**Goal:** Each tenant can define an unlimited-depth company tree. Users are assigned to one or more nodes and inherit access to all descendants. A company switcher in the shell header lets users change their active company context.
+
+**Depends on:** M19 complete.
+
+**Status:** Complete
+
+### Tasks
+
+#### M20-1: Schema — companies, company_ancestors, user_companies
+- [x] Add three tables to `src/shell/lib/db/tenant-schema.ts`
+- [x] Add DDL to `perTenantDDL()` in `src/shell/lib/db/provision.ts`
+
+#### M20-2: JWT — companyId and companyIds
+- [x] Extend types in `src/shell/types/next-auth.d.ts`
+- [x] Write company fields into JWT in `src/shell/lib/auth.ts`
+
+#### M20-3: Server actions and API routes
+- [x] `src/shell/lib/actions/companies.ts` — CRUD + closure table maintenance + access check
+- [x] `/api/admin/companies` — GET/POST
+- [x] `/api/admin/companies/[companyId]` — PATCH/DELETE
+- [x] `/api/admin/users/[userId]/companies` — GET/PUT
+- [x] `/api/users/me/company` — PUT (active company switch cookie)
+
+#### M20-4: Admin UI
+- [x] `/admin/companies` — company tree management
+- [x] User manager — company assignment panel
+
+#### M20-5: Company switcher
+- [x] `CompanySwitcher` component in shell header
+
+---
+
 ## v3 Backlog (Out of Scope for v2)
 
 | Feature | Notes |

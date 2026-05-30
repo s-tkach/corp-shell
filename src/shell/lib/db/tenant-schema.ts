@@ -157,3 +157,41 @@ export const notificationReads = pgTable(
   },
   (t) => [unique().on(t.notificationId, t.userId)],
 );
+
+export const companies = pgTable("companies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  parentId: uuid("parent_id"),
+  name: text("name").notNull(),
+  logoUrl: text("logo_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const companyAncestors = pgTable(
+  "company_ancestors",
+  {
+    ancestorId: uuid("ancestor_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    descendantId: uuid("descendant_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    depth: integer("depth").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ancestorId, t.descendantId] })],
+);
+
+export const userCompanies = pgTable(
+  "user_companies",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.companyId] })],
+);

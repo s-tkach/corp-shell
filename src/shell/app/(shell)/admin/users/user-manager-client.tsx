@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pencil } from "lucide-react";
+import { UserCompaniesClient } from "./user-companies-client";
 
 interface UserSub {
   tierId: string;
@@ -41,6 +42,7 @@ interface User {
   lastLoginAt: Date | null;
   roles: { slug: string; displayName: string }[];
   subscription: UserSub | null;
+  companyIds?: string[];
 }
 
 interface Role {
@@ -60,6 +62,7 @@ interface Props {
   users: User[];
   allRoles: Role[];
   allTiers: Tier[];
+  allCompanies: { id: string; parentId: string | null; name: string; isActive: boolean; sortOrder: number }[];
   page: number;
   hasMore: boolean;
 }
@@ -71,7 +74,7 @@ interface EditForm {
   expiresAt: string;
 }
 
-export function UserManagerClient({ users: initialUsers, allRoles, allTiers, page, hasMore }: Props) {
+export function UserManagerClient({ users: initialUsers, allRoles, allTiers, allCompanies, page, hasMore }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editDialog, setEditDialog] = useState<{ open: boolean; user: User | null }>({ open: false, user: null });
@@ -267,6 +270,17 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, pag
                 onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
               />
             </div>
+
+            {allCompanies.length > 0 && editDialog.user && (
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-sm font-medium">Company Access</p>
+                <UserCompaniesClient
+                  userId={editDialog.user.id}
+                  allCompanies={allCompanies}
+                  assignedCompanyIds={editDialog.user.companyIds ?? []}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog({ open: false, user: null })}>Cancel</Button>

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { withTenant } from "@/lib/db/tenant";
-import { shellConfig, roles, users, userRoles, idpProviders } from "@/lib/db/schema";
+import { shellConfig, roles, users, userRoles, idpProviders, companies, userCompanies } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,6 +83,21 @@ export async function POST(request: Request) {
     userId: adminUser.id,
     roleId: superAdminRole.id,
   });
+
+  // Grant access to the root company seeded during provisioning
+  const rootCompanyRows = await tenantDb
+    .select({ id: companies.id })
+    .from(companies)
+    .orderBy(asc(companies.createdAt))
+    .limit(1);
+
+  const rootCompany = rootCompanyRows[0];
+  if (rootCompany) {
+    await tenantDb.insert(userCompanies).values({
+      userId: adminUser.id,
+      companyId: rootCompany.id,
+    });
+  }
 
   // Insert IDP provider
   const encryptedSecret = await encrypt(oidcClientSecret.trim());

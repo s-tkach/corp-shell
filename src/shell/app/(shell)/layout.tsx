@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
-import { menuSections, menuItems, shellConfig, users } from "@/lib/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { menuSections, menuItems, shellConfig, users, companies, companyAncestors } from "@/lib/db/schema";
+import { asc, eq, inArray } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
 import { isPlatformAdmin as checkPlatformAdmin } from "@/lib/platform-guard";
 import { cacheTag } from "next/cache";
@@ -117,6 +118,64 @@ export default async function ShellGroupLayout({ children }: { children: React.R
     userId ? getUserPreferences(tenantSlug, userId) : Promise.resolve<UserPreferences>({}),
   ]);
 
+  const userCompanyIds = session?.user.companyIds ?? [];
+  let accessibleCompanies: { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[] = [];
+
+  if (userCompanyIds.length > 0) {
+    const layoutTenantDb = withTenant(session!.user.tenantSlug);
+
+    const ancestorRows = await layoutTenantDb
+      .select({ descendantId: companyAncestors.descendantId })
+      .from(companyAncestors)
+      .where(inArray(companyAncestors.ancestorId, userCompanyIds));
+
+    const accessibleIds = [...new Set(ancestorRows.map((r) => r.descendantId))];
+
+    if (accessibleIds.length > 0) {
+      const companyRows = await layoutTenantDb
+        .select({
+          id: companies.id,
+          parentId: companies.parentId,
+          name: companies.name,
+          logoUrl: companies.logoUrl,
+          sortOrder: companies.sortOrder,
+          isActive: companies.isActive,
+        })
+        .from(companies)
+        .where(inArray(companies.id, accessibleIds));
+
+      const accessibleIdSet = new Set(accessibleIds);
+
+      function flattenTree(
+        all: typeof companyRows,
+        parentId: string | null,
+        depth: number
+      ): { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[] {
+        return all
+          .filter((c) => c.parentId === parentId && c.isActive)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+          .flatMap((c) => [
+            { id: c.id, parentId: c.parentId, name: c.name, logoUrl: c.logoUrl, depth },
+            ...flattenTree(all, c.id, depth + 1),
+          ]);
+      }
+
+      // Start from nodes whose parent is not in the accessible set (topmost visible nodes).
+      // This handles users assigned to non-root companies correctly.
+      const roots = companyRows.filter((c) => c.parentId === null || !accessibleIdSet.has(c.parentId));
+      accessibleCompanies = roots
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+        .flatMap((r) => [
+          { id: r.id, parentId: r.parentId, name: r.name, logoUrl: r.logoUrl, depth: 0 },
+          ...flattenTree(companyRows, r.id, 1),
+        ])
+        .filter((c) => c !== undefined);
+    }
+  }
+
+  const cookieStore = await cookies();
+  const activeCompanyId = cookieStore.get("active_company_id")?.value ?? null;
+
   return (
     <ShellLayoutClient
       menu={menu}
@@ -130,6 +189,8 @@ export default async function ShellGroupLayout({ children }: { children: React.R
       initialSidebarCollapsed={preferences.sidebarCollapsed ?? false}
       headerShowDate={config?.headerShowDate ?? false}
       headerDateFormat={config?.headerDateFormat ?? "PPP"}
+      accessibleCompanies={accessibleCompanies}
+      activeCompanyId={activeCompanyId}
       toastConfig={{
         position: config?.toastPosition ?? "bottom-right",
         bgColor: config?.toastBgColor ?? "#ffffff",

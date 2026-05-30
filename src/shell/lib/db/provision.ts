@@ -78,7 +78,7 @@ export async function provisionTenant(
 
       // Seed tenant data on the same connection with correct search_path
       await tx.unsafe(`SET LOCAL search_path TO "${schemaName}", public`);
-      await seedTenantOnConnection(tx, tenant.id, adminEmail, options?.setupComplete ?? true);
+      await seedTenantOnConnection(tx, tenant.id, displayName, adminEmail, options?.setupComplete ?? true);
 
       return { tenantId: tenant.id };
     });
@@ -215,12 +215,37 @@ export function perTenantDDL(schema: string): string {
       policy_slug text NOT NULL,
       PRIMARY KEY (role_id, policy_slug)
     );
+
+    CREATE TABLE "${schema}".companies (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      parent_id uuid REFERENCES "${schema}".companies(id) ON DELETE RESTRICT,
+      name text NOT NULL,
+      logo_url text,
+      is_active boolean NOT NULL DEFAULT true,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "${schema}".company_ancestors (
+      ancestor_id uuid NOT NULL REFERENCES "${schema}".companies(id) ON DELETE CASCADE,
+      descendant_id uuid NOT NULL REFERENCES "${schema}".companies(id) ON DELETE CASCADE,
+      depth integer NOT NULL,
+      PRIMARY KEY (ancestor_id, descendant_id)
+    );
+
+    CREATE TABLE "${schema}".user_companies (
+      user_id uuid NOT NULL REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      company_id uuid NOT NULL REFERENCES "${schema}".companies(id) ON DELETE CASCADE,
+      assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, company_id)
+    );
   `;
 }
 
 async function seedTenantOnConnection(
   sql: postgres.Sql | postgres.TransactionSql,
   _tenantId: string,
+  displayName: string,
   adminEmail: string,
   setupComplete: boolean
 ): Promise<void> {
@@ -238,6 +263,17 @@ async function seedTenantOnConnection(
   await sql`
     INSERT INTO shell_config (app_name, setup_complete)
     VALUES ('Shell', ${setupComplete})
+  `;
+
+  const companyRows = await sql<{ id: string }[]>`
+    INSERT INTO companies (name) VALUES (${displayName}) RETURNING id
+  `;
+  const rootCompany = companyRows[0];
+  if (!rootCompany) throw new Error("Failed to create root company");
+
+  await sql`
+    INSERT INTO company_ancestors (ancestor_id, descendant_id, depth)
+    VALUES (${rootCompany.id}, ${rootCompany.id}, 0)
   `;
 
   if (adminEmail) {

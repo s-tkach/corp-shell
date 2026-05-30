@@ -7,6 +7,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **M20** — Company hierarchy: unlimited-depth organizational tree per tenant
+- Company switcher dropdown in shell header (top-left, tree-indented, search for >8 companies)
+- Admin UI for managing company tree (`/admin/companies`) and user company assignments
+- User access scoped to assigned companies and all descendants via closure table (`company_ancestors`)
+- `PUT /api/users/me/company` endpoint for active company switching (cookie-based)
+
+---
+
 ## [2.1.0] — 2026-05-26
 
 ### Changed

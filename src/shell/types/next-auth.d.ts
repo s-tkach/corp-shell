@@ -9,6 +9,8 @@ declare module "next-auth" {
       subscriptionLevel: number;
       tenantId: string;
       tenantSlug: string;
+      companyId: string | null;
+      companyIds: string[];
     } & DefaultSession["user"];
   }
 }
@@ -22,5 +24,7 @@ declare module "@auth/core/jwt" {
     idToken?: string;
     tenantId?: string;
     tenantSlug?: string;
+    companyId?: string | null;
+    companyIds?: string[];
   }
 }

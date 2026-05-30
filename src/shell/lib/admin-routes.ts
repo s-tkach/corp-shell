@@ -4,6 +4,7 @@ import {
   Users,
   KeyRound,
   Bell,
+  Building2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -17,6 +18,7 @@ export interface AdminRoute {
 export const ADMIN_ROUTES: AdminRoute[] = [
   { href: "/admin/branding",      label: "Branding",      description: "App name, logo, and brand color",            icon: Palette },
   { href: "/admin/roles",         label: "Roles",         description: "Manage roles and IDP group mappings",        icon: Shield },
+  { href: "/admin/companies",    label: "Companies",    description: "Manage company hierarchy",                   icon: Building2 },
   { href: "/admin/users",         label: "Users",         description: "View users, assign roles and subscriptions", icon: Users },
   { href: "/admin/sso",           label: "SSO",           description: "OIDC connection health",                     icon: KeyRound },
   { href: "/admin/notifications", label: "Notifications", description: "Create and manage notifications",            icon: Bell },

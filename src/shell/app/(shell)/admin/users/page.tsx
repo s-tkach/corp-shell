@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
-import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
+import { users, userRoles, roles, subscriptionTiers, tenantSubscription, companies, userCompanies } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { UserManagerClient } from "./user-manager-client";
 
@@ -58,7 +58,12 @@ export default async function UserManagerPage({
         .where(eq(userRoles.userId, u.id))
         .orderBy(asc(roles.displayName));
 
-      return { ...u, roles: roleRows, subscription: orgSubscription };
+      const companyRows = await tenantDb
+        .select({ companyId: userCompanies.companyId })
+        .from(userCompanies)
+        .where(eq(userCompanies.userId, u.id));
+
+      return { ...u, roles: roleRows, subscription: orgSubscription, companyIds: companyRows.map((c) => c.companyId) };
     })
   );
 
@@ -72,11 +77,23 @@ export default async function UserManagerPage({
     .from(subscriptionTiers)
     .orderBy(asc(subscriptionTiers.level));
 
+  const allCompanies = await tenantDb
+    .select({
+      id: companies.id,
+      parentId: companies.parentId,
+      name: companies.name,
+      isActive: companies.isActive,
+      sortOrder: companies.sortOrder,
+    })
+    .from(companies)
+    .orderBy(asc(companies.sortOrder), asc(companies.name));
+
   return (
     <UserManagerClient
       users={enriched}
       allRoles={allRoles}
       allTiers={allTiers}
+      allCompanies={allCompanies}
       page={page}
       hasMore={userRows.length === PAGE_SIZE}
     />

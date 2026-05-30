@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useShellStore } from "@/lib/store/shell-store";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { ADMIN_ROUTES } from "@/lib/admin-routes";
+import { CompanySwitcher } from "./company-switcher";
 import type { MenuSection } from "@/app/api/menu/route";
 
 interface SidebarProps {
@@ -22,9 +23,11 @@ interface SidebarProps {
   userRoles: string[];
   tenantSlug: string;
   isPlatformAdmin: boolean;
+  accessibleCompanies: { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[];
+  activeCompanyId: string | null;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: SidebarProps) {
+export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin, accessibleCompanies, activeCompanyId }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useShellStore();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -105,30 +108,16 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: 
         sidebarCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-14 items-center justify-between px-4 border-b border-sidebar-border">
+      <div className="flex h-14 items-center px-4 border-b border-sidebar-border">
         {sidebarCollapsed ? (
           logoUrl && (
             <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0 mx-auto" />
           )
         ) : (
-          <div className="flex items-center gap-2 min-w-0">
-            {logoUrl && (
-              <Image src={logoUrl} alt={appName} width={28} height={28} className="rounded object-contain flex-shrink-0" />
-            )}
-            <span className="font-semibold text-sidebar-foreground truncate">{appName}</span>
+          <div className="flex items-center min-w-0 flex-1">
+            <CompanySwitcher companies={accessibleCompanies} activeCompanyId={activeCompanyId} />
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleToggle}
-          className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <ChevronLeft
-            className={cn("h-4 w-4 transition-transform", sidebarCollapsed && "rotate-180")}
-          />
-        </Button>
       </div>
 
       <ScrollArea className="flex-1">
@@ -358,12 +347,23 @@ export function Sidebar({ menu, appName, logoUrl, userRoles, isPlatformAdmin }: 
         <div
           className={cn(
             "flex items-center gap-3 px-3 py-2 text-xs text-sidebar-foreground/60",
-            sidebarCollapsed && "justify-center"
+            "justify-end"
           )}
         >
           {!sidebarCollapsed && process.env.NEXT_PUBLIC_APP_VERSION && (
-              <span>{process.env.NEXT_PUBLIC_APP_VERSION}</span>
-            )}
+            <span>{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggle}
+            className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-7 w-7"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronLeft
+              className={cn("h-4 w-4 transition-transform", sidebarCollapsed && "rotate-180")}
+            />
+          </Button>
         </div>
       </div>
     </aside>

@@ -23,6 +23,8 @@ interface ShellLayoutClientProps {
   headerShowDate: boolean;
   headerDateFormat: string;
   toastConfig: ToastConfig;
+  accessibleCompanies: { id: string; parentId: string | null; name: string; logoUrl: string | null; depth: number }[];
+  activeCompanyId: string | null;
 }
 
 export function ShellLayoutClient({
@@ -39,6 +41,8 @@ export function ShellLayoutClient({
   headerShowDate,
   headerDateFormat,
   toastConfig,
+  accessibleCompanies,
+  activeCompanyId,
 }: ShellLayoutClientProps) {
   const { setSidebarCollapsed } = useShellStore();
 
@@ -49,7 +53,7 @@ export function ShellLayoutClient({
   return (
     <NotificationProvider toastConfig={toastConfig}>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} tenantSlug={tenantSlug} isPlatformAdmin={isPlatformAdmin} />
+        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} tenantSlug={tenantSlug} isPlatformAdmin={isPlatformAdmin} accessibleCompanies={accessibleCompanies} activeCompanyId={activeCompanyId} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header
             menu={menu}

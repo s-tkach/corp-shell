@@ -10,6 +10,7 @@ import {
   tenantSubscription,
   authEvents,
   tenants,
+  userCompanies,
 } from "@/lib/db/schema";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
@@ -143,6 +144,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             .limit(1);
 
           const tier = subRow[0];
+          const companyRows = await tenantDb
+            .select({ companyId: userCompanies.companyId })
+            .from(userCompanies)
+            .where(eq(userCompanies.userId, userId));
+
+          const companyIds = companyRows.map((r) => r.companyId);
+          token.companyIds = companyIds;
+          token.companyId = companyIds[0] ?? null;
+
           token.userId = userId;
           token.roles = roleSlugs;
           token.subscriptionTier = tier?.slug ?? "free";
@@ -161,6 +171,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
           (token.subscriptionLevel as number | undefined) ?? 0;
         session.user.tenantId = (token.tenantId as string | undefined) ?? "";
         session.user.tenantSlug = (token.tenantSlug as string | undefined) ?? "";
+        session.user.companyId = (token.companyId as string | null | undefined) ?? null;
+        session.user.companyIds = (token.companyIds as string[] | undefined) ?? [];
         return session;
       },
     },
