@@ -4,7 +4,8 @@ import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
 import { users, userRoles, roles, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
+import { tenants } from "@/lib/db/schema";
 
 export async function PATCH(
   req: NextRequest,
@@ -26,6 +27,15 @@ export async function PATCH(
   const tenantDb = withTenant(tenantSlug);
 
   if (typeof body.isActive === "boolean") {
+    if (body.isActive === false) {
+      const tenantRow = await db.select({ isPlatform: tenants.isPlatform }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      if (tenantRow[0]?.isPlatform) {
+        const rows = await tenantDb.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.isActive, true));
+        if ((rows[0]?.count ?? 0) <= 1) {
+          return NextResponse.json({ error: "Cannot deactivate the last user on a platform tenant" }, { status: 409 });
+        }
+      }
+    }
     await tenantDb.update(users).set({ isActive: body.isActive }).where(eq(users.id, userId));
   }
 
