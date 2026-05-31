@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CheckCircle, Loader2 } from "lucide-react";
 
 interface Tenant {
@@ -11,6 +17,7 @@ interface Tenant {
   slug: string;
   displayName: string;
   status: "active" | "suspended" | "deleted";
+  isPlatform: boolean;
   createdAt: string;
 }
 
@@ -65,7 +72,6 @@ export default function PlatformTenantsPage() {
   async function handleCreate() {
     setSaving(true);
     setError(null);
-    setSuccess(null);
     try {
       const res = await fetch("/api/platform/tenants", {
         method: "POST",
@@ -79,7 +85,7 @@ export default function PlatformTenantsPage() {
       }
       setTenants((prev) => [
         ...prev,
-        { id: data.tenantId!, slug: form.slug, displayName: form.displayName, status: "active", createdAt: new Date().toISOString() },
+        { id: data.tenantId!, slug: form.slug, displayName: form.displayName, status: "active", isPlatform: false, createdAt: new Date().toISOString() },
       ]);
       setSuccess(`Tenant "${form.displayName}" created successfully.`);
       setAdding(false);
@@ -88,6 +94,12 @@ export default function PlatformTenantsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function closeDialog() {
+    setAdding(false);
+    setError(null);
+    setOidcStatus("idle");
   }
 
   async function handleStatusChange(id: string, status: "active" | "suspended" | "deleted") {
@@ -109,7 +121,7 @@ export default function PlatformTenantsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Tenants</h1>
-        <Button onClick={() => { setAdding(true); setSuccess(null); }} disabled={adding}>New Tenant</Button>
+        <Button onClick={() => { setAdding(true); setSuccess(null); }}>New Tenant</Button>
       </div>
 
       {success && (
@@ -118,9 +130,12 @@ export default function PlatformTenantsPage() {
         </div>
       )}
 
-      {adding && (
-        <div className="rounded-md border p-4 space-y-4">
-          <h2 className="font-medium">New Tenant</h2>
+      <Dialog open={adding} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Tenant</DialogTitle>
+          </DialogHeader>
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="space-y-3">
@@ -226,12 +241,12 @@ export default function PlatformTenantsPage() {
             <Button onClick={handleCreate} disabled={saving || !canCreate}>
               {saving ? "Creating…" : "Create Tenant"}
             </Button>
-            <Button variant="outline" onClick={() => { setAdding(false); setError(null); setOidcStatus("idle"); }}>
+            <Button variant="outline" onClick={closeDialog}>
               Cancel
             </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-2">
         {tenants.map((t) => (
@@ -245,17 +260,17 @@ export default function PlatformTenantsPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              {t.status === "active" && (
+              {t.status === "active" && !t.isPlatform && (
                 <Button variant="outline" size="sm" onClick={() => handleStatusChange(t.id, "suspended")}>
                   Suspend
                 </Button>
               )}
-              {t.status === "suspended" && (
+              {t.status === "suspended" && !t.isPlatform && (
                 <Button variant="outline" size="sm" onClick={() => handleStatusChange(t.id, "active")}>
                   Reactivate
                 </Button>
               )}
-              {t.status !== "deleted" && (
+              {t.status !== "deleted" && !t.isPlatform && (
                 <Button variant="destructive" size="sm" onClick={() => handleStatusChange(t.id, "deleted")}>
                   Delete
                 </Button>

@@ -7,6 +7,7 @@ CREATE TABLE "tenants" (
 	"slug" text NOT NULL,
 	"display_name" text NOT NULL,
 	"status" "public"."tenant_status" DEFAULT 'active' NOT NULL,
+	"is_platform" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "tenants_slug_unique" UNIQUE("slug")
 );

@@ -32,7 +32,7 @@ export async function autoBootstrapPlatform(): Promise<void> {
     await provisionTenant(platformSlug, "Platform Admin", "", { setupComplete: false });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("already exists")) return;
+    if (msg.includes("already exists") || msg.includes("duplicate key")) return;
     throw e;
   }
 
@@ -125,8 +125,8 @@ export async function provisionTenant(
     const result = await sql.begin(async (tx) => {
       // Insert tenant row
       const tenantRows = await tx<{ id: string; slug: string }[]>`
-        INSERT INTO public.tenants (slug, display_name, status)
-        VALUES (${slug}, ${displayName}, 'active')
+        INSERT INTO public.tenants (slug, display_name, status, is_platform)
+        VALUES (${slug}, ${displayName}, 'active', ${slug === getPlatformSlug()})
         RETURNING id, slug
       `;
       const tenant = tenantRows[0];
