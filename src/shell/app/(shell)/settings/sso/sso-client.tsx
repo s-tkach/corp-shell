@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 
 interface Provider {
   id: string;
@@ -21,6 +22,7 @@ interface SsoClientProps {
 }
 
 export function SsoClient({ initialProviders }: SsoClientProps) {
+  const { showToast } = useNotifications();
   const [providers, setProviders] = useState<Provider[]>(initialProviders);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({
@@ -32,12 +34,10 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
     scopes: "openid email profile",
     groupClaimName: "groups",
   });
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleAdd() {
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch("/api/settings/sso", {
         method: "POST",
@@ -49,7 +49,7 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
       });
       if (!res.ok) {
         const data = await res.json() as { error?: string };
-        setError(data.error ?? "Failed to add provider");
+        showToast({ title: data.error ?? "Failed to add provider", variant: "error" });
         return;
       }
       const data = await res.json() as { id: string };
@@ -130,7 +130,6 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
       {adding && (
         <div className="rounded-md border p-4 space-y-3">
           <h3 className="font-medium">New Provider</h3>
-          {error && <p className="text-sm text-destructive">{error}</p>}
           <Input
             placeholder="Slug (e.g. okta — used in callback URL)"
             value={form.slug}
@@ -175,7 +174,6 @@ export function SsoClient({ initialProviders }: SsoClientProps) {
               variant="outline"
               onClick={() => {
                 setAdding(false);
-                setError(null);
               }}
             >
               Cancel

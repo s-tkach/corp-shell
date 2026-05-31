@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,12 +99,12 @@ const emptyItemForm: ItemForm = {
 };
 
 export function MenuManagerClient({ tenants, allTiers }: Props) {
+  const { showToast } = useNotifications();
   const [isPending, startTransition] = useTransition();
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
   const [sections, setSections] = useState<Section[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [sectionDialog, setSectionDialog] = useState<{ open: boolean; editing: Section | null }>({
     open: false,
@@ -118,17 +119,15 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
   const [itemForm, setItemForm] = useState<ItemForm>(emptyItemForm);
   const [iconSearch, setIconSearch] = useState("");
   const [sectionIconSearch, setSectionIconSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   async function loadTenantData(tenantId: string) {
-    setLoadError(null);
     const [sectionsRes, itemsRes, rolesRes] = await Promise.all([
       fetch(`/api/platform/menu/sections?tenantId=${tenantId}`),
       fetch(`/api/platform/menu/items?tenantId=${tenantId}`),
       fetch(`/api/platform/menu/roles?tenantId=${tenantId}`),
     ]);
     if (!sectionsRes.ok || !itemsRes.ok || !rolesRes.ok) {
-      setLoadError("Failed to load menu data");
+      showToast({ title: "Failed to load menu data", variant: "error" });
       setSections([]);
       setItems([]);
       setAvailableRoles([]);
@@ -173,7 +172,6 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
   }
 
   async function saveSection() {
-    setError(null);
     const { editing } = sectionDialog;
     const payload = { label: sectionForm.label, icon: sectionForm.icon || undefined };
 
@@ -184,7 +182,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to update section"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to update section", variant: "error" }); return; }
     } else {
       const res = await fetch("/api/platform/menu/sections", {
         method: "POST",
@@ -192,7 +190,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify({ ...payload, tenantId: selectedTenantId }),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to create section"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to create section", variant: "error" }); return; }
     }
     setSectionDialog({ open: false, editing: null });
     refresh();
@@ -247,7 +245,6 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
   }
 
   async function saveItem() {
-    setError(null);
     const { editing } = itemDialog;
     const payload = {
       sectionId: itemForm.sectionId,
@@ -267,7 +264,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to update item"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to update item", variant: "error" }); return; }
     } else {
       const res = await fetch("/api/platform/menu/items", {
         method: "POST",
@@ -275,7 +272,7 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to create item"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to create item", variant: "error" }); return; }
     }
     setItemDialog({ open: false, editing: null });
     refresh();
@@ -346,9 +343,6 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
       {!selectedTenantId && (
         <p className="text-muted-foreground text-sm">Select a tenant to manage its menu.</p>
       )}
-
-      {loadError && <p className="text-sm text-destructive">{loadError}</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {selectedTenantId && (
         <div className="space-y-4">

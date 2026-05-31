@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +55,7 @@ interface HealthResult {
 }
 
 export function AppRegistryClient({ apps: initialApps }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<{ open: boolean; editing: App | null }>({ open: false, editing: null });
@@ -62,7 +64,6 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
   const [healthResults, setHealthResults] = useState<Record<string, HealthResult>>({});
   const [validating, setValidating] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => { router.refresh(); });
@@ -86,7 +87,6 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
   }
 
   async function save() {
-    setError(null);
     const { editing } = dialog;
     const payload = { ...form, healthCheckUrl: form.healthCheckUrl || undefined };
 
@@ -97,7 +97,7 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to update app"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to update app", variant: "error" }); return; }
     } else {
       const res = await fetch("/api/platform/apps", {
         method: "POST",
@@ -105,7 +105,7 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to register app"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to register app", variant: "error" }); return; }
     }
     setDialog({ open: false, editing: null });
     refresh();
@@ -161,8 +161,6 @@ export function AppRegistryClient({ apps: initialApps }: Props) {
           <Plus className="mr-2 h-4 w-4" /> Register App
         </Button>
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Card>
         <Table>

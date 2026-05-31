@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,11 +55,11 @@ const emptyForm: TierForm = {
 };
 
 export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<{ open: boolean; editing: Tier | null }>({ open: false, editing: null });
   const [form, setForm] = useState<TierForm>(emptyForm);
-  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => { router.refresh(); });
@@ -83,7 +84,6 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
   }
 
   async function save() {
-    setError(null);
     const { editing } = dialog;
     const payload = {
       slug: form.slug,
@@ -102,7 +102,7 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to update tier"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to update tier", variant: "error" }); return; }
     } else {
       const res = await fetch("/api/platform/subscriptions", {
         method: "POST",
@@ -110,7 +110,7 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to create tier"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to create tier", variant: "error" }); return; }
     }
     setDialog({ open: false, editing: null });
     refresh();
@@ -121,7 +121,7 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
     const res = await fetch(`/api/platform/subscriptions/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json() as { error: string };
-      alert(data.error);
+      showToast({ title: data.error, variant: "error" });
       return;
     }
     refresh();
@@ -138,8 +138,6 @@ export function SubscriptionTiersClient({ tiers: initialTiers }: Props) {
           <Plus className="mr-2 h-4 w-4" /> New Tier
         </Button>
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Card>
         <Table>

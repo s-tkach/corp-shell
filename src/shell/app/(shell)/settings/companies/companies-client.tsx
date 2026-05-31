@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ function flattenTree(
 }
 
 export function CompaniesClient({ companies }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -60,7 +62,7 @@ export function CompaniesClient({ companies }: Props) {
     logoUrl: "",
     isActive: true,
   });
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const flat = flattenTree(companies);
 
@@ -68,7 +70,7 @@ export function CompaniesClient({ companies }: Props) {
     setEditingId(null);
     setAddingChildOf(parentId);
     setForm({ name: "", parentId, logoUrl: "", isActive: true });
-    setError(null);
+    setFormError(null);
     setDialogOpen(true);
   }
 
@@ -81,12 +83,12 @@ export function CompaniesClient({ companies }: Props) {
       logoUrl: company.logoUrl ?? "",
       isActive: company.isActive,
     });
-    setError(null);
+    setFormError(null);
     setDialogOpen(true);
   }
 
   async function handleSave() {
-    setError(null);
+    setFormError(null);
     const payload = {
       name: form.name.trim(),
       parentId: form.parentId,
@@ -95,32 +97,28 @@ export function CompaniesClient({ companies }: Props) {
     };
 
     if (!payload.name) {
-      setError("Name is required");
+      setFormError("Name is required");
       return;
     }
 
     startTransition(async () => {
-      try {
-        if (editingId) {
-          const res = await fetch(`/api/settings/companies/${editingId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) throw new Error("Failed to update");
-        } else {
-          const res = await fetch("/api/settings/companies", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) throw new Error("Failed to create");
-        }
-        setDialogOpen(false);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "An error occurred");
+      if (editingId) {
+        const res = await fetch(`/api/settings/companies/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) { showToast({ title: "Failed to update company", variant: "error" }); return; }
+      } else {
+        const res = await fetch("/api/settings/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) { showToast({ title: "Failed to create company", variant: "error" }); return; }
       }
+      setDialogOpen(false);
+      router.refresh();
     });
   }
 
@@ -130,7 +128,7 @@ export function CompaniesClient({ companies }: Props) {
       const res = await fetch(`/api/settings/companies/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        alert(data.error ?? "Delete failed");
+        showToast({ title: data.error ?? "Delete failed", variant: "error" });
         return;
       }
       router.refresh();
@@ -238,7 +236,7 @@ export function CompaniesClient({ companies }: Props) {
               />
               <Label htmlFor="company-active">Active</Label>
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

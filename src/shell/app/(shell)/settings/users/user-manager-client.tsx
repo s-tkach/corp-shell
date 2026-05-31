@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -75,11 +76,11 @@ interface EditForm {
 }
 
 export function UserManagerClient({ users: initialUsers, allRoles, allTiers, allCompanies, page, hasMore }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editDialog, setEditDialog] = useState<{ open: boolean; user: User | null }>({ open: false, user: null });
   const [form, setForm] = useState<EditForm>({ isActive: true, selectedRoles: [], tierId: "", expiresAt: "" });
-  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => { router.refresh(); });
@@ -96,7 +97,6 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
   }
 
   async function save() {
-    setError(null);
     const { user } = editDialog;
     if (!user) return;
 
@@ -115,7 +115,7 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
       body: JSON.stringify(body),
     });
     const data = await res.json() as { error?: string };
-    if (!res.ok) { setError(data.error ?? "Failed to update user"); return; }
+    if (!res.ok) { showToast({ title: data.error ?? "Failed to update user", variant: "error" }); return; }
     setEditDialog({ open: false, user: null });
     refresh();
   }
@@ -135,8 +135,6 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
         <h1 className="text-2xl font-bold">User Manager</h1>
         <p className="text-muted-foreground">Manage users, roles, and subscriptions</p>
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Card>
         <Table>

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 
 interface Policy {
   id: string;
@@ -36,6 +37,7 @@ interface PolicyForm {
 const emptyForm: PolicyForm = { slug: "", displayName: "", description: "" };
 
 export function PoliciesClient({ policies: initialPolicies }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<{ open: boolean; editing: Policy | null }>({ open: false, editing: null });
@@ -90,7 +92,7 @@ export function PoliciesClient({ policies: initialPolicies }: Props) {
     const res = await fetch(`/api/platform/policies/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json() as { error: string };
-      alert(data.error);
+      showToast({ title: data.error, variant: "error" });
       return;
     }
     setRows((prev) => prev.filter((p) => p.id !== id));
