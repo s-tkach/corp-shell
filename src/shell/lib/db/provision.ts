@@ -7,11 +7,29 @@ import { getPlatformSlug } from "@/lib/tenant-resolver";
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
 export async function autoBootstrapPlatform(): Promise<void> {
-  const existing = await db.select({ id: tenants.id }).from(tenants).limit(1);
-  if (existing.length > 0) return;
+  const platformSlug = getPlatformSlug();
+  const schemaName = `tenant_${platformSlug}`;
+
+  const sql = postgres(connectionString!);
+  let schemaExists = false;
+  try {
+    const rows = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.schemata WHERE schema_name = ${schemaName}
+      ) AS exists
+    `;
+    schemaExists = rows[0]?.exists ?? false;
+  } finally {
+    await sql.end();
+  }
+
+  if (schemaExists) return;
+
+  // Clean up orphaned tenant row if schema is missing
+  await db.delete(tenants).where(eq(tenants.slug, platformSlug));
 
   try {
-    await provisionTenant(getPlatformSlug(), "Platform Admin", "", { setupComplete: false });
+    await provisionTenant(platformSlug, "Platform Admin", "", { setupComplete: false });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists")) return;
