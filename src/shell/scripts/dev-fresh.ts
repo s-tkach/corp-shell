@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 const shellRoot = resolve(__dirname, "..");
 const envFile = resolve(shellRoot, ".env.test.local");
+const localEnvFile = resolve(shellRoot, ".env.local");
 
 // ── 1. Load and validate .env.test.local ────────────────────────────────────
 
@@ -64,7 +66,24 @@ try {
   process.exit(1);
 }
 
-// ── 4. Start Next.js dev server ──────────────────────────────────────────────
+// ── 4. Rotate NEXTAUTH_SECRET so stale session cookies are rejected ──────────
+// A fresh DB has new company/user UUIDs, but a browser may still hold a cookie
+// signed against the old secret carrying the old UUIDs. Rotating the secret
+// invalidates that cookie, forcing a clean re-login against the fresh DB.
+
+console.log("\n▶ Rotating NEXTAUTH_SECRET in .env.local...");
+const newSecret = randomBytes(32).toString("base64");
+const localEnv = readFileSync(localEnvFile, "utf8");
+if (!/^NEXTAUTH_SECRET=.*$/m.test(localEnv)) {
+  console.error(`\nNo NEXTAUTH_SECRET line found in ${localEnvFile}`);
+  process.exit(1);
+}
+writeFileSync(
+  localEnvFile,
+  localEnv.replace(/^NEXTAUTH_SECRET=.*$/m, `NEXTAUTH_SECRET=${newSecret}`)
+);
+
+// ── 5. Start Next.js dev server ──────────────────────────────────────────────
 
 console.log("\n▶ Starting Next.js dev server...");
 const nextProcess = spawn("pnpm", ["dev"], {
@@ -92,7 +111,7 @@ function shutdown(code = 0): never {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-// ── 5. Wait for Next.js to be ready ─────────────────────────────────────────
+// ── 6. Wait for Next.js to be ready ─────────────────────────────────────────
 
 const APP_URL = "http://localhost:3000";
 const TIMEOUT_MS = 60_000;
@@ -113,7 +132,7 @@ async function waitForApp(): Promise<void> {
   throw new Error(`Next.js did not start within ${TIMEOUT_MS / 1000}s`);
 }
 
-// ── 6. POST to /api/setup ───────────────────────────────────────────────────
+// ── 7. POST to /api/setup ───────────────────────────────────────────────────
 
 async function runSetup(): Promise<void> {
   await waitForApp();

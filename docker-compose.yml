@@ -19,8 +19,13 @@ services:
     image: node:22-alpine
     working_dir: /app
     volumes:
-      - .:/app
-    command: sh -c "npm install -g pnpm@10 --quiet && pnpm install --frozen-lockfile && pnpm drizzle-kit migrate"
+      - ./src/shell/lib/db/migrations:/app/migrations
+    command: >
+      sh -c "
+        npm install -g drizzle-kit drizzle-orm postgres --quiet --no-fund --no-update-notifier 2>/dev/null &&
+        echo '{\"dialect\":\"postgresql\",\"out\":\"./migrations\",\"dbCredentials\":{\"url\":\"'$$DATABASE_URL'\"}}' > drizzle.config.json &&
+        drizzle-kit migrate --config=drizzle.config.json
+      "
     environment:
       DATABASE_URL: postgresql://corpshell:corpshell@postgres:5432/corpshell
     depends_on:
