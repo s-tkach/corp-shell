@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
-import { idpProviders } from "@/lib/db/schema";
+import { db } from "@/lib/db/client";
+import { idpProviders, tenants } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function PATCH(
   req: NextRequest,
@@ -57,7 +58,18 @@ export async function PATCH(
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "";
+  const tenantId = session?.user.tenantId ?? "";
   const tenantDb = withTenant(tenantSlug);
+
+  if (body.isEnabled === false) {
+    const tenantRow = await db.select({ isPlatform: tenants.isPlatform }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    if (tenantRow[0]?.isPlatform) {
+      const rows = await tenantDb.select({ count: sql<number>`count(*)::int` }).from(idpProviders).where(eq(idpProviders.isEnabled, true));
+      if ((rows[0]?.count ?? 0) <= 1) {
+        return NextResponse.json({ error: "Cannot disable the last SSO provider on a platform tenant" }, { status: 409 });
+      }
+    }
+  }
 
   await tenantDb
     .update(idpProviders)
@@ -77,7 +89,16 @@ export async function DELETE(
   const { providerId } = await params;
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "";
+  const tenantId = session?.user.tenantId ?? "";
   const tenantDb = withTenant(tenantSlug);
+
+  const tenantRow = await db.select({ isPlatform: tenants.isPlatform }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (tenantRow[0]?.isPlatform) {
+    const rows = await tenantDb.select({ count: sql<number>`count(*)::int` }).from(idpProviders);
+    if ((rows[0]?.count ?? 0) <= 1) {
+      return NextResponse.json({ error: "Cannot remove the last SSO provider on a platform tenant" }, { status: 409 });
+    }
+  }
 
   await tenantDb.delete(idpProviders).where(eq(idpProviders.id, providerId));
 
