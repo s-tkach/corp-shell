@@ -26,6 +26,7 @@ export const tenants = pgTable("tenants", {
   slug: text("slug").notNull().unique(),
   displayName: text("display_name").notNull(),
   status: tenantStatusEnum("status").notNull().default("active"),
+  isPlatform: boolean("is_platform").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

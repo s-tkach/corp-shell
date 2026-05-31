@@ -29,6 +29,7 @@ export async function GET() {
       slug: tenants.slug,
       displayName: tenants.displayName,
       status: tenants.status,
+      isPlatform: tenants.isPlatform,
       createdAt: tenants.createdAt,
     })
     .from(tenants)

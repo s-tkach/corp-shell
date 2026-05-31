@@ -19,9 +19,6 @@ function isSetupRoute(pathname: string): boolean {
 }
 
 async function ensurePlatformTenant(): Promise<boolean> {
-  const rows = await db.select({ id: tenants.id }).from(tenants).limit(1);
-  if (rows.length > 0) return true;
-
   await autoBootstrapPlatform();
 
   const check = await db.select({ id: tenants.id }).from(tenants).limit(1);
