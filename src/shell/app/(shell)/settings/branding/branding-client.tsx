@@ -3,6 +3,7 @@
 import React, { useState, useTransition, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -290,6 +291,7 @@ function ColorGroup({ label, colors, overrides, defaults, onChange, defaultOpen 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function BrandingClient({ config }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [appName, setAppName] = useState(config?.appName ?? "");
@@ -328,8 +330,6 @@ export function BrandingClient({ config }: Props) {
   const [savedToastDuration] = useState(config?.toastDuration ?? 5000);
   const [uploading, setUploading] = useState(false);
   const [loginBgUploading, setLoginBgUploading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const loginBgFileRef = useRef<HTMLInputElement>(null);
   const [savedOverrides, setSavedOverrides] = useState<Record<string, string>>(
@@ -410,7 +410,6 @@ export function BrandingClient({ config }: Props) {
 
   async function uploadLogo(file: File) {
     setUploading(true);
-    setError(null);
     try {
       const res = await fetch("/api/settings/branding", {
         method: "POST",
@@ -418,7 +417,7 @@ export function BrandingClient({ config }: Props) {
         body: JSON.stringify({ fileName: file.name, contentType: file.type }),
       });
       const urlData = await res.json() as { uploadUrl?: string; publicUrl?: string; error?: string };
-      if (!res.ok) { setError(urlData.error ?? "Failed to get upload URL"); return; }
+      if (!res.ok) { showToast({ title: urlData.error ?? "Failed to get upload URL", variant: "error" }); return; }
       const { uploadUrl, publicUrl } = urlData as { uploadUrl: string; publicUrl: string };
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       setLogoUrl(publicUrl);
@@ -430,7 +429,6 @@ export function BrandingClient({ config }: Props) {
 
   async function uploadLoginBg(file: File) {
     setLoginBgUploading(true);
-    setError(null);
     try {
       const res = await fetch("/api/settings/branding", {
         method: "POST",
@@ -438,7 +436,7 @@ export function BrandingClient({ config }: Props) {
         body: JSON.stringify({ fileName: file.name, contentType: file.type, uploadType: "login-bg" }),
       });
       const urlData = await res.json() as { uploadUrl?: string; publicUrl?: string; error?: string };
-      if (!res.ok) { setError(urlData.error ?? "Failed to get upload URL"); return; }
+      if (!res.ok) { showToast({ title: urlData.error ?? "Failed to get upload URL", variant: "error" }); return; }
       const { uploadUrl, publicUrl } = urlData as { uploadUrl: string; publicUrl: string };
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       setLoginBgImageUrl(publicUrl);
@@ -449,8 +447,6 @@ export function BrandingClient({ config }: Props) {
   }
 
   async function save() {
-    setError(null);
-    setSaved(false);
     const primaryHex = colorOverrides["--primary"];
     const res = await fetch("/api/settings/branding", {
       method: "PATCH",
@@ -478,13 +474,13 @@ export function BrandingClient({ config }: Props) {
       }),
     });
     const data = await res.json() as { error?: string };
-    if (!res.ok) { setError(data.error ?? "Failed to save branding"); return; }
+    if (!res.ok) { showToast({ title: data.error ?? "Failed to save branding", variant: "error" }); return; }
     for (const [variable, hex] of Object.entries(colorOverrides)) {
       document.documentElement.style.setProperty(variable, hexToHslString(hex));
     }
     setSavedOverrides(colorOverrides);
     setSavedOverridesDark(colorOverridesDark);
-    setSaved(true);
+    showToast({ title: "Branding saved", variant: "success" });
     refresh();
   }
 
@@ -905,8 +901,6 @@ export function BrandingClient({ config }: Props) {
                   {unsavedCount} unsaved {unsavedCount === 1 ? "change" : "changes"}
                 </span>
               )}
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              {saved && <p className="text-sm text-green-600 dark:text-green-400">Saved</p>}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">

@@ -1,10 +1,17 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Bell, X } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, X, XCircle } from "lucide-react";
 import { useNotifications } from "./notification-provider";
 import { useShellStore } from "@/lib/store/shell-store";
-import type { NotificationItem, ToastConfig } from "./notification-provider";
+import type { NotificationItem, ToastConfig, ToastVariant } from "./notification-provider";
+
+function ToastIcon({ variant }: { variant: ToastVariant | undefined }) {
+  if (variant === "success") return <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-green-500" />;
+  if (variant === "warning") return <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-yellow-500" />;
+  if (variant === "error") return <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />;
+  return <Bell className="h-4 w-4 mt-0.5 flex-shrink-0" />;
+}
 
 function Toast({
   notification,
@@ -29,7 +36,7 @@ function Toast({
         borderColor: config.borderColor,
       }}
     >
-      <Bell className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: config.textColor, opacity: 0.6 }} />
+      <ToastIcon variant={notification.variant} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{notification.title}</p>
         <p className="text-xs line-clamp-2" style={{ color: config.textColor, opacity: 0.6 }}>{notification.body}</p>

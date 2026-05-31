@@ -26,6 +26,8 @@ export const DEFAULT_TOAST_CONFIG: ToastConfig = {
   duration: 5000,
 };
 
+export type ToastVariant = "default" | "success" | "warning" | "error";
+
 export interface NotificationItem {
   id: string;
   title: string;
@@ -40,6 +42,7 @@ export interface NotificationItem {
   createdBy: string;
   createdAt: string;
   isRead: boolean;
+  variant?: ToastVariant;
 }
 
 interface NotificationsContextValue {
@@ -51,6 +54,7 @@ interface NotificationsContextValue {
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
   refresh: () => Promise<void>;
+  showToast: (toast: { title: string; body?: string; variant?: ToastVariant }) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -146,9 +150,34 @@ export function NotificationProvider({ children, toastConfig = DEFAULT_TOAST_CON
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const showToast = useCallback(
+    ({ title, body, variant }: { title: string; body?: string; variant?: ToastVariant }) => {
+      const id = crypto.randomUUID();
+      const item: NotificationItem = {
+        id,
+        title,
+        body: body ?? "",
+        actionLabel: null,
+        actionType: null,
+        actionPayload: null,
+        targetType: "all",
+        targetUserId: null,
+        targetSubLevel: null,
+        expiresAt: null,
+        createdBy: "",
+        createdAt: new Date().toISOString(),
+        isRead: true,
+        variant,
+      };
+      setToasts((prev) => [item, ...prev].slice(0, 3));
+      setTimeout(() => dismissToast(id), toastConfig.duration);
+    },
+    [dismissToast, toastConfig.duration]
+  );
+
   return (
     <NotificationsContext.Provider
-      value={{ notifications: notifs, unreadCount, toasts, toastConfig, dismissToast, markRead, markAllRead, refresh }}
+      value={{ notifications: notifs, unreadCount, toasts, toastConfig, dismissToast, markRead, markAllRead, refresh, showToast }}
     >
       {children}
     </NotificationsContext.Provider>

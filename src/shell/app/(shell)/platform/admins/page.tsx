@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 
 interface Admin {
   id: string;
@@ -13,11 +14,10 @@ interface Admin {
 }
 
 export default function PlatformAdminsPage() {
+  const { showToast } = useNotifications();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -29,8 +29,6 @@ export default function PlatformAdminsPage() {
 
   async function handleInvite() {
     setSaving(true);
-    setError(null);
-    setSuccess(null);
     try {
       const res = await fetch("/api/platform/admins", {
         method: "POST",
@@ -39,12 +37,11 @@ export default function PlatformAdminsPage() {
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? "Failed to invite admin");
+        showToast({ title: data.error ?? "Failed to invite admin", variant: "error" });
         return;
       }
-      setSuccess(`${email} added as platform admin.`);
+      showToast({ title: `${email} added as platform admin.`, variant: "success" });
       setEmail("");
-      // Refresh list
       const listRes = await fetch("/api/platform/admins");
       const updated = await listRes.json() as Admin[];
       setAdmins(updated);
@@ -64,10 +61,6 @@ export default function PlatformAdminsPage() {
         <p className="text-sm text-muted-foreground">
           Add an email to grant platform admin access. The user will receive the role on their next OIDC login.
         </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && (
-          <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
-        )}
         <div className="flex gap-2 items-end">
           <div className="flex-1 space-y-1">
             <Label htmlFor="adminEmail">Email</Label>

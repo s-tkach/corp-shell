@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CheckCircle, Loader2 } from "lucide-react";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 
 interface Tenant {
   id: string;
@@ -34,12 +35,11 @@ const EMPTY_FORM = {
 type OidcStatus = "idle" | "testing" | "ok" | "error";
 
 export default function PlatformTenantsPage() {
+  const { showToast } = useNotifications();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [oidcStatus, setOidcStatus] = useState<OidcStatus>("idle");
   const [oidcError, setOidcError] = useState("");
@@ -71,7 +71,6 @@ export default function PlatformTenantsPage() {
 
   async function handleCreate() {
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch("/api/platform/tenants", {
         method: "POST",
@@ -80,14 +79,14 @@ export default function PlatformTenantsPage() {
       });
       const data = await res.json() as { error?: string; tenantId?: string };
       if (!res.ok) {
-        setError(data.error ?? "Failed to create tenant");
+        showToast({ title: data.error ?? "Failed to create tenant", variant: "error" });
         return;
       }
       setTenants((prev) => [
         ...prev,
         { id: data.tenantId!, slug: form.slug, displayName: form.displayName, status: "active", isPlatform: false, createdAt: new Date().toISOString() },
       ]);
-      setSuccess(`Tenant "${form.displayName}" created successfully.`);
+      showToast({ title: `Tenant "${form.displayName}" created successfully.`, variant: "success" });
       setAdding(false);
       setForm(EMPTY_FORM);
       setOidcStatus("idle");
@@ -98,7 +97,6 @@ export default function PlatformTenantsPage() {
 
   function closeDialog() {
     setAdding(false);
-    setError(null);
     setOidcStatus("idle");
   }
 
@@ -121,22 +119,14 @@ export default function PlatformTenantsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Tenants</h1>
-        <Button onClick={() => { setAdding(true); setSuccess(null); }}>New Tenant</Button>
+        <Button onClick={() => setAdding(true)}>New Tenant</Button>
       </div>
-
-      {success && (
-        <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 p-4 text-sm text-green-800 dark:text-green-300">
-          {success}
-        </div>
-      )}
 
       <Dialog open={adding} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Tenant</DialogTitle>
           </DialogHeader>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="space-y-3">
             <div className="space-y-1">

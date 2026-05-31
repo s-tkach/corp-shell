@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,7 @@ interface Props {
 }
 
 export function RoleManagerClient({ roles: initialRoles, mappings: initialMappings }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -52,7 +54,6 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
 
   const [mappingDialog, setMappingDialog] = useState<{ open: boolean; roleId: string | null }>({ open: false, roleId: null });
   const [mappingGroup, setMappingGroup] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const [policyPanel, setPolicyPanel] = useState<{ roleId: string; roleName: string } | null>(null);
   const [allPolicies, setAllPolicies] = useState<PlatformPolicy[]>([]);
@@ -76,7 +77,6 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
   }
 
   async function saveRole() {
-    setError(null);
     const { editing } = roleDialog;
     if (editing) {
       const res = await fetch(`/api/settings/roles/${editing.id}`, {
@@ -85,7 +85,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
         body: JSON.stringify({ displayName: roleForm.displayName }),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to update role"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to update role", variant: "error" }); return; }
     } else {
       const res = await fetch("/api/settings/roles", {
         method: "POST",
@@ -93,7 +93,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
         body: JSON.stringify(roleForm),
       });
       const data = await res.json() as { error?: string };
-      if (!res.ok) { setError(data.error ?? "Failed to create role"); return; }
+      if (!res.ok) { showToast({ title: data.error ?? "Failed to create role", variant: "error" }); return; }
     }
     setRoleDialog({ open: false, editing: null });
     refresh();
@@ -104,7 +104,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
     const res = await fetch(`/api/settings/roles/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json() as { error: string };
-      alert(data.error);
+      showToast({ title: data.error, variant: "error" });
       return;
     }
     refresh();
@@ -118,7 +118,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
       body: JSON.stringify({ idpGroupName: mappingGroup.trim() }),
     });
     const data = await res.json() as { error?: string };
-    if (!res.ok) { setError(data.error ?? "Failed to add mapping"); return; }
+    if (!res.ok) { showToast({ title: data.error ?? "Failed to add mapping", variant: "error" }); return; }
     setMappingGroup("");
     setMappingDialog({ open: false, roleId: null });
     refresh();
@@ -152,7 +152,6 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
   async function savePolicies() {
     if (!policyPanel) return;
     setPoliciesSaving(true);
-    setPolicyError(null);
     try {
       const res = await fetch(`/api/settings/roles/${policyPanel.roleId}/policies`, {
         method: "PUT",
@@ -161,7 +160,7 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
       });
       if (!res.ok) {
         const data = await res.json() as { error: string };
-        setPolicyError(data.error ?? "Failed to save");
+        showToast({ title: data.error ?? "Failed to save", variant: "error" });
         return;
       }
       setPolicyPanel(null);
@@ -187,8 +186,6 @@ export function RoleManagerClient({ roles: initialRoles, mappings: initialMappin
           <Plus className="mr-2 h-4 w-4" /> New Role
         </Button>
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Card>
         <Table>

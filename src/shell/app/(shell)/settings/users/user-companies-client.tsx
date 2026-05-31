@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -33,10 +34,10 @@ function flattenTree(
 }
 
 export function UserCompaniesClient({ userId, allCompanies, assignedCompanyIds }: Props) {
+  const { showToast } = useNotifications();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set(assignedCompanyIds));
-  const [error, setError] = useState<string | null>(null);
 
   const flat = flattenTree(allCompanies);
 
@@ -50,19 +51,17 @@ export function UserCompaniesClient({ userId, allCompanies, assignedCompanyIds }
   }
 
   async function handleSave() {
-    setError(null);
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/settings/users/${userId}/companies`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ companyIds: Array.from(selected) }),
-        });
-        if (!res.ok) throw new Error("Failed to save");
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "An error occurred");
+      const res = await fetch(`/api/settings/users/${userId}/companies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyIds: Array.from(selected) }),
+      });
+      if (!res.ok) {
+        showToast({ title: "Failed to save company access", variant: "error" });
+        return;
       }
+      router.refresh();
     });
   }
 
@@ -95,7 +94,6 @@ export function UserCompaniesClient({ userId, allCompanies, assignedCompanyIds }
           </div>
         ))}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
       <Button size="sm" onClick={handleSave} disabled={isPending}>
         {isPending ? "Saving…" : "Save company access"}
       </Button>
