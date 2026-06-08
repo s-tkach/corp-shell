@@ -492,7 +492,7 @@ npm publish --access public → @s-tkach/create-shell-app on GitHub Packages
 Trigger: tag `shell-app/vX.Y.Z` pushed to `main`.
 
 ```
-pnpm --filter shell build    # Next.js production build (validates the source compiles)
+pnpm --filter shell typecheck    # tsc --noEmit (validates the source type-checks)
   ↓
 npm publish --access public → @s-tkach/shell-app on GitHub Packages
   (files: app/, components/, lib/, public/, middleware.ts, next.config.ts, etc.
@@ -500,6 +500,8 @@ npm publish --access public → @s-tkach/shell-app on GitHub Packages
 ```
 
 The published package contains raw TypeScript/TSX source. Consumers receive the source tree, not a compiled bundle — each instance runs its own `next build` in its own deployment environment.
+
+The publish gate runs `tsc --noEmit`, not `next build`. With `cacheComponents` enabled, `next build` prerenders pages that perform uncached database reads, so it cannot run without a reachable database — which the publish pipeline deliberately has none of. Type-checking validates the source before publishing; the full `next build` runs in each consumer instance against its own database.
 
 ---
 

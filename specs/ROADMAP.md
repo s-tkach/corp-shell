@@ -649,7 +649,7 @@ Before marking v1 as released, confirm:
 #### M15-2: GitHub Actions publish workflow
 - [x] Create `.github/workflows/publish-shell-app.yml`
 - [x] Trigger: tag `shell-app/vX.Y.Z`
-- [x] Steps: checkout → pnpm install → `pnpm --filter @s-tkach/shell-app build` (validates source compiles) → `npm publish --access public`
+- [x] Steps: checkout → pnpm install → `pnpm --filter @s-tkach/shell-app typecheck` (validates source type-checks; `next build` can't run DB-free under cacheComponents) → `npm publish --access public`
 - [x] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@s-tkach/shell-app@1.0.0` to GitHub Packages
 
 #### M15-3: `create-shell-app init` subcommand
