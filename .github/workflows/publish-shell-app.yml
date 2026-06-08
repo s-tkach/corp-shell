@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace SDK dependency
+        run: pnpm --filter @s-tkach/shell-sdk build
+
       - name: Build (validate source compiles)
         run: pnpm --filter @s-tkach/shell-app build
 
