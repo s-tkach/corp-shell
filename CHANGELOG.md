@@ -18,6 +18,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - User access scoped to assigned companies and all descendants via closure table (`company_ancestors`)
 - `PUT /api/users/me/company` endpoint for active company switching (cookie-based)
 
+### Changed
+
+- Published package scope renamed `@corp/*` → `@s-tkach/*` to match the GitHub org (`github.com/s-tkach`); GitHub Packages ties the scope to the owning org. Affects `@s-tkach/shell-sdk`, `@s-tkach/create-shell-app`, `@s-tkach/shell-app`, and the child-app template
+- Packages now publish with **public** access (`--access public`) instead of restricted, so anyone with a GitHub account can install them (a read token is still required, as GitHub Packages mandates auth even for public packages)
+- Added `publishConfig` (GitHub Packages registry + public access) and `repository` metadata to all three publishable packages; added root `.npmrc` mapping the `@s-tkach` scope and `.npmrc.example` documenting auth setup
+
 ---
 
 ## [2.1.0] — 2026-05-26
@@ -63,10 +69,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **M6** — Data-driven sidebar (DB-backed, role/tier-filtered); header with breadcrumbs, user dropdown, theme toggle; collapse state persistence
 - **M7** — Admin Panel with 7 sections: Menu Manager, Role Manager, User Manager, SSO Status, Application Registry, Subscription Tiers, Theme & Branding
 - **M8** — Module Federation host (runtime script federation); child app mount page; `ShellSDKProvider`; error boundary
-- **M9** — `@corp/shell-sdk` package (hooks, event bus, Tailwind preset); `@corp/create-shell-app` CLI scaffolder; GitHub Packages publish pipelines
+- **M9** — `@s-tkach/shell-sdk` package (hooks, event bus, Tailwind preset); `@s-tkach/create-shell-app` CLI scaffolder; GitHub Packages publish pipelines
 - **M10** — Subscription & entitlement engine; upgrade prompt; subscription expiry enforcement; HMAC-signed webhook endpoint
 - **M11** — Structured JSON logging; X-Ray request tracing; CSP and security headers
 - **M12** — Performance and load validation (P95 LCP < 2s; MF cold load < 1.5s; 1000 concurrent sessions)
 - **M13** — Notifications system: bell icon, unread badge, SSE real-time push, toast notifications, admin page, session-auth push API for child apps
 - **M14** — Open-source readiness: local crypto/storage providers; Docker Compose local dev; conditional CSP; OSS contribution files; Vitest test suite
-- **M15** — `src/shell` published as `@corp/shell-app`; CLI extended with `init` and `update` subcommands.
+- **M15** — `src/shell` published as `@s-tkach/shell-app`; CLI extended with `init` and `update` subcommands.

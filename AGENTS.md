@@ -54,9 +54,9 @@
 
 ```bash
 pnpm install                          # Install dependencies
-pnpm --filter @corp/shell-app dev     # Run dev server
-pnpm --filter @corp/shell-app test    # Run tests
+pnpm --filter @s-tkach/shell-app dev     # Run dev server
+pnpm --filter @s-tkach/shell-app test    # Run tests
 pnpm lint                             # Lint
 pnpm typecheck                        # Typecheck
-pnpm --filter @corp/shell-app build   # Production build
+pnpm --filter @s-tkach/shell-app build   # Production build
 ```

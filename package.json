@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @corp/shell-app dev",
-    "build": "pnpm --filter @corp/shell-app build",
-    "start": "pnpm --filter @corp/shell-app start",
-    "typecheck": "pnpm --filter @corp/shell-app typecheck",
-    "lint": "pnpm --filter @corp/shell-app lint",
-    "test": "pnpm --filter @corp/shell-app test",
+    "dev": "pnpm --filter @s-tkach/shell-app dev",
+    "build": "pnpm --filter @s-tkach/shell-app build",
+    "start": "pnpm --filter @s-tkach/shell-app start",
+    "typecheck": "pnpm --filter @s-tkach/shell-app typecheck",
+    "lint": "pnpm --filter @s-tkach/shell-app lint",
+    "test": "pnpm --filter @s-tkach/shell-app test",
     "drizzle-kit": "node --env-file=src/shell/.env.local node_modules/drizzle-kit/bin.cjs",
-    "dev:fresh": "pnpm --filter @corp/shell-app dev:fresh"
+    "dev:fresh": "pnpm --filter @s-tkach/shell-app dev:fresh"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0",

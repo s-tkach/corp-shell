@@ -7,7 +7,7 @@ import { AppErrorBoundary } from "@/components/shell/error-boundary";
 import { AppSkeleton } from "@/components/shell/app-skeleton";
 import { AppErrorView } from "@/components/shell/app-error-view";
 import type { RegisteredApp } from "@/lib/mf/router";
-import type { ShellUser } from "@corp/shell-sdk";
+import type { ShellUser } from "@s-tkach/shell-sdk";
 
 interface ChildAppHostProps {
   apps: RegisteredApp[];

@@ -1,7 +1,7 @@
 import { fetchRegisteredApps } from "@/lib/mf/router";
 import { auth } from "@/lib/auth";
 import { ChildAppHost } from "./child-app-host";
-import type { ShellUser } from "@corp/shell-sdk";
+import type { ShellUser } from "@s-tkach/shell-sdk";
 
 export default async function SlugPage() {
   const [apps, session] = await Promise.all([

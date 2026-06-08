@@ -1,0 +1,6 @@
+# Copy the auth line below into your user-level ~/.npmrc (NOT this committed file),
+# or export NODE_AUTH_TOKEN in CI. A GitHub PAT with read:packages is enough to
+# install; write:packages is required to publish.
+#
+# @s-tkach:registry=https://npm.pkg.github.com
+# //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN

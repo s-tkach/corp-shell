@@ -18,11 +18,11 @@ The Corporate Application Shell is a **Next.js 15 monorepo** deployed on AWS via
 ## 2. Repository Structure
 
 ```
-corp-shell/                          ← monorepo root (also the @corp/shell-app source)
+corp-shell/                          ← monorepo root (also the @s-tkach/shell-app source)
 ├── .shell-version                   # Installed shell version (written by create-shell-app init/update)
 ├── package.json                     # Workspace root (pnpm workspaces)
 ├── src/
-│   └── shell/                       # Next.js 15 application — published as @corp/shell-app
+│   └── shell/                       # Next.js 15 application — published as @s-tkach/shell-app
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout (Server Component): auth, menu, sidebar
 │   │   ├── (auth)/                  # /login, /api/auth/callback, /error, /setup
@@ -68,13 +68,13 @@ corp-shell/                          ← monorepo root (also the @corp/shell-app
 │   │       └── router.ts            # MF remote resolution by route prefix
 │   └── middleware.ts                # Auth gate + RBAC guard (runs on every request)
 ├── packages/
-│   ├── shell-sdk/                   # @corp/shell-sdk — published to GitHub Packages
+│   ├── shell-sdk/                   # @s-tkach/shell-sdk — published to GitHub Packages
 │   │   ├── src/
 │   │   │   ├── hooks/               # useShellUser, useShellNavigate, useShellTheme
 │   │   │   ├── events/              # ShellEventBus
 │   │   │   └── tailwind/            # Shared design token preset
 │   │   └── package.json
-│   └── create-shell-app/            # @corp/create-shell-app CLI (init, update, new subcommands)
+│   └── create-shell-app/            # @s-tkach/create-shell-app CLI (init, update, new subcommands)
 │       ├── src/
 │       │   └── index.ts             # CLI entry: routes init / update / new subcommands
 │       └── template/                # Child app project template
@@ -100,7 +100,7 @@ corp-shell/                          ← monorepo root (also the @corp/shell-app
 | File storage | S3 or local disk | — | Logo uploads; `STORAGE_PROVIDER=s3\|local`; defaults to `local` when `AWS_S3_BUCKET` is absent |
 | Unit/integration tests | Vitest | latest | `crypto.ts`, `auth.ts`, `middleware.ts`, setup-complete route |
 | CI/CD | GitHub Actions | — | Child apps deploy independently; shell via Amplify |
-| Package registry | GitHub Packages | — | `@corp/shell-sdk`, `@corp/create-shell-app` |
+| Package registry | GitHub Packages | — | `@s-tkach/shell-sdk`, `@s-tkach/create-shell-app` |
 | Package manager | pnpm workspaces | 9.x | Monorepo; shared lockfile |
 
 ---
@@ -140,7 +140,7 @@ AWS KMS
   Encrypts OIDC client secret stored in shell_config DB row
 
 GitHub Packages
-  @corp/shell-sdk, @corp/create-shell-app
+  @s-tkach/shell-sdk, @s-tkach/create-shell-app
 ```
 
 **Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `src/shell/.env.local`.
@@ -196,7 +196,7 @@ The shell owns layout, auth, and navigation. Child apps own their feature conten
 - Export a default `AppEntry(): JSX.Element` from its MF config
 - Be a React Client Component
 - Not import Next.js-specific APIs (`next/navigation`, `next/image`, etc.)
-- Use `@corp/shell-sdk` for user context, navigation, and theme
+- Use `@s-tkach/shell-sdk` for user context, navigation, and theme
 
 **Shell guarantees to child apps:**
 - `ShellSDKProvider` wraps `AppEntry` — all SDK hooks are available
@@ -311,7 +311,7 @@ new NextFederationPlugin({
   shared: {
     react:             { singleton: true, requiredVersion: '^18' },
     'react-dom':       { singleton: true, requiredVersion: '^18' },
-    '@corp/shell-sdk': { singleton: true },
+    '@s-tkach/shell-sdk': { singleton: true },
   },
 })
 ```
@@ -477,14 +477,14 @@ aws cloudfront create-invalidation
 ```
 pnpm --filter shell-sdk build
   ↓
-npm publish --access restricted → @corp/shell-sdk on GitHub Packages
+npm publish --access public → @s-tkach/shell-sdk on GitHub Packages
 ```
 
 **CLI** (trigger: tag `create-shell-app/v*.*.*`):
 ```
 pnpm --filter create-shell-app build
   ↓
-npm publish --access restricted → @corp/create-shell-app on GitHub Packages
+npm publish --access public → @s-tkach/create-shell-app on GitHub Packages
 ```
 
 ### 11.4 Shell App Publish Pipeline
@@ -494,7 +494,7 @@ Trigger: tag `shell-app/vX.Y.Z` pushed to `main`.
 ```
 pnpm --filter shell build    # Next.js production build (validates the source compiles)
   ↓
-npm publish --access restricted → @corp/shell-app on GitHub Packages
+npm publish --access public → @s-tkach/shell-app on GitHub Packages
   (files: app/, components/, lib/, public/, middleware.ts, next.config.ts, etc.
    — full source tree, not the compiled .next output)
 ```
@@ -586,7 +586,7 @@ The platform tenant schema (roles, subscriptionTiers, tenantSubscription, shellC
 | PostgreSQL over DynamoDB | PostgreSQL | RBAC, menu, and admin queries are relational; Drizzle ORM type safety |
 | Single AWS account | One account | Simplified IAM, networking, and cost tracking for v1 |
 | Fork over build from scratch | `satnaing/shadcn-admin` | Sidebar, header, Shadcn wiring already done; focus on domain logic |
-| GitHub Packages over npm | GitHub Packages | Org-private packages; GITHUB_TOKEN auth in Actions without extra secrets |
+| GitHub Packages over npm | GitHub Packages | Public packages under the org scope; GITHUB_TOKEN auth in Actions without extra secrets. Note: installs require a read token even for public packages. |
 | AWS Amplify over CDK/SAM | Amplify | First-class Next.js support; managed hosting; no IaC config in repo |
 
 ---
@@ -783,18 +783,18 @@ The `README.md` "Getting started" section is reordered to be local-first: Docker
 
 ### 15.1 Overview
 
-`src/shell` is published as `@corp/shell-app` to GitHub Packages. Consumers do not fork the repository — they provision a shell instance via the CLI and receive future updates as npm package versions.
+`src/shell` is published as `@s-tkach/shell-app` to GitHub Packages. Consumers do not fork the repository — they provision a shell instance via the CLI and receive future updates as npm package versions.
 
 ```
 GitHub Packages
-  @corp/shell-app@x.y.z  ← full Next.js source tree
+  @s-tkach/shell-app@x.y.z  ← full Next.js source tree
         ↓
-npx @corp/create-shell-app init <name>
-  → downloads @corp/shell-app, extracts source into <name>/
+npx @s-tkach/create-shell-app init <name>
+  → downloads @s-tkach/shell-app, extracts source into <name>/
   → writes <name>/.shell-version
 
-npx @corp/create-shell-app update [--version x.y.z]
-  → downloads target @corp/shell-app version
+npx @s-tkach/create-shell-app update [--version x.y.z]
+  → downloads target @s-tkach/shell-app version
   → full overwrite of shell source files
   → operator runs: pnpm install + pnpm drizzle-kit migrate
 ```
@@ -812,7 +812,7 @@ The full-overwrite update model is safe because all instance-specific state live
 | Roles & permissions | `roles` + `role_assignments` DB tables |
 | Child app registry | `app_registry` DB table |
 
-Operators MUST NOT modify shell source files. Any file in `src/shell/` is owned by `@corp/shell-app` and will be overwritten on update.
+Operators MUST NOT modify shell source files. Any file in `src/shell/` is owned by `@s-tkach/shell-app` and will be overwritten on update.
 
 ### 15.3 Version Tracking
 
@@ -828,7 +828,7 @@ A `.shell-version` file at the instance repo root records the installed version:
 
 | Subcommand | Purpose |
 |------------|---------|
-| `init <name>` | Provision a new shell host instance from `@corp/shell-app` |
+| `init <name>` | Provision a new shell host instance from `@s-tkach/shell-app` |
 | `update [--version X.Y.Z]` | Full-overwrite update of current instance |
 | `new <app-name>` | Scaffold a new Module Federation child app (existing behaviour) |
 
@@ -836,7 +836,7 @@ A `.shell-version` file at the instance repo root records the installed version:
 
 ```json
 {
-  "name": "@corp/shell-app",
+  "name": "@s-tkach/shell-app",
   "version": "1.0.0",
   "private": false,
   "files": [

@@ -1,5 +1,5 @@
 {
-  "name": "@corp/{{APP_NAME}}",
+  "name": "@s-tkach/{{APP_NAME}}",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,7 @@
     "serve": "webpack serve --config webpack.config.js --port 3001"
   },
   "dependencies": {
-    "@corp/shell-sdk": "^0.1.0",
+    "@s-tkach/shell-sdk": "^0.1.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
