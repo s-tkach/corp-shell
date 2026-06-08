@@ -51,7 +51,7 @@ importers:
 
   packages/test-child-app:
     dependencies:
-      '@corp/shell-sdk':
+      '@s-tkach/shell-sdk':
         specifier: workspace:*
         version: link:../shell-sdk
       react:
@@ -91,9 +91,6 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1048.0
         version: 3.1048.0
-      '@corp/shell-sdk':
-        specifier: workspace:*
-        version: link:../../packages/shell-sdk
       '@radix-ui/react-checkbox':
         specifier: ^1.3.3
         version: 1.3.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -124,6 +121,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@s-tkach/shell-sdk':
+        specifier: workspace:*
+        version: link:../../packages/shell-sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

@@ -10,6 +10,8 @@ out/
 dist/
 build/
 .turbo/
+.pack-output/
+*.tgz
 
 # SST / AWS CDK
 .sst/
