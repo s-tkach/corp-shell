@@ -1,4 +1,4 @@
-import { useShellUser } from "@corp/shell-sdk";
+import { useShellUser } from "@s-tkach/shell-sdk";
 
 export default function AppEntry() {
   const user = useShellUser();

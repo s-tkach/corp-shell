@@ -1,5 +1,5 @@
 {
-  "name": "@corp/create-shell-app",
+  "name": "@s-tkach/create-shell-app",
   "version": "1.0.0",
   "description": "Scaffold and manage Corp shell instances and child apps",
   "bin": {
@@ -9,6 +9,15 @@
     "dist",
     "template"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/s-tkach/corp-shell.git",
+    "directory": "packages/create-shell-app"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"

@@ -32,7 +32,7 @@ After deploying, register this app in the Corp Admin Panel:
 
 | Secret | Description |
 |--------|-------------|
-| `GITHUB_TOKEN` | Auto-provided — used to install `@corp/shell-sdk` from GitHub Packages |
+| `GITHUB_TOKEN` | Auto-provided — used to install `@s-tkach/shell-sdk` from GitHub Packages |
 | `S3_BUCKET` | S3 bucket name for static assets |
 | `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution to invalidate after deploy |
 | `AWS_ACCESS_KEY_ID` | AWS deploy credentials |

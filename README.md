@@ -46,8 +46,8 @@ corp-shell/
 │       ├── db/                # Drizzle client, schema, migrations
 │       └── mf/                # Module Federation remote loader
 ├── packages/
-│   ├── shell-sdk/             # @corp/shell-sdk — published to GitHub Packages
-│   └── create-shell-app/      # @corp/create-shell-app CLI
+│   ├── shell-sdk/             # @s-tkach/shell-sdk — published to GitHub Packages
+│   └── create-shell-app/      # @s-tkach/create-shell-app CLI
 ```
 
 ## Getting started
@@ -145,14 +145,14 @@ WEBHOOK_SECRET=<from Secrets Manager>
 New operators can receive a fully configured shell without forking this repository:
 
 ```bash
-npx @corp/create-shell-app init my-corp-shell
+npx @s-tkach/create-shell-app init my-corp-shell
 cd my-corp-shell
 cp .env.local.example .env.local
 # Fill in NEXTAUTH_SECRET (openssl rand -base64 32) and ENCRYPTION_KEY (openssl rand -hex 32)
 docker compose up -d
 pnpm install
 pnpm drizzle-kit migrate
-pnpm --filter @corp/shell-app dev
+pnpm --filter @s-tkach/shell-app dev
 ```
 
 Open `http://localhost:3000` → complete the setup wizard.
@@ -160,8 +160,8 @@ Open `http://localhost:3000` → complete the setup wizard.
 To update to a newer shell version:
 
 ```bash
-npx @corp/create-shell-app update             # latest
-npx @corp/create-shell-app update --version 1.2.0  # pinned
+npx @s-tkach/create-shell-app update             # latest
+npx @s-tkach/create-shell-app update --version 1.2.0  # pinned
 pnpm install && pnpm drizzle-kit migrate
 ```
 
@@ -170,10 +170,10 @@ The `.shell-version` file at the repo root records the installed version. All in
 ## Onboarding a child app
 
 ```bash
-npx @corp/create-shell-app new my-app
+npx @s-tkach/create-shell-app new my-app
 ```
 
-This scaffolds a React + TypeScript + Webpack 5 project with Module Federation pre-configured, `@corp/shell-sdk` installed, and a GitHub Actions workflow that deploys to S3/CloudFront on push to `main`.
+This scaffolds a React + TypeScript + Webpack 5 project with Module Federation pre-configured, `@s-tkach/shell-sdk` installed, and a GitHub Actions workflow that deploys to S3/CloudFront on push to `main`.
 
 After deploying, register the app in **Admin Panel → Application Registry**. Paste the CloudFront URL, set the route prefix, map routes to sidebar menu items — live for permitted users within 60 seconds.
 
@@ -185,7 +185,7 @@ import {
   useShellNavigate,  // shell-aware navigate(path)
   useShellTheme,     // { mode: 'light' | 'dark', primaryColor }
   ShellEventBus,     // emit / on / off
-} from '@corp/shell-sdk';
+} from '@s-tkach/shell-sdk';
 ```
 
 ## Secrets

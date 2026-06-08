@@ -47,7 +47,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@corp/shell-sdk"],
+  transpilePackages: ["@s-tkach/shell-sdk"],
   cacheComponents: true,
   experimental: {
     // Tree-shake large icon/component libraries to reduce initial bundle size

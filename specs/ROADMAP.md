@@ -28,13 +28,13 @@
 | M6 | Navigation Shell & Menu System | Data-driven sidebar, header, theme toggle |
 | M7 | Admin Panel | All 7 admin sections fully functional |
 | M8 | Module Federation Host | Child apps mountable via MF |
-| M9 | Shell SDK & CLI | `@corp/shell-sdk` and `@corp/create-shell-app` published |
+| M9 | Shell SDK & CLI | `@s-tkach/shell-sdk` and `@s-tkach/create-shell-app` published |
 | M10 | Subscription & Entitlement Engine | Tier-gated nav, upgrade prompt, webhook |
 | M11 | Observability & Security Hardening | Logging, tracing, CSP, audit events |
 | M12 | Performance & Load Validation | NFR targets verified under load |
 | M13 | Notifications System | Bell icon, dropdown, SSE toasts, admin page, session-auth push API |
 | M14 | Open-Source Readiness | AWS dependencies optional; local dev path; OSS DX files; Vitest test coverage |
-| M15 | Shell as Distributable Package | `@corp/shell-app` published; `init` and `update` CLI subcommands |
+| M15 | Shell as Distributable Package | `@s-tkach/shell-app` published; `init` and `update` CLI subcommands |
 | M16 | Multi-Tenant Data Model | Schema-per-tenant; `withTenant()` factory; `provisionTenant()` |
 | M17 | Subdomain Routing + Tenant JWT | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
 | M18 | Dynamic IDP Registration | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
@@ -297,7 +297,7 @@
 
 #### M8-1: Install and configure `@module-federation/nextjs-mf`
 - [x] `@module-federation/nextjs-mf` is incompatible with Next.js 16 (supports up to 15); implemented via runtime script federation instead
-- [x] `shell/next.config.ts`: added `transpilePackages: ["@corp/shell-sdk"]`; remotes resolved at runtime via `shell/lib/mf/router.ts`
+- [x] `shell/next.config.ts`: added `transpilePackages: ["@s-tkach/shell-sdk"]`; remotes resolved at runtime via `shell/lib/mf/router.ts`
 - [x] `proxy.ts` merged with deprecated `middleware.ts` (Next.js 16 requires one file only)
 - [x] **Acceptance:** `pnpm --filter shell build` compiles successfully; no shared module conflicts
 
@@ -317,7 +317,7 @@
 
 #### M8-4: ShellSDKProvider wrapper
 - [x] `shell/components/shell/shell-sdk-provider.tsx`: wraps `AppEntry` in `ShellContext.Provider` with `user`, `navigate` (router.push), `theme` (next-themes)
-- [x] `packages/shell-sdk/`: `@corp/shell-sdk` — `ShellContext`, `useShellUser`, `useShellNavigate`, `useShellTheme`, `ShellEventBus`, tailwind preset
+- [x] `packages/shell-sdk/`: `@s-tkach/shell-sdk` — `ShellContext`, `useShellUser`, `useShellNavigate`, `useShellTheme`, `ShellEventBus`, tailwind preset
 - [x] **Acceptance:** `useShellUser()` inside a child app returns correct user data; `useShellTheme()` returns current theme
 
 #### M8-5: End-to-end MF smoke test
@@ -329,7 +329,7 @@
 
 ## M9 — Shell SDK & CLI
 
-**Goal:** `@corp/shell-sdk` is published to GitHub Packages and usable by child app teams. `@corp/create-shell-app` CLI scaffolds a ready-to-deploy child app project.
+**Goal:** `@s-tkach/shell-sdk` is published to GitHub Packages and usable by child app teams. `@s-tkach/create-shell-app` CLI scaffolds a ready-to-deploy child app project.
 
 ### Tasks
 
@@ -344,9 +344,9 @@
 
 #### M9-2: Shell SDK — publish pipeline
 - [x] `.github/workflows/publish-sdk.yml`: trigger on tag `shell-sdk/v*.*.*`
-- [x] Steps: build → `npm publish --access restricted` with `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
-- [x] Package name: `@corp/shell-sdk` on GitHub Packages
-- [x] **Acceptance:** Tagged release publishes package; `npm install @corp/shell-sdk` resolves from GitHub Packages
+- [x] Steps: build → `npm publish --access public` with `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
+- [x] Package name: `@s-tkach/shell-sdk` on GitHub Packages
+- [x] **Acceptance:** Tagged release publishes package; `npm install @s-tkach/shell-sdk` resolves from GitHub Packages
 
 #### M9-3: Create-shell-app CLI — scaffolder (`new` subcommand)
 - [x] `packages/create-shell-app/src/index.ts`: reads `<app-name>` arg under `new` subcommand, copies `template/` with substitutions
@@ -355,15 +355,15 @@
   - Module Federation remote config (pre-filled `name`, `filename: 'remoteEntry.js'`)
   - `AppEntry.tsx` stub
   - `mf-manifest.json` template
-  - `@corp/shell-sdk` pre-installed in template `package.json`
+  - `@s-tkach/shell-sdk` pre-installed in template `package.json`
   - `.github/workflows/deploy.yml`: build → S3 sync → CloudFront invalidation
   - `README.md` with registration walkthrough
-- [x] **Acceptance:** `npx @corp/create-shell-app new my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
+- [x] **Acceptance:** `npx @s-tkach/create-shell-app new my-app` creates a valid project; `cd my-app && pnpm install && pnpm build` succeeds
 
 #### M9-4: Create-shell-app — publish pipeline
 - [x] `.github/workflows/publish-cli.yml`: trigger on tag `create-shell-app/v*.*.*`
-- [x] Published as `@corp/create-shell-app` on GitHub Packages
-- [x] **Acceptance:** `npx @corp/create-shell-app` resolves from GitHub Packages after publish
+- [x] Published as `@s-tkach/create-shell-app` on GitHub Packages
+- [x] **Acceptance:** `npx @s-tkach/create-shell-app` resolves from GitHub Packages after publish
 
 ---
 
@@ -622,7 +622,7 @@ Before marking v1 as released, confirm:
 - [ ] `super_admin` account verified and secured
 - [ ] All secrets in Secrets Manager; zero secrets in git or Lambda env vars (only ARN references)
 - [ ] CloudWatch alarms configured for error rate, PostgreSQL ACU, and Lambda throttling
-- [ ] `@corp/shell-sdk` v1.0.0 published to GitHub Packages
+- [ ] `@s-tkach/shell-sdk` v1.0.0 published to GitHub Packages
 - [ ] At least one child app successfully onboarded end-to-end (< 2 hours)
 - [ ] Cost Explorer tag `project=corp-shell` shows < $100/month in production
 - [ ] M14 launch criteria all pass (local dev path verified end-to-end)
@@ -632,7 +632,7 @@ Before marking v1 as released, confirm:
 
 ## M15 — Shell as Distributable Package
 
-**Goal:** Publish `src/shell` as `@corp/shell-app` to GitHub Packages and extend `create-shell-app` with `init` and `update` subcommands so operators can provision and update shell instances without forking the repository.
+**Goal:** Publish `src/shell` as `@s-tkach/shell-app` to GitHub Packages and extend `create-shell-app` with `init` and `update` subcommands so operators can provision and update shell instances without forking the repository.
 
 **Depends on:** M9 (SDK & CLI), M14 (OSS readiness / local dev)
 
@@ -641,36 +641,36 @@ Before marking v1 as released, confirm:
 ### Tasks
 
 #### M15-1: Prepare `src/shell` for publication
-- [x] Set `"name": "@corp/shell-app"` and `"private": false` in `src/shell/package.json`
+- [x] Set `"name": "@s-tkach/shell-app"` and `"private": false` in `src/shell/package.json`
 - [x] Add `"files"` array to `src/shell/package.json` (see ARCHITECTURE.md §15.5)
 - [x] Add `shell-app/vX.Y.Z` tag format and release process to `CONTRIBUTING.md`
-- [x] **Acceptance:** `pnpm --filter @corp/shell-app pack --dry-run` lists only source files; no `.next/` or `node_modules/`
+- [x] **Acceptance:** `pnpm --filter @s-tkach/shell-app pack --dry-run` lists only source files; no `.next/` or `node_modules/`
 
 #### M15-2: GitHub Actions publish workflow
 - [x] Create `.github/workflows/publish-shell-app.yml`
 - [x] Trigger: tag `shell-app/vX.Y.Z`
-- [x] Steps: checkout → pnpm install → `pnpm --filter @corp/shell-app build` (validates source compiles) → `npm publish --access restricted`
-- [x] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@corp/shell-app@1.0.0` to GitHub Packages
+- [x] Steps: checkout → pnpm install → `pnpm --filter @s-tkach/shell-app build` (validates source compiles) → `npm publish --access public`
+- [x] **Acceptance:** Pushing tag `shell-app/v1.0.0` publishes `@s-tkach/shell-app@1.0.0` to GitHub Packages
 
 #### M15-3: `create-shell-app init` subcommand
 - [x] Refactor `packages/create-shell-app/src/index.ts` to route `init`, `update`, `new` subcommands
-- [x] `init <name>`: downloads `@corp/shell-app` from GitHub Packages, extracts source tree to `./<name>/`, writes `./<name>/.shell-version`
+- [x] `init <name>`: downloads `@s-tkach/shell-app` from GitHub Packages, extracts source tree to `./<name>/`, writes `./<name>/.shell-version`
 - [x] Existing default behaviour (scaffold child app) moves to `new <name>` subcommand
-- [x] **Acceptance:** `npx @corp/create-shell-app init my-shell` creates a directory with full shell source and `.shell-version` file; `npx @corp/create-shell-app new my-app` still scaffolds a child app project
+- [x] **Acceptance:** `npx @s-tkach/create-shell-app init my-shell` creates a directory with full shell source and `.shell-version` file; `npx @s-tkach/create-shell-app new my-app` still scaffolds a child app project
 
 #### M15-4: `create-shell-app update` subcommand
-- [x] `update [--version X.Y.Z]`: reads `.shell-version` from CWD, downloads target `@corp/shell-app` version, fully overwrites shell source files, updates `.shell-version`
+- [x] `update [--version X.Y.Z]`: reads `.shell-version` from CWD, downloads target `@s-tkach/shell-app` version, fully overwrites shell source files, updates `.shell-version`
 - [x] Prints list of overwritten files and post-update instructions (`pnpm install`, `pnpm drizzle-kit migrate`)
 - [x] **Acceptance:** Running `update --version 1.1.0` in a provisioned instance replaces all shell files and updates `.shell-version` to `1.1.0`
 
 #### M15-5: CLI publish pipeline update
-- [x] Update `publish-cli.yml` to build and publish `@corp/create-shell-app` with the new subcommands
-- [x] Bump `create-shell-app` version to `1.0.0` (breaking change: bare `npx @corp/create-shell-app <name>` removed)
-- [x] **Acceptance:** `npx @corp/create-shell-app --help` shows `init`, `update`, `new` subcommands
+- [x] Update `publish-cli.yml` to build and publish `@s-tkach/create-shell-app` with the new subcommands
+- [x] Bump `create-shell-app` version to `1.0.0` (breaking change: bare `npx @s-tkach/create-shell-app <name>` removed)
+- [x] **Acceptance:** `npx @s-tkach/create-shell-app --help` shows `init`, `update`, `new` subcommands
 
 #### M15-6: Documentation
 - [x] Update `README.md` "Getting started" to show `init` as the primary provisioning path
-- [x] Update `CONTRIBUTING.md` with versioning and release process for `@corp/shell-app`
+- [x] Update `CONTRIBUTING.md` with versioning and release process for `@s-tkach/shell-app`
 - [x] **Acceptance:** A new operator can provision a shell instance using only the README without reading source code
 
 ---

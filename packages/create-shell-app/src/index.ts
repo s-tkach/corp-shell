@@ -7,7 +7,7 @@ import { parseArgs } from "./args";
 const args = parseArgs(process.argv.slice(2));
 
 const HELP = `
-Usage: npx @corp/create-shell-app <command> [options]
+Usage: npx @s-tkach/create-shell-app <command> [options]
 
 Commands:
   init <name>               Provision a new shell host instance
@@ -15,10 +15,10 @@ Commands:
   new <app-name>            Scaffold a new child app project
 
 Examples:
-  npx @corp/create-shell-app init my-corp-shell
-  npx @corp/create-shell-app update
-  npx @corp/create-shell-app update --version 1.2.0
-  npx @corp/create-shell-app new inventory-app
+  npx @s-tkach/create-shell-app init my-corp-shell
+  npx @s-tkach/create-shell-app update
+  npx @s-tkach/create-shell-app update --version 1.2.0
+  npx @s-tkach/create-shell-app new inventory-app
 `.trim();
 
 if (args.command === "help") {
@@ -86,7 +86,7 @@ function runInit(name: string): void {
     process.exit(1);
   }
 
-  console.log(`Downloading @corp/shell-app from GitHub Packages...`);
+  console.log(`Downloading @s-tkach/shell-app from GitHub Packages...`);
   const version = downloadShellApp(destDir, "latest");
 
   fs.writeFileSync(path.join(destDir, ".shell-version"), version, "utf8");
@@ -103,7 +103,7 @@ Next steps:
   docker compose up -d
   pnpm install
   pnpm drizzle-kit migrate
-  pnpm --filter @corp/shell-app dev
+  pnpm --filter @s-tkach/shell-app dev
   # Open http://localhost:3000 → complete the setup wizard
 `);
 }
@@ -124,7 +124,7 @@ function runUpdate(targetVersion: string | undefined): void {
   const resolvedTarget = targetVersion ?? "latest";
 
   console.log(`Updating shell from ${installed} → ${resolvedTarget}...`);
-  console.log("Downloading @corp/shell-app from GitHub Packages...");
+  console.log("Downloading @s-tkach/shell-app from GitHub Packages...");
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const os = require("node:os") as typeof import("node:os");
@@ -167,7 +167,7 @@ function downloadShellApp(destDir: string, version: string): string {
   const os = require("node:os") as typeof import("node:os");
 
   const packageSpec =
-    version === "latest" ? "@corp/shell-app" : `@corp/shell-app@${version}`;
+    version === "latest" ? "@s-tkach/shell-app" : `@s-tkach/shell-app@${version}`;
 
   const packDir = fs.mkdtempSync(path.join(os.tmpdir(), "shell-pack-"));
 

@@ -1,5 +1,5 @@
 {
-  "name": "@corp/test-child-app",
+  "name": "@s-tkach/test-child-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,7 @@
     "serve": "webpack serve --config webpack.config.js --port 3001"
   },
   "dependencies": {
-    "@corp/shell-sdk": "workspace:*",
+    "@s-tkach/shell-sdk": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

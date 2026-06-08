@@ -1,4 +1,4 @@
-name: Publish @corp/shell-sdk
+name: Publish @s-tkach/shell-sdk
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
-          scope: "@corp"
+          scope: "@s-tkach"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -31,6 +31,6 @@ jobs:
         run: pnpm --filter shell-sdk build
 
       - name: Publish
-        run: pnpm --filter shell-sdk publish --access restricted --no-git-checks
+        run: pnpm --filter shell-sdk publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

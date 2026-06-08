@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { ShellContext } from "@corp/shell-sdk";
-import type { ShellUser } from "@corp/shell-sdk";
+import { ShellContext } from "@s-tkach/shell-sdk";
+import type { ShellUser } from "@s-tkach/shell-sdk";
 
 interface ShellSDKProviderProps {
   children: React.ReactNode;

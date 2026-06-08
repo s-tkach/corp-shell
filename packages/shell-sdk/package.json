@@ -1,5 +1,5 @@
 {
-  "name": "@corp/shell-sdk",
+  "name": "@s-tkach/shell-sdk",
   "version": "0.1.0",
   "description": "Shell SDK for Corp child apps",
   "main": "./dist/index.js",
@@ -20,6 +20,15 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/s-tkach/corp-shell.git",
+    "directory": "packages/shell-sdk"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json"
   },
