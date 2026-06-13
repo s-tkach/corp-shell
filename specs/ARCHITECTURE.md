@@ -145,6 +145,8 @@ GitHub Packages
 
 **Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `src/shell/.env.local`.
 
+**Local bootstrap preflight:** `src/shell/scripts/dev-fresh.ts` validates the effective encryption provider before Docker teardown or Next.js startup. If local config resolves to KMS, the script stops with an actionable error instead of continuing to `/api/setup`, because that route encrypts the OIDC client secret during setup. Local bootstrap refuses KMS-backed setup unless the developer intentionally provides a working KMS configuration outside this workflow.
+
 ### 4.2 Request Lifecycle
 
 ```

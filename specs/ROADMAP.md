@@ -599,6 +599,12 @@
   - Encrypts OIDC client secret before writing (verifies ciphertext != plaintext in DB)
 - [x] **Acceptance:** `pnpm --filter shell test` passes all tests with zero failures
 
+#### M14-7: Local bootstrap crypto preflight
+
+- [x] `src/shell/scripts/dev-fresh.ts` validates the effective encryption provider before Docker teardown and app startup
+- [x] KMS-backed local setup fails early with an actionable message instead of reaching `/api/setup`
+- [x] **Acceptance:** `pnpm --filter @s-tkach/shell-app exec vitest run tests/crypto.test.ts tests/unit/dev-fresh-crypto.test.ts` passes and `pnpm run dev:fresh` stops before Docker teardown and app startup when config resolves to KMS
+
 ---
 
 ### M14 Launch Criteria

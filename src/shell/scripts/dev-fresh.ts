@@ -3,6 +3,10 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  getDevFreshCryptoPreflightError,
+  parseDevFreshEnv,
+} from "./dev-fresh-crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -20,15 +24,7 @@ if (!existsSync(envFile)) {
 }
 
 function parseEnvFile(path: string): Record<string, string> {
-  const vars: Record<string, string> = {};
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
-  }
-  return vars;
+  return parseDevFreshEnv(readFileSync(path, "utf8"));
 }
 
 const env = parseEnvFile(envFile);
@@ -37,6 +33,22 @@ const required = ["SETUP_EMAIL", "SETUP_ISSUER", "SETUP_CLIENT_ID", "SETUP_CLIEN
 const missing = required.filter((k) => !env[k]);
 if (missing.length > 0) {
   console.error(`\nMissing required vars in .env.test.local:\n  ${missing.join("\n  ")}\n`);
+  process.exit(1);
+}
+
+if (!existsSync(localEnvFile)) {
+  console.error(
+    `\nMissing ${localEnvFile}\nCreate .env.local with local encryption settings before running dev:fresh.\n`
+  );
+  process.exit(1);
+}
+
+const localEnv = readFileSync(localEnvFile, "utf8");
+const localEnvVars = parseDevFreshEnv(localEnv);
+const cryptoPreflightError = getDevFreshCryptoPreflightError(localEnvVars);
+
+if (cryptoPreflightError) {
+  console.error(`\n${cryptoPreflightError}\n`);
   process.exit(1);
 }
 
@@ -73,7 +85,6 @@ try {
 
 console.log("\n▶ Rotating NEXTAUTH_SECRET in .env.local...");
 const newSecret = randomBytes(32).toString("base64");
-const localEnv = readFileSync(localEnvFile, "utf8");
 if (!/^NEXTAUTH_SECRET=.*$/m.test(localEnv)) {
   console.error(`\nNo NEXTAUTH_SECRET line found in ${localEnvFile}`);
   process.exit(1);
