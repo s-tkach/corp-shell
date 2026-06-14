@@ -13,7 +13,6 @@ interface ShellLayoutClientProps {
   children: React.ReactNode;
   menu: MenuSection[];
   appName: string;
-  logoUrl: string | null;
   userName: string;
   userEmail: string;
   userRoles: string[];
@@ -30,7 +29,6 @@ export function ShellLayoutClient({
   children,
   menu,
   appName,
-  logoUrl,
   userName,
   userEmail,
   userRoles,
@@ -51,7 +49,7 @@ export function ShellLayoutClient({
   return (
     <NotificationProvider toastConfig={toastConfig}>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar menu={menu} appName={appName} logoUrl={logoUrl} userRoles={userRoles} userName={userName} userEmail={userEmail} tenantSlug={tenantSlug} accessibleCompanies={accessibleCompanies} activeCompanyId={activeCompanyId} />
+        <Sidebar menu={menu} appName={appName} userRoles={userRoles} userName={userName} userEmail={userEmail} tenantSlug={tenantSlug} accessibleCompanies={accessibleCompanies} activeCompanyId={activeCompanyId} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header
             menu={menu}

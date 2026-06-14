@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { MenuManagerClient } from "./menu-manager-client";
 
-export default function MenuPage() {
-  redirect("/platform/menu");
+export default function SettingsMenuPage() {
+  return <MenuManagerClient />;
 }

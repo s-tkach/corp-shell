@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useNotifications } from "@/components/shell/notifications/notification-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -21,18 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, Plus, Pencil, Trash2, Folder } from "lucide-react";
-import { ICON_OPTIONS, ICON_MAP } from "@/lib/icon-map";
+import { ChevronDown, ChevronUp, Folder, Pencil, Plus, Trash2 } from "lucide-react";
 
-interface Tenant {
+interface Tier {
   id: string;
   slug: string;
   displayName: string;
+  level: number;
 }
 
 interface Section {
@@ -51,30 +46,23 @@ interface Item {
   route: string;
   icon: string | null;
   badge: string | null;
-  requiredSubLevel: number;
-  requiredRoles: string[];
+  subscriptionTierId: string | null;
+  subscriptionTierLabel: string | null;
+  isInherited: boolean;
   sortOrder: number;
 }
 
-interface Tier {
-  id: string;
-  slug: string;
-  displayName: string;
-  level: number;
-}
-
-interface Role {
-  id: string;
-  slug: string;
-  displayName: string;
-}
-
 interface Props {
-  tenants: Tenant[];
   allTiers: Tier[];
 }
 
-type SectionForm = { label: string; icon: string };
+type ScopeValue = string;
+
+type SectionForm = {
+  label: string;
+  icon: string;
+};
+
 type ItemForm = {
   sectionId: string;
   parentItemId: string;
@@ -82,10 +70,11 @@ type ItemForm = {
   label: string;
   route: string;
   icon: string;
-  requiredSubLevel: string;
-  requiredRoleIds: string[];
+  badge: string;
+  subscriptionScope: string;
 };
 
+const PLATFORM_SCOPE = "platform";
 const emptySectionForm: SectionForm = { label: "", icon: "" };
 const emptyItemForm: ItemForm = {
   sectionId: "",
@@ -94,17 +83,23 @@ const emptyItemForm: ItemForm = {
   label: "",
   route: "",
   icon: "",
-  requiredSubLevel: "none",
-  requiredRoleIds: [],
+  badge: "",
+  subscriptionScope: PLATFORM_SCOPE,
 };
 
-export function MenuManagerClient({ tenants, allTiers }: Props) {
+function buildItemsQuery(selectedScope: ScopeValue): string {
+  if (selectedScope === PLATFORM_SCOPE) {
+    return "/api/platform/menu/items?scope=platform";
+  }
+  return `/api/platform/menu/items?tierId=${selectedScope}`;
+}
+
+export function MenuManagerClient({ allTiers }: Props) {
   const { showToast } = useNotifications();
   const [isPending, startTransition] = useTransition();
-  const [selectedTenantId, setSelectedTenantId] = useState<string>("");
+  const [selectedScope, setSelectedScope] = useState<ScopeValue>(allTiers[0]?.id ?? PLATFORM_SCOPE);
   const [sections, setSections] = useState<Section[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
 
   const [sectionDialog, setSectionDialog] = useState<{ open: boolean; editing: Section | null }>({
     open: false,
@@ -116,96 +111,102 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
     open: false,
     editing: null,
   });
-  const [itemForm, setItemForm] = useState<ItemForm>(emptyItemForm);
-  const [iconSearch, setIconSearch] = useState("");
-  const [sectionIconSearch, setSectionIconSearch] = useState("");
+  const [itemForm, setItemForm] = useState<ItemForm>({
+    ...emptyItemForm,
+    subscriptionScope: allTiers[0]?.id ?? PLATFORM_SCOPE,
+  });
 
-  async function loadTenantData(tenantId: string) {
-    const [sectionsRes, itemsRes, rolesRes] = await Promise.all([
-      fetch(`/api/platform/menu/sections?tenantId=${tenantId}`),
-      fetch(`/api/platform/menu/items?tenantId=${tenantId}`),
-      fetch(`/api/platform/menu/roles?tenantId=${tenantId}`),
+  const scopeLabel = useMemo(() => {
+    if (selectedScope === PLATFORM_SCOPE) return "Platform-only items";
+    return allTiers.find((tier) => tier.id === selectedScope)?.displayName ?? "Selected tier";
+  }, [allTiers, selectedScope]);
+
+  async function loadScopeData(scope: ScopeValue) {
+    const [sectionsRes, itemsRes] = await Promise.all([
+      fetch("/api/platform/menu/sections"),
+      fetch(buildItemsQuery(scope)),
     ]);
-    if (!sectionsRes.ok || !itemsRes.ok || !rolesRes.ok) {
+
+    if (!sectionsRes.ok || !itemsRes.ok) {
       showToast({ title: "Failed to load menu data", variant: "error" });
       setSections([]);
       setItems([]);
-      setAvailableRoles([]);
       return;
     }
-    const [sectionsData, itemsData, rolesData] = await Promise.all([
+
+    const [sectionsData, itemsData] = await Promise.all([
       sectionsRes.json() as Promise<Section[]>,
       itemsRes.json() as Promise<Item[]>,
-      rolesRes.json() as Promise<Role[]>,
     ]);
     setSections(sectionsData);
     setItems(itemsData);
-    setAvailableRoles(rolesData);
   }
 
   useEffect(() => {
-    if (!selectedTenantId) {
-      setSections([]);
-      setItems([]);
-      return;
-    }
-    void loadTenantData(selectedTenantId);
-  }, [selectedTenantId]);
+    void loadScopeData(selectedScope);
+  }, [selectedScope]);
 
   function refresh() {
-    if (!selectedTenantId) return;
     startTransition(() => {
-      void loadTenantData(selectedTenantId);
+      void loadScopeData(selectedScope);
     });
   }
 
   function openNewSection() {
     setSectionForm(emptySectionForm);
-    setSectionIconSearch("");
     setSectionDialog({ open: true, editing: null });
   }
 
-  function openEditSection(s: Section) {
-    setSectionForm({ label: s.label, icon: s.icon ?? "" });
-    setSectionIconSearch("");
-    setSectionDialog({ open: true, editing: s });
+  function openEditSection(section: Section) {
+    setSectionForm({ label: section.label, icon: section.icon ?? "" });
+    setSectionDialog({ open: true, editing: section });
   }
 
   async function saveSection() {
-    const { editing } = sectionDialog;
-    const payload = { label: sectionForm.label, icon: sectionForm.icon || undefined };
+    const payload = {
+      label: sectionForm.label.trim(),
+      icon: sectionForm.icon.trim() || undefined,
+    };
 
-    if (editing) {
-      const res = await fetch(`/api/platform/menu/sections/${editing.id}`, {
+    if (sectionDialog.editing) {
+      const res = await fetch(`/api/platform/menu/sections/${sectionDialog.editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) { showToast({ title: data.error ?? "Failed to update section", variant: "error" }); return; }
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        showToast({ title: data.error ?? "Failed to update section", variant: "error" });
+        return;
+      }
     } else {
       const res = await fetch("/api/platform/menu/sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, tenantId: selectedTenantId }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) { showToast({ title: data.error ?? "Failed to create section", variant: "error" }); return; }
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        showToast({ title: data.error ?? "Failed to create section", variant: "error" });
+        return;
+      }
     }
+
     setSectionDialog({ open: false, editing: null });
     refresh();
   }
 
-  async function deleteSection(id: string) {
+  async function deleteSection(sectionId: string) {
     if (!confirm("Delete this section and all its items?")) return;
-    await fetch(`/api/platform/menu/sections/${id}`, { method: "DELETE" });
+    await fetch(`/api/platform/menu/sections/${sectionId}`, { method: "DELETE" });
     refresh();
   }
 
   async function reorderSection(section: Section, direction: "up" | "down") {
-    const idx = sections.findIndex((s) => s.id === section.id);
+    const idx = sections.findIndex((candidate) => candidate.id === section.id);
     const swap = direction === "up" ? sections[idx - 1] : sections[idx + 1];
     if (!swap) return;
+
     await Promise.all([
       fetch(`/api/platform/menu/sections/${section.id}`, {
         method: "PATCH",
@@ -218,12 +219,17 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify({ sortOrder: section.sortOrder }),
       }),
     ]);
+
     refresh();
   }
 
   function openNewItem(sectionId: string, parentItemId?: string) {
-    setItemForm({ ...emptyItemForm, sectionId, parentItemId: parentItemId ?? "" });
-    setIconSearch("");
+    setItemForm({
+      ...emptyItemForm,
+      sectionId,
+      parentItemId: parentItemId ?? "",
+      subscriptionScope: selectedScope,
+    });
     setItemDialog({ open: true, editing: null });
   }
 
@@ -235,62 +241,70 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
       label: item.label,
       route: item.route,
       icon: item.icon ?? "",
-      requiredSubLevel: item.requiredSubLevel > 0 ? String(item.requiredSubLevel) : "none",
-      requiredRoleIds: availableRoles
-        .filter((r) => item.requiredRoles.includes(r.slug))
-        .map((r) => r.id),
+      badge: item.badge ?? "",
+      subscriptionScope: item.subscriptionTierId ?? PLATFORM_SCOPE,
     });
-    setIconSearch("");
     setItemDialog({ open: true, editing: item });
   }
 
   async function saveItem() {
-    const { editing } = itemDialog;
     const payload = {
       sectionId: itemForm.sectionId,
       parentItemId: itemForm.parentItemId || null,
       isFolder: itemForm.isFolder,
-      label: itemForm.label,
-      route: itemForm.isFolder ? "" : itemForm.route,
-      icon: itemForm.icon || undefined,
-      requiredSubLevel: itemForm.requiredSubLevel === "none" ? 0 : Number(itemForm.requiredSubLevel),
-      requiredRoleIds: itemForm.requiredRoleIds,
+      label: itemForm.label.trim(),
+      route: itemForm.isFolder ? "" : itemForm.route.trim(),
+      icon: itemForm.icon.trim() || undefined,
+      badge: itemForm.badge.trim() || undefined,
+      subscriptionTierId:
+        itemForm.subscriptionScope === PLATFORM_SCOPE ? null : itemForm.subscriptionScope,
     };
 
-    if (editing) {
-      const res = await fetch(`/api/platform/menu/items/${editing.id}`, {
+    if (itemDialog.editing) {
+      const res = await fetch(`/api/platform/menu/items/${itemDialog.editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) { showToast({ title: data.error ?? "Failed to update item", variant: "error" }); return; }
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        showToast({ title: data.error ?? "Failed to update item", variant: "error" });
+        return;
+      }
     } else {
       const res = await fetch("/api/platform/menu/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) { showToast({ title: data.error ?? "Failed to create item", variant: "error" }); return; }
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        showToast({ title: data.error ?? "Failed to create item", variant: "error" });
+        return;
+      }
     }
+
     setItemDialog({ open: false, editing: null });
     refresh();
   }
 
-  async function deleteItem(id: string) {
+  async function deleteItem(itemId: string) {
     if (!confirm("Delete this menu item?")) return;
-    await fetch(`/api/platform/menu/items/${id}`, { method: "DELETE" });
+    await fetch(`/api/platform/menu/items/${itemId}`, { method: "DELETE" });
     refresh();
   }
 
-  async function reorderItem(item: Item, direction: "up" | "down") {
-    const sectionItems = items.filter(
-      (i) => i.sectionId === item.sectionId && (i.parentItemId ?? null) === (item.parentItemId ?? null)
-    );
-    const idx = sectionItems.findIndex((i) => i.id === item.id);
-    const swap = direction === "up" ? sectionItems[idx - 1] : sectionItems[idx + 1];
+  async function reorderOwnedItem(item: Item, direction: "up" | "down") {
+    const siblingItems = items
+      .filter((candidate) => candidate.sectionId === item.sectionId)
+      .filter((candidate) => (candidate.parentItemId ?? null) === (item.parentItemId ?? null))
+      .filter((candidate) => candidate.subscriptionTierId === item.subscriptionTierId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const idx = siblingItems.findIndex((candidate) => candidate.id === item.id);
+    const swap = direction === "up" ? siblingItems[idx - 1] : siblingItems[idx + 1];
     if (!swap) return;
+
     await Promise.all([
       fetch(`/api/platform/menu/items/${item.id}`, {
         method: "PATCH",
@@ -303,167 +317,178 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
         body: JSON.stringify({ sortOrder: item.sortOrder }),
       }),
     ]);
+
     refresh();
   }
 
-  const filteredIcons = ICON_OPTIONS.filter((name) =>
-    name.toLowerCase().includes(iconSearch.toLowerCase())
-  );
-  const filteredSectionIcons = ICON_OPTIONS.filter((name) =>
-    name.toLowerCase().includes(sectionIconSearch.toLowerCase())
-  );
+  function renderItem(item: Item, index: number, siblings: Item[]) {
+    const children = items
+      .filter((candidate) => candidate.parentItemId === item.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const canMutate = !item.isInherited;
+
+    return (
+      <div key={item.id} className="space-y-1">
+        <div className="flex items-center justify-between rounded border p-2">
+          <div className="flex items-center gap-2">
+            {item.isFolder && <Folder className="h-3.5 w-3.5 text-muted-foreground" />}
+            <span className="text-sm font-medium">{item.label}</span>
+            {!item.isFolder && item.route && (
+              <span className="text-xs text-muted-foreground">{item.route}</span>
+            )}
+            <Badge variant="secondary" className="text-xs">
+              {item.subscriptionTierLabel ?? "Platform"}
+            </Badge>
+            {item.isInherited && (
+              <Badge variant="outline" className="text-xs">
+                Inherited
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!canMutate || index === 0 || isPending}
+              onClick={() => void reorderOwnedItem(item, "up")}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!canMutate || index === siblings.length - 1 || isPending}
+              onClick={() => void reorderOwnedItem(item, "down")}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!canMutate}
+              onClick={() => openEditItem(item)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!canMutate}
+              onClick={() => void deleteItem(item.id)}
+            >
+              <Trash2 className="h-3 w-3 text-destructive" />
+            </Button>
+          </div>
+        </div>
+        {item.isFolder && (
+          <div className="ml-6 space-y-1 border-l pl-3">
+            {children.map((child, childIndex) =>
+              renderItem(child, childIndex, children.filter((candidate) => candidate.subscriptionTierId === child.subscriptionTierId))
+            )}
+            {!item.isInherited && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openNewItem(item.sectionId, item.id)}
+                disabled={isPending}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Add Child Item
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Menu Manager</h1>
-          <p className="text-muted-foreground">Manage navigation sections and items per tenant</p>
+          <p className="text-muted-foreground">
+            Manage shared menu structure by subscription tier and platform-only scope.
+          </p>
         </div>
-        {selectedTenantId && (
-          <Button onClick={openNewSection} disabled={isPending}>
-            <Plus className="mr-2 h-4 w-4" /> New Section
-          </Button>
-        )}
+        <Button onClick={openNewSection} disabled={isPending}>
+          <Plus className="mr-2 h-4 w-4" /> New Section
+        </Button>
       </div>
 
-      <div className="w-72">
-        <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a tenant..." />
-          </SelectTrigger>
-          <SelectContent>
-            {tenants.map((t) => (
-              <SelectItem key={t.id} value={t.id}>{t.displayName}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid gap-3 md:grid-cols-[20rem_1fr]">
+        <div className="space-y-2">
+          <Label>Scope</Label>
+          <Select value={selectedScope} onValueChange={setSelectedScope}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select scope" />
+            </SelectTrigger>
+            <SelectContent>
+              {allTiers.map((tier) => (
+                <SelectItem key={tier.id} value={tier.id}>
+                  {tier.displayName} (L{tier.level})
+                </SelectItem>
+              ))}
+              <SelectItem value={PLATFORM_SCOPE}>Platform-only</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Viewing: {scopeLabel}. Higher tiers preview inherited lower-tier items.
+          </p>
+        </div>
       </div>
 
-      {!selectedTenantId && (
-        <p className="text-muted-foreground text-sm">Select a tenant to manage its menu.</p>
-      )}
+      <div className="space-y-4">
+        {sections.map((section, sectionIndex) => {
+          const topLevelItems = items
+            .filter((item) => item.sectionId === section.id && item.parentItemId === null)
+            .sort((a, b) => a.sortOrder - b.sortOrder);
 
-      {selectedTenantId && (
-        <div className="space-y-4">
-          {sections.map((section, sIdx) => {
-            const sectionItems = items.filter((i) => i.sectionId === section.id);
-            return (
-              <Card key={section.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
-                      {section.icon && <span className="mr-2 text-muted-foreground">{section.icon}</span>}
-                      {section.label}
-                    </CardTitle>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" disabled={sIdx === 0 || isPending} onClick={() => reorderSection(section, "up")}>
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" disabled={sIdx === sections.length - 1 || isPending} onClick={() => reorderSection(section, "down")}>
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEditSection(section)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteSection(section.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+          return (
+            <Card key={section.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">{section.label}</CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={sectionIndex === 0 || isPending}
+                      onClick={() => void reorderSection(section, "up")}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={sectionIndex === sections.length - 1 || isPending}
+                      onClick={() => void reorderSection(section, "down")}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => openEditSection(section)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => void deleteSection(section.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {(() => {
-                    const topLevelItems = sectionItems.filter((i) => !i.parentItemId);
-                    return topLevelItems.map((item, iIdx) => {
-                      const children = sectionItems.filter((i) => i.parentItemId === item.id);
-                      return (
-                        <div key={item.id} className="space-y-1">
-                          <div className="flex items-center justify-between rounded border p-2">
-                            <div className="flex items-center gap-2">
-                              {item.isFolder && <Folder className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                              <span className="text-sm font-medium">{item.label}</span>
-                              {!item.isFolder && <span className="text-xs text-muted-foreground">{item.route}</span>}
-                              {item.requiredSubLevel > 0 && (
-                                <Badge variant="secondary" className="text-xs">L{item.requiredSubLevel}+</Badge>
-                              )}
-                              {item.requiredRoles.length > 0 && (
-                                <div className="flex gap-1 flex-wrap mt-1">
-                                  {item.requiredRoles.map((slug) => (
-                                    <Badge key={slug} variant="outline" className="text-xs">{slug}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" disabled={iIdx === 0 || isPending} onClick={() => reorderItem(item, "up")}>
-                                <ChevronUp className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" disabled={iIdx === topLevelItems.length - 1 || isPending} onClick={() => reorderItem(item, "down")}>
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-                          {item.isFolder && (
-                            <div className="ml-6 space-y-1 border-l pl-3">
-                              {children.map((child, cIdx) => (
-                                <div key={child.id} className="flex items-center justify-between rounded border p-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{child.label}</span>
-                                    <span className="text-xs text-muted-foreground">{child.route}</span>
-                                    {child.requiredSubLevel > 0 && (
-                                      <Badge variant="secondary" className="text-xs">L{child.requiredSubLevel}+</Badge>
-                                    )}
-                                    {child.requiredRoles.length > 0 && (
-                                      <div className="flex gap-1 flex-wrap mt-1">
-                                        {child.requiredRoles.map((slug) => (
-                                          <Badge key={slug} variant="outline" className="text-xs">{slug}</Badge>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="icon" disabled={cIdx === 0 || isPending} onClick={() => reorderItem(child, "up")}>
-                                      <ChevronUp className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" disabled={cIdx === children.length - 1 || isPending} onClick={() => reorderItem(child, "down")}>
-                                      <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => openEditItem(child)}>
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => deleteItem(child.id)}>
-                                      <Trash2 className="h-3 w-3 text-destructive" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                              <Button variant="outline" size="sm" onClick={() => openNewItem(section.id, item.id)} disabled={isPending}>
-                                <Plus className="mr-1 h-3 w-3" /> Add Child Item
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()}
-                  <Button variant="outline" size="sm" onClick={() => openNewItem(section.id)} disabled={isPending}>
-                    <Plus className="mr-1 h-3 w-3" /> Add Item
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {topLevelItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No items in this section for the selected scope.</p>
+                )}
+                {topLevelItems.map((item, index) => renderItem(item, index, topLevelItems.filter((candidate) => candidate.subscriptionTierId === item.subscriptionTierId)))}
+                <Button variant="outline" size="sm" onClick={() => openNewItem(section.id)} disabled={isPending}>
+                  <Plus className="mr-1 h-3 w-3" /> Add Item
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-      <Dialog open={sectionDialog.open} onOpenChange={(o) => setSectionDialog((s) => ({ ...s, open: o }))}>
+      <Dialog open={sectionDialog.open} onOpenChange={(open) => setSectionDialog((state) => ({ ...state, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{sectionDialog.editing ? "Edit Section" : "New Section"}</DialogTitle>
@@ -471,76 +496,33 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
           <div className="space-y-4">
             <div className="space-y-1">
               <Label>Label</Label>
-              <Input value={sectionForm.label} onChange={(e) => setSectionForm((f) => ({ ...f, label: e.target.value }))} />
+              <Input
+                value={sectionForm.label}
+                onChange={(event) => setSectionForm((state) => ({ ...state, label: event.target.value }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>Icon (optional)</Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <span className="flex items-center gap-2">
-                      {sectionForm.icon && ICON_MAP[sectionForm.icon] ? (
-                        <>
-                          {(() => { const Icon = ICON_MAP[sectionForm.icon]; return Icon ? <Icon className="h-4 w-4" /> : null; })()}
-                          <span>{sectionForm.icon}</span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">No icon</span>
-                      )}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-72 p-2" align="start">
-                  <Input
-                    placeholder="Search icons..."
-                    value={sectionIconSearch}
-                    onChange={(e) => setSectionIconSearch(e.target.value)}
-                    className="mb-2 h-8"
-                  />
-                  <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
-                    {filteredSectionIcons.map((name) => {
-                      const Icon = ICON_MAP[name];
-                      if (!Icon) return null;
-                      return (
-                        <button
-                          type="button"
-                          key={name}
-                          title={name}
-                          onClick={() => setSectionForm((f) => ({ ...f, icon: name }))}
-                          className={`flex flex-col items-center gap-0.5 rounded p-1.5 text-xs transition-colors hover:bg-accent ${sectionForm.icon === name ? "bg-primary text-primary-foreground hover:bg-primary" : ""}`}
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span className="truncate w-full text-center" style={{ fontSize: "9px" }}>{name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {sectionForm.icon && (
-                    <button
-                      type="button"
-                      className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground text-center"
-                      onClick={() => setSectionForm((f) => ({ ...f, icon: "" }))}
-                    >
-                      Clear selection
-                    </button>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Input
+                value={sectionForm.icon}
+                onChange={(event) => setSectionForm((state) => ({ ...state, icon: event.target.value }))}
+                placeholder="Lucide icon name"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSectionDialog({ open: false, editing: null })}>Cancel</Button>
-            <Button onClick={saveSection} disabled={!sectionForm.label || isPending}>Save</Button>
+            <Button variant="outline" onClick={() => setSectionDialog({ open: false, editing: null })}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveSection()} disabled={!sectionForm.label.trim() || isPending}>
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={itemDialog.open} onOpenChange={(o) => setItemDialog((s) => ({ ...s, open: o }))}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={itemDialog.open} onOpenChange={(open) => setItemDialog((state) => ({ ...state, open }))}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{itemDialog.editing ? "Edit Item" : "New Item"}</DialogTitle>
           </DialogHeader>
@@ -549,147 +531,87 @@ export function MenuManagerClient({ tenants, allTiers }: Props) {
               <div className="space-y-1">
                 <Label>Type</Label>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => setItemForm((f) => ({ ...f, isFolder: false }))}
-                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${!itemForm.isFolder ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                    variant={itemForm.isFolder ? "outline" : "default"}
+                    onClick={() => setItemForm((state) => ({ ...state, isFolder: false }))}
+                    className="flex-1"
                   >
                     Link
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    onClick={() => setItemForm((f) => ({ ...f, isFolder: true }))}
-                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${itemForm.isFolder ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"}`}
+                    variant={itemForm.isFolder ? "default" : "outline"}
+                    onClick={() => setItemForm((state) => ({ ...state, isFolder: true }))}
+                    className="flex-1"
                   >
                     Folder
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <div className="space-y-1">
               <Label>Label</Label>
-              <Input value={itemForm.label} onChange={(e) => setItemForm((f) => ({ ...f, label: e.target.value }))} />
+              <Input
+                value={itemForm.label}
+                onChange={(event) => setItemForm((state) => ({ ...state, label: event.target.value }))}
+              />
             </div>
             {!itemForm.isFolder && (
               <div className="space-y-1">
                 <Label>Route</Label>
-                <Input value={itemForm.route} onChange={(e) => setItemForm((f) => ({ ...f, route: e.target.value }))} placeholder="/dashboard" />
+                <Input
+                  value={itemForm.route}
+                  onChange={(event) => setItemForm((state) => ({ ...state, route: event.target.value }))}
+                  placeholder="/dashboard"
+                />
               </div>
             )}
-
             <div className="space-y-1">
               <Label>Icon (optional)</Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <span className="flex items-center gap-2">
-                      {itemForm.icon && ICON_MAP[itemForm.icon] ? (
-                        <>
-                          {(() => { const Icon = ICON_MAP[itemForm.icon]; return Icon ? <Icon className="h-4 w-4" /> : null; })()}
-                          <span>{itemForm.icon}</span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">No icon</span>
-                      )}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-72 p-2" align="start">
-                  <Input
-                    placeholder="Search icons..."
-                    value={iconSearch}
-                    onChange={(e) => setIconSearch(e.target.value)}
-                    className="mb-2 h-8"
-                  />
-                  <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
-                    {filteredIcons.map((name) => {
-                      const Icon = ICON_MAP[name];
-                      if (!Icon) return null;
-                      return (
-                        <button
-                          type="button"
-                          key={name}
-                          title={name}
-                          onClick={() => setItemForm((f) => ({ ...f, icon: name }))}
-                          className={`flex flex-col items-center gap-0.5 rounded p-1.5 text-xs transition-colors hover:bg-accent ${itemForm.icon === name ? "bg-primary text-primary-foreground hover:bg-primary" : ""}`}
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span className="truncate w-full text-center" style={{ fontSize: "9px" }}>{name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {itemForm.icon && (
-                    <button
-                      type="button"
-                      className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground text-center"
-                      onClick={() => setItemForm((f) => ({ ...f, icon: "" }))}
-                    >
-                      Clear selection
-                    </button>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Input
+                value={itemForm.icon}
+                onChange={(event) => setItemForm((state) => ({ ...state, icon: event.target.value }))}
+                placeholder="Lucide icon name"
+              />
             </div>
-
             <div className="space-y-1">
-              <Label>Required Subscription</Label>
-              <Select value={itemForm.requiredSubLevel} onValueChange={(v) => setItemForm((f) => ({ ...f, requiredSubLevel: v }))}>
+              <Label>Badge (optional)</Label>
+              <Input
+                value={itemForm.badge}
+                onChange={(event) => setItemForm((state) => ({ ...state, badge: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Owning Scope</Label>
+              <Select
+                value={itemForm.subscriptionScope}
+                onValueChange={(value) => setItemForm((state) => ({ ...state, subscriptionScope: value }))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="No restriction" />
+                  <SelectValue placeholder="Select owning scope" />
                 </SelectTrigger>
                 <SelectContent>
                   {allTiers.map((tier) => (
-                    <SelectItem key={tier.id} value={String(tier.level)}>
+                    <SelectItem key={tier.id} value={tier.id}>
                       {tier.displayName} (L{tier.level})
                     </SelectItem>
                   ))}
+                  <SelectItem value={PLATFORM_SCOPE}>Platform-only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {availableRoles.length > 0 && (
-              <div className="space-y-2">
-                <Label>Required Roles</Label>
-                <div className="flex flex-wrap gap-2">
-                  {availableRoles.map((role) => {
-                    const selected = itemForm.requiredRoleIds.includes(role.id);
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => {
-                          setItemForm((f) => ({
-                            ...f,
-                            requiredRoleIds: selected
-                              ? f.requiredRoleIds.filter((id) => id !== role.id)
-                              : [...f.requiredRoleIds, role.id],
-                          }));
-                        }}
-                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                          selected
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:bg-muted"
-                        }`}
-                      >
-                        {role.displayName}
-                      </button>
-                    );
-                  })}
-                </div>
-                {itemForm.requiredRoleIds.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No roles required — visible to all authenticated users.</p>
-                )}
-              </div>
-            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setItemDialog({ open: false, editing: null })}>Cancel</Button>
-            <Button onClick={saveItem} disabled={!itemForm.label || (!itemForm.isFolder && !itemForm.route) || isPending}>Save</Button>
+            <Button variant="outline" onClick={() => setItemDialog({ open: false, editing: null })}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void saveItem()}
+              disabled={!itemForm.label.trim() || (!itemForm.isFolder && !itemForm.route.trim()) || isPending}
+            >
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

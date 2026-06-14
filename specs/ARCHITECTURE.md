@@ -295,7 +295,10 @@ Layer 3 — Server Component    (layout, menu render)
 
 - Each user has a `subscriptionTier` (e.g. `free`) and numeric `subscriptionLevel` (0/1/2).
 - Both embedded in session JWT — no per-route DB call.
-- Menu items declare `requiredSubLevel`; shell filters at render time.
+- Shared menu items are assigned to a single owning subscription tier in `public.menu_items.subscriptionTierId`.
+- A tenant sees the union of all shared menu items whose owning tier level is less than or equal to `session.subscriptionLevel`.
+- Platform-only menu items use `subscriptionTierId = NULL` and are eligible only when `isPlatformAdmin(...)` is true.
+- Tenant-local `menu_item_roles` continue to hide shared menu items per tenant after tier filtering.
 - Users below required level → Upgrade Prompt page (admin-configured content).
 - `subscriptionExpiresAt` → downgrade to `free` on next login.
 
@@ -376,7 +379,7 @@ Admin Panel → Application Registry:
 | `subscription_tiers` | Tier definitions (id, displayName, level, upgradeCta, upgradeUrl) |
 | `user_subscriptions` | User → tier assignment with optional expiry |
 | `menu_sections` | Top-level nav groupings (label, icon, sortOrder) |
-| `menu_items` | Nav leaf items (route, requiredRoles[], requiredSubLevel, badge) |
+| `menu_items` | Shared nav leaf items (route, owning subscription tier, badge) |
 | `app_registry` | Registered child apps (remoteUrl, routePrefix, healthCheckUrl) |
 | `shell_config` | Single-row: branding, OIDC issuer + client ID + KMS-encrypted client secret, setup_complete flag |
 | `auth_events` | Login/logout/failure events (viewer UI in v2) |
@@ -955,8 +958,8 @@ Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
 | `public.subscription_tiers` | `id` (uuid PK), `slug` (text unique), `displayName`, `level` (int), `upgradeCtaHeadline`, `upgradeCtaBody`, `upgradeCtaLabel`, `upgradeUrl`, `createdAt` |
 | `public.tenant_subscription` | `id` (uuid PK), `tenantId` (FK → tenants, cascade, unique), `tierId` (FK → subscription_tiers), `status` (enum), `expiresAt`, `assignedAt` — singleton per tenant |
 | `public.app_registry` | `id` (uuid PK), `name` (unique), `remoteUrl`, `routePrefix` (unique), `healthCheckUrl`, `isEnabled`, `lastHealthyAt`, `createdAt` |
-| `public.menu_sections` | Top-level nav groupings scoped to a tenant via `tenantId` FK |
-| `public.menu_items` | Nav leaf/folder items; FK → `menu_sections`; `requiredSubLevel`, `sortOrder` |
+| `public.menu_sections` | Shared top-level nav groupings used across all tenants |
+| `public.menu_items` | Shared nav leaf/folder items; FK → `menu_sections`; nullable `subscriptionTierId` (`NULL` = platform-only), `sortOrder` |
 | `public.policies` | Platform-managed policy definitions (slug, displayName, description) |
 
 **`tenant_{slug}` schema** — full per-tenant data, created by `provisionTenant()`:
@@ -969,7 +972,7 @@ Route 53 ──→ CloudFront (ONE distribution, wildcard alternate domain)
 | `userRoles` | Many-to-many: users ↔ roles |
 | `idpProviders` | Per-tenant OIDC providers (replaces v1 `shell_config` OIDC fields) |
 | `idpGroupRoleMappings` | IDP group name → shell role mappings |
-| `menu_item_roles` | Role-based access control for menu items — cross-schema by design: `menuItemId` references `public.menu_items.id` (no FK enforced at DB level; referential integrity maintained by the DELETE handler in `DELETE /api/platform/menu/items/[itemId]`, which removes `menu_item_roles` rows before deleting the item). The non-transactional gap between the two statements is a known minor risk. |
+| `menu_item_roles` | Tenant-local role-based hiding for shared menu items — cross-schema by design: `menuItemId` references `public.menu_items.id` (no FK enforced at DB level; referential integrity maintained by the DELETE handler in `DELETE /api/platform/menu/items/[itemId]`, which removes `menu_item_roles` rows before deleting the item). The non-transactional gap between the two statements is a known minor risk. |
 | `role_policies` | Tenant role → policy slug assignments |
 | `authEvents` | Login/logout/failure audit events |
 | `notifications` | Notification records (targeting: all/user/sub_level) |

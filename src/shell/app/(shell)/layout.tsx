@@ -1,80 +1,12 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
-import { db } from "@/lib/db/client";
-import { menuSections, menuItems, shellConfig, users, companies, companyAncestors } from "@/lib/db/schema";
-import { asc, eq, inArray } from "drizzle-orm";
+import { shellConfig, users, companies, companyAncestors } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
 import { cacheTag } from "next/cache";
-import type { MenuSection } from "@/app/api/menu/route";
-
-function isVisible(
-  item: { requiredSubLevel: number },
-  subscriptionLevel: number
-): boolean {
-  return item.requiredSubLevel <= subscriptionLevel;
-}
-
-async function getMenuTree(tenantId: string, subscriptionLevel: number): Promise<MenuSection[]> {
-  "use cache";
-  cacheTag("menu");
-
-  const sections = await db
-    .select()
-    .from(menuSections)
-    .where(eq(menuSections.tenantId, tenantId))
-    .orderBy(asc(menuSections.sortOrder));
-
-  const allItems = await db
-    .select()
-    .from(menuItems)
-    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
-    .where(eq(menuSections.tenantId, tenantId))
-    .orderBy(asc(menuItems.sortOrder));
-
-  const flatItems = allItems.map((r) => r.menu_items);
-
-  return sections.map((section) => {
-    const sectionItems = flatItems.filter((item) => item.sectionId === section.id);
-    const topLevel = sectionItems.filter(
-      (item) => item.parentItemId === null && isVisible(item, subscriptionLevel)
-    );
-
-    return {
-      id: section.id,
-      label: section.label,
-      icon: section.icon,
-      sortOrder: section.sortOrder,
-      items: topLevel.map((item) => ({
-        id: item.id,
-        label: item.label,
-        route: item.route,
-        icon: item.icon,
-        badge: item.badge,
-        sortOrder: item.sortOrder,
-        isFolder: item.isFolder,
-        children: item.isFolder
-          ? sectionItems
-              .filter(
-                (child) =>
-                  child.parentItemId === item.id &&
-                  isVisible(child, subscriptionLevel)
-              )
-              .map((child) => ({
-                id: child.id,
-                label: child.label,
-                route: child.route,
-                icon: child.icon,
-                badge: child.badge,
-                sortOrder: child.sortOrder,
-                isFolder: false,
-                children: [],
-              }))
-          : [],
-      })),
-    };
-  });
-}
+import { getMenuTreeForTenant } from "@/lib/menu";
+import { isPlatformAdmin } from "@/lib/platform-guard";
 
 async function getShellConfig(tenantSlug: string) {
   "use cache";
@@ -109,10 +41,15 @@ export default async function ShellGroupLayout({ children }: { children: React.R
   const userName = session?.user.name ?? "";
   const userEmail = session?.user.email ?? "";
   const tenantSlug = session?.user.tenantSlug ?? "";
-  const tenantId = session?.user.tenantId ?? "";
+  const platformAdmin = isPlatformAdmin({ roles, tenantSlug });
 
   const [menu, config, preferences] = await Promise.all([
-    getMenuTree(tenantId, subscriptionLevel),
+    getMenuTreeForTenant({
+      tenantSlug,
+      subscriptionLevel,
+      userRoles: roles,
+      isPlatformAdmin: platformAdmin,
+    }),
     getShellConfig(tenantSlug),
     userId ? getUserPreferences(tenantSlug, userId) : Promise.resolve<UserPreferences>({}),
   ]);
@@ -179,7 +116,6 @@ export default async function ShellGroupLayout({ children }: { children: React.R
     <ShellLayoutClient
       menu={menu}
       appName={config?.appName ?? "Corp Shell"}
-      logoUrl={config?.logoUrl ?? null}
       userName={userName}
       userEmail={userEmail}
       userRoles={roles}

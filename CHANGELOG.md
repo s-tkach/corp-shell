@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **M19-7** — Platform menu seeded from database on bootstrap; platform admins can now manage their own navigation via the Menu Manager UI (`/platform/menu`) like any other tenant
 - **M20** — Company hierarchy: unlimited-depth organizational tree per tenant
+- **M21** — Shared menu structure now belongs to subscription tiers instead of tenants; higher tiers inherit lower-tier items automatically, `/platform/menu` manages tier/platform scopes, and `/settings/menu` lets each tenant hide shared items with tenant-local role assignments
 - Company switcher dropdown in shell header (top-left, tree-indented, search for >8 companies)
 - Admin UI for managing company tree (`/admin/companies`) and user company assignments
 - User access scoped to assigned companies and all descendants via closure table (`company_ancestors`)

@@ -52,6 +52,13 @@ async function seedPlatformDefaults(): Promise<void> {
 }
 
 async function seedPlatformMenu(): Promise<void> {
+  const existing = await db
+    .select({ id: menuItems.id })
+    .from(menuItems)
+    .where(eq(menuItems.route, "/platform/tenants"))
+    .limit(1);
+  if (existing.length > 0) return;
+
   const platformTenant = await db
     .select({ id: tenants.id })
     .from(tenants)
@@ -60,27 +67,20 @@ async function seedPlatformMenu(): Promise<void> {
   const tenant = platformTenant[0];
   if (!tenant) return;
 
-  const existing = await db
-    .select({ id: menuSections.id })
-    .from(menuSections)
-    .where(eq(menuSections.tenantId, tenant.id))
-    .limit(1);
-  if (existing.length > 0) return;
-
   const sectionRows = await db
     .insert(menuSections)
-    .values({ tenantId: tenant.id, label: "Platform", sortOrder: 0 })
+    .values({ label: "Platform", sortOrder: 0 })
     .returning({ id: menuSections.id });
   const section = sectionRows[0];
   if (!section) return;
 
   const insertedItems = await db.insert(menuItems).values([
-    { sectionId: section.id, label: "Tenants",          route: "/platform/tenants",       icon: "Globe",           sortOrder: 0 },
-    { sectionId: section.id, label: "Platform Admins",  route: "/platform/admins",        icon: "Users",           sortOrder: 1 },
-    { sectionId: section.id, label: "Apps",             route: "/platform/apps",          icon: "Server",          sortOrder: 2 },
-    { sectionId: section.id, label: "Subscriptions",    route: "/platform/subscriptions", icon: "CreditCard",      sortOrder: 3 },
-    { sectionId: section.id, label: "Menu",             route: "/platform/menu",          icon: "LayoutDashboard", sortOrder: 4 },
-    { sectionId: section.id, label: "Policies",         route: "/platform/policies",      icon: "Shield",          sortOrder: 5 },
+    { sectionId: section.id, label: "Tenants",          route: "/platform/tenants",       icon: "Globe",           subscriptionTierId: null, sortOrder: 0 },
+    { sectionId: section.id, label: "Platform Admins",  route: "/platform/admins",        icon: "Users",           subscriptionTierId: null, sortOrder: 1 },
+    { sectionId: section.id, label: "Apps",             route: "/platform/apps",          icon: "Server",          subscriptionTierId: null, sortOrder: 2 },
+    { sectionId: section.id, label: "Subscriptions",    route: "/platform/subscriptions", icon: "CreditCard",      subscriptionTierId: null, sortOrder: 3 },
+    { sectionId: section.id, label: "Menu",             route: "/platform/menu",          icon: "LayoutDashboard", subscriptionTierId: null, sortOrder: 4 },
+    { sectionId: section.id, label: "Policies",         route: "/platform/policies",      icon: "Shield",          subscriptionTierId: null, sortOrder: 5 },
   ]).returning({ id: menuItems.id });
 
   const platformSlug = getPlatformSlug();

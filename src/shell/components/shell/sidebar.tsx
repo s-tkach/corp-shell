@@ -26,7 +26,6 @@ import type { MenuSection } from "@/app/api/menu/route";
 interface SidebarProps {
   menu: MenuSection[];
   appName: string;
-  logoUrl: string | null;
   userRoles: string[];
   userName: string;
   userEmail: string;
@@ -35,7 +34,7 @@ interface SidebarProps {
   activeCompanyId: string | null;
 }
 
-export function Sidebar({ menu, appName, logoUrl, userRoles, userName, userEmail, accessibleCompanies, activeCompanyId }: SidebarProps) {
+export function Sidebar({ menu, appName, userRoles, userName, userEmail, accessibleCompanies, activeCompanyId }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed } = useShellStore();
   const activeCompany = accessibleCompanies.find((c) => c.id === activeCompanyId) ?? accessibleCompanies[0] ?? null;

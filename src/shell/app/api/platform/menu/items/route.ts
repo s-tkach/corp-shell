@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
-import { menuItems, menuSections, tenants } from "@/lib/db/schema";
-import { menuItemRoles, roles } from "@/lib/db/tenant-schema";
-import { withTenant } from "@/lib/db/tenant";
-import { asc, eq, inArray } from "drizzle-orm";
+import { menuItems, menuSections, subscriptionTiers } from "@/lib/db/schema";
+import { and, asc, eq, inArray, isNull, not } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 
 async function guardPlatformAdmin() {
@@ -19,50 +17,76 @@ async function guardPlatformAdmin() {
 export async function GET(req: NextRequest) {
   const guard = await guardPlatformAdmin();
   if (guard) return guard;
-  const tenantId = req.nextUrl.searchParams.get("tenantId");
-  if (!tenantId) return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
+
+  const selectedTierId = req.nextUrl.searchParams.get("tierId");
+  const scope = req.nextUrl.searchParams.get("scope");
+
+  const tiers = await db
+    .select({
+      id: subscriptionTiers.id,
+      slug: subscriptionTiers.slug,
+      displayName: subscriptionTiers.displayName,
+      level: subscriptionTiers.level,
+    })
+    .from(subscriptionTiers)
+    .orderBy(asc(subscriptionTiers.level));
+
+  if (scope === "platform") {
+    const rows = await db
+      .select()
+      .from(menuItems)
+      .where(isNull(menuItems.subscriptionTierId))
+      .orderBy(asc(menuItems.sortOrder));
+
+    return NextResponse.json(
+      rows.map((item) => ({
+        ...item,
+        subscriptionTierLabel: null,
+        isInherited: false,
+      }))
+    );
+  }
+
+  if (!selectedTierId) {
+    return NextResponse.json({ error: "tierId or scope=platform is required" }, { status: 400 });
+  }
+
+  const selectedTier = tiers.find((tier) => tier.id === selectedTierId);
+  if (!selectedTier) {
+    return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+  }
+
+  const visibleTierIds = tiers
+    .filter((tier) => tier.level <= selectedTier.level)
+    .map((tier) => tier.id);
 
   const rows = await db
-    .select({ menuItems })
+    .select()
     .from(menuItems)
-    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
-    .where(eq(menuSections.tenantId, tenantId))
+    .where(
+      and(
+        not(isNull(menuItems.subscriptionTierId)),
+        inArray(menuItems.subscriptionTierId, visibleTierIds)
+      )
+    )
     .orderBy(asc(menuItems.sortOrder));
 
-  const items = rows.map((r) => r.menuItems);
-
-  const tenantRows = await db
-    .select({ slug: tenants.slug })
-    .from(tenants)
-    .where(eq(tenants.id, tenantId))
-    .limit(1);
-  const tenant = tenantRows[0];
-
-  if (!tenant || items.length === 0) {
-    return NextResponse.json(items.map((item) => ({ ...item, requiredRoles: [] })));
-  }
-
-  const itemIds = items.map((i) => i.id);
-  const tenantDb = withTenant(tenant.slug);
-  const assignments = await tenantDb
-    .select({ menuItemId: menuItemRoles.menuItemId, slug: roles.slug })
-    .from(menuItemRoles)
-    .innerJoin(roles, eq(menuItemRoles.roleId, roles.id))
-    .where(inArray(menuItemRoles.menuItemId, itemIds));
-
-  const rolesByItem = new Map<string, string[]>();
-  for (const a of assignments) {
-    const existing = rolesByItem.get(a.menuItemId) ?? [];
-    existing.push(a.slug);
-    rolesByItem.set(a.menuItemId, existing);
-  }
-
-  return NextResponse.json(items.map((item) => ({ ...item, requiredRoles: rolesByItem.get(item.id) ?? [] })));
+  const tierLabels = new Map(tiers.map((tier) => [tier.id, tier.displayName]));
+  return NextResponse.json(
+    rows.map((item) => ({
+      ...item,
+      subscriptionTierLabel: item.subscriptionTierId
+        ? tierLabels.get(item.subscriptionTierId) ?? null
+        : null,
+      isInherited: item.subscriptionTierId !== selectedTierId,
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {
   const guard = await guardPlatformAdmin();
   if (guard) return guard;
+
   const body = await req.json() as {
     sectionId: string;
     parentItemId?: string;
@@ -71,21 +95,20 @@ export async function POST(req: NextRequest) {
     route?: string;
     icon?: string;
     badge?: string;
-    requiredSubLevel?: number;
+    subscriptionTierId?: string | null;
     sortOrder?: number;
-    requiredRoleIds?: string[];
   };
+
   if (!body.sectionId || !body.label) {
     return NextResponse.json({ error: "sectionId and label are required" }, { status: 400 });
   }
 
   const sectionRows = await db
-    .select({ id: menuSections.id, tenantId: menuSections.tenantId })
+    .select({ id: menuSections.id })
     .from(menuSections)
     .where(eq(menuSections.id, body.sectionId))
     .limit(1);
-  const section = sectionRows[0];
-  if (!section) {
+  if (!sectionRows[0]) {
     return NextResponse.json({ error: "Section not found" }, { status: 404 });
   }
 
@@ -99,25 +122,10 @@ export async function POST(req: NextRequest) {
       route: body.route ?? "",
       icon: body.icon ?? null,
       badge: body.badge ?? null,
-      requiredSubLevel: body.requiredSubLevel ?? 0,
+      subscriptionTierId: body.subscriptionTierId ?? null,
       sortOrder: body.sortOrder ?? 0,
     })
     .returning();
-
-  if (body.requiredRoleIds?.length && row) {
-    const tenantRows = await db
-      .select({ slug: tenants.slug })
-      .from(tenants)
-      .where(eq(tenants.id, section.tenantId))
-      .limit(1);
-    const tenant = tenantRows[0];
-    if (tenant) {
-      const tenantDb = withTenant(tenant.slug);
-      await tenantDb.insert(menuItemRoles).values(
-        body.requiredRoleIds.map((roleId) => ({ menuItemId: row.id, roleId }))
-      );
-    }
-  }
 
   revalidateTag("menu", {});
   return NextResponse.json(row, { status: 201 });

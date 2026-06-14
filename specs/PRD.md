@@ -176,17 +176,19 @@ If these are set, the platform tenant uses them directly (no DB-stored OIDC conf
 
 **FR-NAV-1:** Persistent left sidebar with collapse-to-icons mode. Collapse state persisted per user in the database.
 
-**FR-NAV-2:** Fully data-driven menu — all items in the database, none hardcoded.
+**FR-NAV-2:** Fully data-driven menu — all items in the database, none hardcoded. Shared menu structure is owned by subscription tier, not by tenant.
 
 **FR-NAV-3:** Two hierarchy levels: **sections** (groups with optional label + icon) and **items** (leaf links, optionally with one level of sub-items).
 
-**FR-NAV-4:** Each menu item has: `label`, `icon` (Lucide name), `routeType` (`internal` | `external`), `route`, `requiredRoles[]`, `requiredSubscriptionLevel` (integer, 0 = all), `badge` (optional string), `sortOrder`, `isEnabled`.
+**FR-NAV-4:** Each menu item has: `label`, `icon` (Lucide name), `routeType` (`internal` | `external`), `route`, `subscriptionTierId` (nullable; `NULL` = platform-only), tenant-local `requiredRoles[]` (optional), `badge` (optional string), `sortOrder`, `isEnabled`.
 
 **FR-NAV-5:** Top header bar: configurable app logo and name (from DB, set in wizard / Admin Panel), breadcrumb trail, user avatar dropdown (name, roles, logout), notification bell with unread badge (see §6.8).
 
 **FR-NAV-6:** Light/dark mode toggle; theme persisted per user in DB.
 
-**FR-NAV-7:** Admin Panel menu editor: full CRUD, drag-and-drop reorder, live role-filtered preview.
+**FR-NAV-7:** Platform Admin menu editor: full CRUD for shared sections/items, drag-and-drop reorder, tier-scope selection, and preview of inherited lower-tier items.
+
+**FR-NAV-8:** Tenant Admin menu editor (`/settings/menu`): view the tenant's effective shared menu for its current subscription tier and assign tenant-local roles per item to hide items. Tenant admins cannot edit labels, routes, icons, ordering, or tier ownership.
 
 ### 6.5 Child Application Integration — Module Federation
 
@@ -276,7 +278,7 @@ Every child app's `AppEntry` is wrapped in a React Error Boundary. Crash or unre
 
 **FR-SUB-1:** Admins define subscription tiers (e.g. `free`, `standard`, `enterprise`) with a numeric `level`. Higher level = more access.
 
-**FR-SUB-2:** Menu items and child-app feature flags can declare a `requiredSubscriptionLevel`. Users below that level see a configurable Upgrade Prompt page.
+**FR-SUB-2:** Menu items are assigned to a single owning subscription tier. A tenant sees the union of all menu items whose tier level is less than or equal to the tenant's current subscription level. Child-app feature flags may still declare a required subscription level. Users below the required level see a configurable Upgrade Prompt page.
 
 **FR-SUB-3:** Subscription tier is resolved at login, embedded in the NextAuth.js session JWT. No per-route DB call needed.
 
@@ -294,7 +296,7 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 
 | Section | Capabilities |
 |---------|-------------|
-| **Menu Manager** | Full CRUD for sections and items. Drag-and-drop reorder. Inline role + subscription level assignment. Live role-filtered menu preview. |
+| **Menu Manager** | Platform admin: full CRUD for shared sections and items by subscription tier, including platform-only items. Drag-and-drop reorder. Inherited preview for higher tiers. Tenant admin: role-assignment-only editor for hiding shared items within that tenant. |
 | **Role Manager** | Create/rename/delete roles. Define IDP group → shell role mappings. View users per role. |
 | **User Manager** | View all JIT-provisioned users. Assign/revoke roles. Set subscription tier + expiry. View last login + IDP source. Deactivate users. |
 | **SSO Status** | Read-only display of current OIDC config (issuer, client ID). Live reachability check (pings `{issuer}/.well-known/openid-configuration`). Shows "Connected ✓" or error detail. |
@@ -683,8 +685,7 @@ export const menuItems = pgTable('menu_items', {
   icon:                   text('icon'),
   routeType:              text('route_type').notNull(),  // 'internal' | 'external'
   route:                  text('route').notNull(),
-  requiredRoles:          text('required_roles').array().default(sql`'{}'`),
-  requiredSubLevel:       integer('required_sub_level').default(0),
+  subscriptionTierId:     uuid('subscription_tier_id').references(() => subscriptionTiers.id),
   badge:                  text('badge'),
   sortOrder:              integer('sort_order').default(0),
   isEnabled:              boolean('is_enabled').default(true),

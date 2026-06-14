@@ -1,61 +1,15 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { withTenant } from "@/lib/db/tenant";
-import { db } from "@/lib/db/client";
-import { notifications, notificationReads, menuSections, menuItems } from "@/lib/db/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import { notifications, notificationReads } from "@/lib/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
-import { cacheTag } from "next/cache";
-import type { MenuItem, MenuSection } from "@/app/api/menu/route";
+import { getVisibleMenuItemsForTenant } from "@/lib/menu";
+import { isPlatformAdmin } from "@/lib/platform-guard";
 import { GreetingBanner } from "./_components/greeting-banner";
 import { AppsGrid } from "./_components/apps-grid";
 import { ProfileCard } from "./_components/profile-card";
 import { NotificationsCard } from "./_components/notifications-card";
-
-async function getMenuItems(tenantId: string, subscriptionLevel: number): Promise<MenuItem[]> {
-  "use cache";
-  cacheTag("menu");
-
-  const sections = await db
-    .select()
-    .from(menuSections)
-    .where(eq(menuSections.tenantId, tenantId))
-    .orderBy(asc(menuSections.sortOrder));
-
-  const allItems = await db
-    .select()
-    .from(menuItems)
-    .innerJoin(menuSections, eq(menuItems.sectionId, menuSections.id))
-    .where(eq(menuSections.tenantId, tenantId))
-    .orderBy(asc(menuItems.sortOrder));
-
-  const flatItems = allItems.map((r) => r.menu_items);
-
-  const tree: MenuSection[] = sections.map((section) => ({
-    id: section.id,
-    label: section.label,
-    icon: section.icon,
-    sortOrder: section.sortOrder,
-    items: flatItems
-      .filter((item) => {
-        if (item.sectionId !== section.id) return false;
-        if (item.requiredSubLevel > subscriptionLevel) return false;
-        return true;
-      })
-      .map((item) => ({
-        id: item.id,
-        label: item.label,
-        route: item.route,
-        icon: item.icon,
-        badge: item.badge,
-        sortOrder: item.sortOrder,
-        isFolder: item.isFolder,
-        children: [],
-      })),
-  }));
-
-  return tree.flatMap((s) => s.items);
-}
 
 interface NotificationItem {
   id: string;
@@ -97,10 +51,15 @@ export default async function DashboardPage() {
   const roles = session.user.roles ?? [];
   const subscriptionLevel = session.user.subscriptionLevel ?? 0;
   const tenantSlug = session.user.tenantSlug ?? "";
-  const tenantId = session.user.tenantId ?? "";
+  const platformAdmin = isPlatformAdmin({ roles, tenantSlug });
 
   const [appMenuItems, { notifications: recentNotifications, unreadCount }] = await Promise.all([
-    getMenuItems(tenantId, subscriptionLevel),
+    getVisibleMenuItemsForTenant({
+      tenantSlug,
+      subscriptionLevel,
+      userRoles: roles,
+      isPlatformAdmin: platformAdmin,
+    }),
     getRecentNotifications(tenantSlug, userId, subscriptionLevel),
   ]);
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
-import { menuSections } from "@/lib/db/schema";
+import { menuItemRoles, menuItems, menuSections, tenants } from "@/lib/db/schema";
+import { withTenant } from "@/lib/db/tenant";
 import { eq } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 
@@ -42,6 +43,22 @@ export async function DELETE(
   const guard = await guardPlatformAdmin();
   if (guard) return guard;
   const { sectionId } = await params;
+
+  const sectionItems = await db
+    .select({ id: menuItems.id })
+    .from(menuItems)
+    .where(eq(menuItems.sectionId, sectionId));
+
+  if (sectionItems.length > 0) {
+    const tenantRows = await db.select({ slug: tenants.slug }).from(tenants);
+    for (const tenant of tenantRows) {
+      const tenantDb = withTenant(tenant.slug);
+      for (const item of sectionItems) {
+        await tenantDb.delete(menuItemRoles).where(eq(menuItemRoles.menuItemId, item.id));
+      }
+    }
+  }
+
   await db.delete(menuSections).where(eq(menuSections.id, sectionId));
   revalidateTag("menu", {});
   return new NextResponse(null, { status: 204 });

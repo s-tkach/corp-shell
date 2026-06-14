@@ -39,6 +39,8 @@
 | M17 | Subdomain Routing + Tenant JWT | CloudFront wildcard DNS; host-based login boundary; tenantSlug in JWT |
 | M18 | Dynamic IDP Registration | Per-tenant `idpProviders` table; `getAuthConfig()`; multi-IDP admin UI |
 | M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
+| M20 | Company Hierarchy | Unlimited-depth company tree; user company scope; active company switcher |
+| M21 | Tier-Scoped Shared Menu Ownership | Shared menus by subscription tier; tenant-local role hiding; platform-only scope |
 
 ---
 
@@ -377,6 +379,30 @@
 - [x] Middleware: for routes with `requiredSubLevel > 0`, check `session.subscriptionLevel`; if insufficient, redirect to `/upgrade?from={route}`
 - [x] `app/(shell)/upgrade/page.tsx`: renders Upgrade Prompt content from `subscription_tiers.upgradeCta` / `upgradeUrl` for the required tier
 - [x] **Acceptance:** User with `free` tier accessing a `standard` route sees Upgrade Prompt; `standard` user passes through
+
+---
+
+## M21 — Tier-Scoped Shared Menu Ownership
+
+**Goal:** Shared menu structure is owned by subscription tier rather than tenant. Tenants inherit all lower-tier menu items for their current subscription level and may still hide shared items with tenant-local role assignments. Platform-only menu items remain tierless and visible only to platform admins.
+
+### Tasks
+
+#### M21-1: Shared menu schema and runtime resolution
+- [x] Replace tenant-scoped menu ownership with shared `menu_sections` and tier-scoped `menu_items.subscriptionTierId`
+- [x] Remove `requiredSubLevel`; derive route gating from the owning menu tier level
+- [x] Create one shared resolver used by `/api/menu`, shell layout, dashboard, and proxy
+- [x] **Acceptance:** Tenants see the union of all menu items at or below their org subscription level; platform-only items stay hidden from non-platform tenants
+
+#### M21-2: Platform menu manager
+- [x] Rework `/platform/menu` to manage shared menu structure by subscription tier or platform-only scope
+- [x] Show inherited lower-tier items when previewing a higher tier
+- [x] **Acceptance:** Platform admin can create/edit shared items for a tier and create platform-only items with `NULL` tier
+
+#### M21-3: Tenant-local role hiding
+- [x] Rework `/settings/menu` into a tenant admin UI for assigning tenant-local roles to shared menu items
+- [x] Preserve `menu_item_roles` semantics: no assigned roles means visible to all authenticated users in that tenant
+- [x] **Acceptance:** Two tenants on the same subscription tier can hide different shared items using their own role assignments without affecting each other
 
 #### M10-2: Subscription expiry enforcement
 - [x] In NextAuth.js `jwt()` callback: if `user_subscriptions.expiresAt` is in the past, downgrade to `free` tier and update DB

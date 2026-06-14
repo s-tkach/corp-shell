@@ -76,9 +76,6 @@ export const policies = pgTable("policies", {
 
 export const menuSections = pgTable("menu_sections", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenant_id")
-    .notNull()
-    .references(() => tenants.id, { onDelete: "cascade" }),
   label: text("label").notNull(),
   icon: text("icon"),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -96,8 +93,7 @@ export const menuItems = pgTable("menu_items", {
   route: text("route").notNull().default(""),
   icon: text("icon"),
   badge: text("badge"),
-  requiredSubLevel: integer("required_sub_level").notNull().default(0),
+  subscriptionTierId: uuid("subscription_tier_id").references(() => subscriptionTiers.id),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
-

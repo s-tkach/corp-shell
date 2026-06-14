@@ -5,6 +5,7 @@ import {
   KeyRound,
   Bell,
   Building2,
+  LayoutDashboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -17,6 +18,7 @@ export interface SettingsRoute {
 
 export const SETTINGS_ROUTES: SettingsRoute[] = [
   { href: "/settings/branding",      label: "Branding",      description: "App name, logo, and brand color",            icon: Palette },
+  { href: "/settings/menu",          label: "Menu",          description: "Hide shared menu items with tenant roles",    icon: LayoutDashboard },
   { href: "/settings/roles",         label: "Roles",         description: "Manage roles and IDP group mappings",        icon: Shield },
   { href: "/settings/companies",     label: "Companies",     description: "Manage company hierarchy",                   icon: Building2 },
   { href: "/settings/users",         label: "Users",         description: "View users, assign roles and subscriptions", icon: Users },

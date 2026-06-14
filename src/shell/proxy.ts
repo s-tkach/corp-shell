@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { menuItems, shellConfig, tenants } from "@/lib/db/schema";
+import { shellConfig, tenants } from "@/lib/db/schema";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
@@ -9,6 +9,7 @@ import { isPlatformAdmin } from "@/lib/platform-guard";
 import { withTenant } from "@/lib/db/tenant";
 import { autoBootstrapPlatform } from "@/lib/db/provision";
 import { eq } from "drizzle-orm";
+import { getRequiredSubscriptionLevelForRoute } from "@/lib/menu";
 
 const TENANT_ADMIN_ROUTES = ["/settings", "/api/settings"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
@@ -53,18 +54,6 @@ function isPlatformRoute(pathname: string): boolean {
 
 function hasAdminRole(roles: string[]): boolean {
   return roles.some((r) => ADMIN_ROLES.has(r));
-}
-
-async function getRequiredSubLevel(pathname: string, tenantSlug: string): Promise<number | null> {
-  const tenantDb = withTenant(tenantSlug);
-  const rows = await tenantDb
-    .select({ requiredSubLevel: menuItems.requiredSubLevel })
-    .from(menuItems)
-    .where(eq(menuItems.route, pathname))
-    .limit(1);
-  const row = rows[0];
-  if (!row || row.requiredSubLevel === 0) return null;
-  return row.requiredSubLevel;
 }
 
 export async function proxy(request: NextRequest) {
@@ -157,7 +146,7 @@ export async function proxy(request: NextRequest) {
 
   // Subscription gate: skip for /upgrade itself to avoid redirect loop
   if (tenantSlug && !pathname.startsWith("/upgrade") && !isTenantAdminRoute(pathname) && !isPlatformRoute(pathname)) {
-    const requiredLevel = await getRequiredSubLevel(pathname, tenantSlug);
+    const requiredLevel = await getRequiredSubscriptionLevelForRoute(pathname);
     if (requiredLevel !== null) {
       const userLevel: number = session.user.subscriptionLevel ?? 0;
       if (userLevel < requiredLevel) {

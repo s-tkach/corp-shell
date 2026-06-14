@@ -60,7 +60,7 @@ try {
     cwd: repoRoot,
     stdio: "inherit",
   });
-} catch (err) {
+} catch {
   console.error("\nFailed to run `docker compose down -v`. Is Docker running?");
   process.exit(1);
 }
@@ -73,7 +73,7 @@ try {
     cwd: repoRoot,
     stdio: "inherit",
   });
-} catch (err) {
+} catch {
   console.error("\nMigration failed. Check the output above.");
   process.exit(1);
 }
