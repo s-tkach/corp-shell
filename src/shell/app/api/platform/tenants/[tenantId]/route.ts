@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
-import { tenants } from "@/lib/db/schema";
+import { tenants, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { eq } from "drizzle-orm";
 
@@ -22,9 +22,16 @@ export async function PATCH(
   if (guard) return guard;
 
   const { tenantId } = await params;
-  const body = await req.json() as { status?: "active" | "suspended" | "deleted" };
+  const body = await req.json() as {
+    status?: "active" | "suspended" | "deleted";
+    tierId?: string;
+  };
 
-  if (!body.status || !["active", "suspended", "deleted"].includes(body.status)) {
+  if (!body.status && !body.tierId) {
+    return NextResponse.json({ error: "status or tierId is required" }, { status: 400 });
+  }
+
+  if (body.status && !["active", "suspended", "deleted"].includes(body.status)) {
     return NextResponse.json({ error: "status must be active, suspended, or deleted" }, { status: 400 });
   }
 
@@ -42,10 +49,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Cannot modify the platform tenant" }, { status: 400 });
   }
 
-  await db
-    .update(tenants)
-    .set({ status: body.status })
-    .where(eq(tenants.id, tenantId));
+  if (body.tierId) {
+    const tier = await db
+      .select({ id: subscriptionTiers.id })
+      .from(subscriptionTiers)
+      .where(eq(subscriptionTiers.id, body.tierId))
+      .limit(1);
+
+    if (!tier[0]) {
+      return NextResponse.json({ error: `Unknown tier "${body.tierId}"` }, { status: 400 });
+    }
+
+    await db
+      .update(tenantSubscription)
+      .set({ tierId: body.tierId })
+      .where(eq(tenantSubscription.tenantId, tenantId));
+  }
+
+  if (body.status) {
+    await db
+      .update(tenants)
+      .set({ status: body.status })
+      .where(eq(tenants.id, tenantId));
+  }
 
   return NextResponse.json({ ok: true });
 }

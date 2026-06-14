@@ -944,10 +944,12 @@ Before marking v1 as released, confirm:
 - [x] Create `src/shell/app/api/platform/tenants/route.ts`: GET list + POST create
 - [x] Create `src/shell/app/api/platform/tenants/[tenantId]/route.ts`: PATCH suspend/delete
 - [x] **Acceptance:** POST creates tenant and schema; PATCH to `suspended` causes middleware to redirect that tenant's users to `/suspended`
+- [x] Tenant create API requires a selected `tierId`; tenant list API returns current tier metadata; PATCH also supports changing org subscription tier for non-platform tenants
 
 #### M19-5: Platform tenants UI page
 - [x] Create `src/shell/app/(platform)/platform/tenants/page.tsx`
 - [x] **Acceptance:** Platform admin can create a tenant from the UI; created tenant appears in list; suspend changes status
+- [x] Tenant create dialog requires a tier selection and the tenant list supports later tier changes from the same page
 
 #### M19-6: Org-level subscription admin view
 - [x] Updated `src/shell/app/(shell)/admin/subscriptions/page.tsx` to show org-level subscription card (tier name, level, status, expiresAt, upgrade CTA)

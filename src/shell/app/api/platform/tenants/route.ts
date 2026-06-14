@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
-import { tenants, idpProviders, shellConfig } from "@/lib/db/schema";
+import { tenants, idpProviders, shellConfig, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { provisionTenant } from "@/lib/db/provision";
 import { withTenant } from "@/lib/db/tenant";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
@@ -31,8 +31,14 @@ export async function GET() {
       status: tenants.status,
       isPlatform: tenants.isPlatform,
       createdAt: tenants.createdAt,
+      tierId: tenantSubscription.tierId,
+      tierSlug: subscriptionTiers.slug,
+      tierDisplayName: subscriptionTiers.displayName,
+      tierLevel: subscriptionTiers.level,
     })
     .from(tenants)
+    .leftJoin(tenantSubscription, eq(tenantSubscription.tenantId, tenants.id))
+    .leftJoin(subscriptionTiers, eq(subscriptionTiers.id, tenantSubscription.tierId))
     .orderBy(asc(tenants.createdAt));
 
   return NextResponse.json(rows);
@@ -42,6 +48,7 @@ interface CreateTenantBody {
   slug: string;
   displayName: string;
   adminEmail: string;
+  tierId: string;
   oidcIssuer: string;
   oidcClientId: string;
   oidcClientSecret: string;
@@ -53,10 +60,10 @@ export async function POST(req: NextRequest) {
   if (guard) return guard;
 
   const body = await req.json() as CreateTenantBody;
-  const { slug, displayName, adminEmail, oidcIssuer, oidcClientId, oidcClientSecret, appName } = body;
+  const { slug, displayName, adminEmail, tierId, oidcIssuer, oidcClientId, oidcClientSecret, appName } = body;
 
-  if (!slug || !displayName || !adminEmail || !oidcIssuer || !oidcClientId || !oidcClientSecret) {
-    return NextResponse.json({ error: "slug, displayName, adminEmail, oidcIssuer, oidcClientId, and oidcClientSecret are required" }, { status: 400 });
+  if (!slug || !displayName || !adminEmail || !tierId || !oidcIssuer || !oidcClientId || !oidcClientSecret) {
+    return NextResponse.json({ error: "slug, displayName, adminEmail, tierId, oidcIssuer, oidcClientId, and oidcClientSecret are required" }, { status: 400 });
   }
 
   if (!SLUG_RE.test(slug)) {
@@ -65,6 +72,15 @@ export async function POST(req: NextRequest) {
 
   if (slug === getPlatformSlug()) {
     return NextResponse.json({ error: `Cannot create tenant with slug '${getPlatformSlug()}'` }, { status: 400 });
+  }
+
+  const tier = await db
+    .select({ id: subscriptionTiers.id })
+    .from(subscriptionTiers)
+    .where(eq(subscriptionTiers.id, tierId))
+    .limit(1);
+  if (!tier[0]) {
+    return NextResponse.json({ error: `Unknown tier "${tierId}"` }, { status: 400 });
   }
 
   const existing = await db
@@ -77,7 +93,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { tenantId } = await provisionTenant(slug, displayName, adminEmail);
+    const { tenantId } = await provisionTenant(slug, displayName, adminEmail, tierId);
 
     const tenantDb = withTenant(slug);
     const encryptedSecret = await encrypt(oidcClientSecret.trim());

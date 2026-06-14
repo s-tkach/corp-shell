@@ -27,16 +27,21 @@ export async function autoBootstrapPlatform(): Promise<void> {
 
   // Clean up orphaned tenant row if schema is missing
   await db.delete(tenants).where(eq(tenants.slug, platformSlug));
+  await seedPlatformDefaults();
+
+  const freeTierId = await getTierIdBySlug("free");
+  if (!freeTierId) {
+    throw new Error("Failed to resolve free tier for platform bootstrap");
+  }
 
   try {
-    await provisionTenant(platformSlug, "Platform Admin", "", { setupComplete: false });
+    await provisionTenant(platformSlug, "Platform Admin", "", freeTierId, { setupComplete: false });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists") || msg.includes("duplicate key")) return;
     throw e;
   }
 
-  await seedPlatformDefaults();
   await seedPlatformMenu();
 }
 
@@ -49,6 +54,28 @@ async function seedPlatformDefaults(): Promise<void> {
     { slug: "standard", displayName: "Standard", level: 1 },
     { slug: "enterprise", displayName: "Enterprise", level: 2 },
   ]);
+}
+
+async function getTierIdBySlug(slug: string): Promise<string | null> {
+  const rows = await db
+    .select({ id: subscriptionTiers.id })
+    .from(subscriptionTiers)
+    .where(eq(subscriptionTiers.slug, slug))
+    .limit(1);
+
+  return rows[0]?.id ?? null;
+}
+
+async function validateTierId(tierId: string): Promise<void> {
+  const rows = await db
+    .select({ id: subscriptionTiers.id })
+    .from(subscriptionTiers)
+    .where(eq(subscriptionTiers.id, tierId))
+    .limit(1);
+
+  if (!rows[0]) {
+    throw new Error(`Unknown tier "${tierId}"`);
+  }
 }
 
 async function seedPlatformMenu(): Promise<void> {
@@ -107,16 +134,23 @@ export async function provisionTenant(
   slug: string,
   displayName: string,
   adminEmail: string,
+  tierId: string,
   options?: { setupComplete?: boolean }
 ): Promise<{ tenantId: string }> {
   if (!SLUG_PATTERN.test(slug)) {
     throw new Error("Invalid slug");
   }
 
+  if (!tierId) {
+    throw new Error("Tier is required");
+  }
+
   const existing = await db.select().from(tenants).where(eq(tenants.slug, slug)).limit(1);
   if (existing.length > 0) {
     throw new Error(`Slug "${slug}" already exists`);
   }
+
+  await validateTierId(tierId);
 
   const schemaName = `tenant_${slug}`;
   const sql = postgres(connectionString!);
@@ -132,16 +166,10 @@ export async function provisionTenant(
       const tenant = tenantRows[0];
       if (!tenant) throw new Error("Failed to create tenant");
 
-      // Assign free tier subscription
-      const tierRows = await tx<{ id: string }[]>`
-        SELECT id FROM public.subscription_tiers WHERE slug = 'free' LIMIT 1
+      await tx`
+        INSERT INTO public.tenant_subscription (tenant_id, tier_id, status)
+        VALUES (${tenant.id}, ${tierId}, 'active')
       `;
-      if (tierRows[0]) {
-        await tx`
-          INSERT INTO public.tenant_subscription (tenant_id, tier_id, status)
-          VALUES (${tenant.id}, ${tierRows[0].id}, 'active')
-        `;
-      }
 
       // Create tenant schema and run DDL — transactional in Postgres
       await tx.unsafe(`CREATE SCHEMA "${schemaName}"`);

@@ -1024,17 +1024,18 @@ All steps run inside a **single Postgres transaction** on one raw `postgres` con
 
 1. Validate `slug` matches `/^[a-z0-9-]+$/` — throw if invalid (pre-transaction)
 2. Assert slug uniqueness in `public.tenants` — throw if taken (pre-transaction)
-3. `BEGIN`
-4. `INSERT public.tenants` (status: active)
-5. `INSERT public.tenant_subscription` (free tier, if tier exists)
-6. `CREATE SCHEMA tenant_{slug}` — DDL is transactional in Postgres
-7. Run DDL for all per-tenant tables within the transaction
-8. `SET LOCAL search_path` to the new schema; seed `roles`, `shell_config`, optional admin `users` + `user_roles`
-9. `COMMIT`
+3. Validate that the requested `tierId` exists in `public.subscription_tiers` — throw if missing (pre-transaction)
+4. `BEGIN`
+5. `INSERT public.tenants` (status: active)
+6. `INSERT public.tenant_subscription` (selected tier, status: active)
+7. `CREATE SCHEMA tenant_{slug}` — DDL is transactional in Postgres
+8. Run DDL for all per-tenant tables within the transaction
+9. `SET LOCAL search_path` to the new schema; seed `roles`, `shell_config`, optional admin `users` + `user_roles`
+10. `COMMIT`
 
 On any exception: `ROLLBACK`, then `DROP SCHEMA IF EXISTS tenant_{slug} CASCADE` as belt-and-suspenders cleanup. The single connection is closed in a `finally` block.
 
-No public signup path exists. All tenant creation is platform-admin-only.
+No public signup path exists. All tenant creation is platform-admin-only, and `/platform/tenants` is also the place where platform admins can later replace a tenant's assigned org subscription tier.
 
 ### 20.7 Request Lifecycle (v2)
 

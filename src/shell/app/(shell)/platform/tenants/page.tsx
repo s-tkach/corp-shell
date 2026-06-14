@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Loader2, Pencil } from "lucide-react";
 import { useNotifications } from "@/components/shell/notifications/notification-provider";
 
 interface Tenant {
@@ -20,12 +28,24 @@ interface Tenant {
   status: "active" | "suspended" | "deleted";
   isPlatform: boolean;
   createdAt: string;
+  tierId: string | null;
+  tierSlug: string | null;
+  tierDisplayName: string | null;
+  tierLevel: number | null;
+}
+
+interface TierOption {
+  id: string;
+  slug: string;
+  displayName: string;
+  level: number;
 }
 
 const EMPTY_FORM = {
   slug: "",
   displayName: "",
   adminEmail: "",
+  tierId: "",
   oidcIssuer: "",
   oidcClientId: "",
   oidcClientSecret: "",
@@ -37,17 +57,26 @@ type OidcStatus = "idle" | "testing" | "ok" | "error";
 export default function PlatformTenantsPage() {
   const { showToast } = useNotifications();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tiers, setTiers] = useState<TierOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [editingTierTenant, setEditingTierTenant] = useState<Tenant | null>(null);
+  const [editingTierId, setEditingTierId] = useState("");
   const [oidcStatus, setOidcStatus] = useState<OidcStatus>("idle");
   const [oidcError, setOidcError] = useState("");
 
   useEffect(() => {
-    fetch("/api/platform/tenants")
-      .then((r) => r.json())
-      .then((data: Tenant[]) => { setTenants(data); setLoading(false); })
+    Promise.all([
+      fetch("/api/platform/tenants").then((r) => r.json() as Promise<Tenant[]>),
+      fetch("/api/platform/subscriptions").then((r) => r.json() as Promise<TierOption[]>),
+    ])
+      .then(([tenantData, tierData]) => {
+        setTenants(tenantData);
+        setTiers(tierData);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -84,7 +113,18 @@ export default function PlatformTenantsPage() {
       }
       setTenants((prev) => [
         ...prev,
-        { id: data.tenantId!, slug: form.slug, displayName: form.displayName, status: "active", isPlatform: false, createdAt: new Date().toISOString() },
+        {
+          id: data.tenantId!,
+          slug: form.slug,
+          displayName: form.displayName,
+          status: "active",
+          isPlatform: false,
+          createdAt: new Date().toISOString(),
+          tierId: form.tierId,
+          tierSlug: tiers.find((tier) => tier.id === form.tierId)?.slug ?? null,
+          tierDisplayName: tiers.find((tier) => tier.id === form.tierId)?.displayName ?? null,
+          tierLevel: tiers.find((tier) => tier.id === form.tierId)?.level ?? null,
+        },
       ]);
       showToast({ title: `Tenant "${form.displayName}" created successfully.`, variant: "success" });
       setAdding(false);
@@ -110,8 +150,45 @@ export default function PlatformTenantsPage() {
     setTenants((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
   }
 
+  async function handleTierSave() {
+    if (!editingTierTenant || !editingTierId) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/platform/tenants/${editingTierTenant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tierId: editingTierId }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) {
+        showToast({ title: data.error ?? "Failed to update tenant tier", variant: "error" });
+        return;
+      }
+
+      const nextTier = tiers.find((tier) => tier.id === editingTierId) ?? null;
+      setTenants((prev) =>
+        prev.map((tenant) =>
+          tenant.id === editingTierTenant.id
+            ? {
+                ...tenant,
+                tierId: nextTier?.id ?? null,
+                tierSlug: nextTier?.slug ?? null,
+                tierDisplayName: nextTier?.displayName ?? null,
+                tierLevel: nextTier?.level ?? null,
+              }
+            : tenant
+        )
+      );
+      setEditingTierTenant(null);
+      setEditingTierId("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const canTest = form.oidcIssuer.trim().length > 0;
-  const canCreate = form.slug && form.displayName && form.adminEmail && form.oidcIssuer && form.oidcClientId && form.oidcClientSecret;
+  const canCreate = form.slug && form.displayName && form.adminEmail && form.tierId && form.oidcIssuer && form.oidcClientId && form.oidcClientSecret;
 
   if (loading) return <div className="p-6">Loading…</div>;
 
@@ -156,6 +233,21 @@ export default function PlatformTenantsPage() {
                 value={form.adminEmail}
                 onChange={(e) => setForm((f) => ({ ...f, adminEmail: e.target.value }))}
               />
+            </div>
+            <div className="space-y-1">
+              <Label>Subscription tier</Label>
+              <Select value={form.tierId} onValueChange={(tierId) => setForm((f) => ({ ...f, tierId }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiers.map((tier) => (
+                    <SelectItem key={tier.id} value={tier.id}>
+                      {tier.displayName} (L{tier.level})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -238,18 +330,73 @@ export default function PlatformTenantsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={editingTierTenant !== null} onOpenChange={(open) => { if (!open) { setEditingTierTenant(null); setEditingTierId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Subscription Tier</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Tenant</Label>
+              <p className="text-sm text-muted-foreground">
+                {editingTierTenant?.displayName} ({editingTierTenant?.slug})
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Subscription tier</Label>
+              <Select value={editingTierId} onValueChange={setEditingTierId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiers.map((tier) => (
+                    <SelectItem key={tier.id} value={tier.id}>
+                      {tier.displayName} (L{tier.level})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingTierTenant(null); setEditingTierId(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleTierSave()} disabled={saving || !editingTierId}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-2">
         {tenants.map((t) => (
           <div key={t.id} className="flex items-center justify-between rounded-md border p-4">
             <div>
               <p className="font-medium">{t.displayName}</p>
               <p className="text-sm text-muted-foreground">{t.slug}</p>
+              <p className="text-sm text-muted-foreground">
+                Tier: {t.tierDisplayName ? `${t.tierDisplayName} (L${t.tierLevel ?? 0})` : "Unassigned"}
+              </p>
               <p className="text-xs text-muted-foreground">
                 Status: <span className={t.status === "active" ? "text-green-600" : "text-destructive"}>{t.status}</span>
                 {" · "}Created {new Date(t.createdAt).toLocaleDateString()}
               </p>
             </div>
             <div className="flex gap-2">
+              {!t.isPlatform && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingTierTenant(t);
+                    setEditingTierId(t.tierId ?? "");
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Tier
+                </Button>
+              )}
               {t.status === "active" && !t.isPlatform && (
                 <Button variant="outline" size="sm" onClick={() => handleStatusChange(t.id, "suspended")}>
                   Suspend

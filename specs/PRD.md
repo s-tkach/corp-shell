@@ -875,10 +875,10 @@ Per-user `userSubscriptions` is replaced by a single `tenantSubscription` row pe
 `POST /api/internal/subscriptions/assign` payload changes from `{ userId, tierId, expiresAt }` to `{ tenantSlug, tierId, expiresAt }`. The endpoint updates the target tenant's `tenantSubscription` row. HMAC-SHA256 signature validation is unchanged.
 
 ### FR-MT-9: Platform Admin Panel
-`/platform/tenants` is accessible only to users authenticated in the `tenant_platform` schema with `super_admin` role. It provides: tenant list with status, create-tenant form (slug + display name + admin email), suspend/reactivate, soft-delete. Tenant creation calls `provisionTenant()` which creates the schema, runs DDL, and seeds defaults.
+`/platform/tenants` is accessible only to users authenticated in the `tenant_platform` schema with `super_admin` role. It provides: tenant list with status and current org subscription tier, create-tenant form (slug + display name + admin email + required tier selection), tier-change action, suspend/reactivate, soft-delete. Tenant creation calls `provisionTenant()` which creates the schema, runs DDL, and seeds defaults.
 
 ### FR-MT-10: Tenant Provisioning
-`provisionTenant(slug, displayName, adminEmail)` is the sole mechanism for creating a new tenant. It: validates slug format (`^[a-z0-9-]+$`), inserts into `public.tenants`, creates `tenant_{slug}` schema, runs all per-tenant DDL, seeds default `shellConfig`, `free` subscription tier, `super_admin`/`admin`/`user` roles, and an initial admin user record. The platform admin then sends the tenant admin a setup link to `https://{slug}.corp.example.com/setup`.
+`provisionTenant(slug, displayName, adminEmail, tierId)` is the sole mechanism for creating a new tenant. It: validates slug format (`^[a-z0-9-]+$`), inserts into `public.tenants`, creates `tenant_{slug}` schema, writes the selected org subscription tier into `public.tenant_subscription`, runs all per-tenant DDL, seeds default `shellConfig`, `super_admin`/`admin`/`user` roles, and an initial admin user record. The platform admin then sends the tenant admin a setup link to `https://{slug}.corp.example.com/setup`.
 
 ---
 
