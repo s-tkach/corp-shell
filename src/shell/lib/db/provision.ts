@@ -225,6 +225,13 @@ export function perTenantDDL(schema: string): string {
       PRIMARY KEY (user_id, role_id)
     );
 
+    CREATE TABLE "${schema}".user_idp_roles (
+      user_id uuid NOT NULL REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      role_id uuid NOT NULL REFERENCES "${schema}".roles(id) ON DELETE CASCADE,
+      assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, role_id)
+    );
+
     CREATE TABLE "${schema}".idp_group_role_mappings (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       idp_group_name text NOT NULL,

@@ -154,8 +154,8 @@ GitHub Packages
      c. all protected routes: read a compact auth snapshot for the resolved tenant
         - tenant status
         - user active state
-        - current tenant-local roles
-        - current tenant subscription tier/status
+        - effective tenant-local roles (manual + current IDP-derived)
+        - effective tenant subscription tier/level/status after applying `expiresAt`
         - effective route requirements derived from shared menu ownership + tenant-local role assignments
      d. all other routes: check NextAuth.js session cookie
         - No session → redirect /login
@@ -165,7 +165,7 @@ GitHub Packages
           - Authorized → continue
 3. Server Component (layout.tsx):
      - auth() reads session (no DB hit — JWT cookie)
-     - fetch menu from DB, filter by roles + subscriptionLevel
+     - fetch menu from DB, filter by request-time effective roles + subscriptionLevel
      - render Sidebar + Header (server HTML)
 4. Client Component ([...slug]/page.tsx):
      - useShellRouting() → resolves MF remote by route prefix
@@ -236,13 +236,14 @@ User → middleware (no session) → NextAuth redirect to OIDC provider
   → NextAuth jwt() callback:
       1. Extract groups[] from ID token
       2. DB: map IDP groups → shell roles  (idp_group_role_mappings)
-      3. DB: get subscription tier          (user_subscriptions)
+      3. Replace the user's `user_idp_roles` rows with the newly mapped role set
+      4. Read manual roles from `user_roles` and compute effective roles as the union
+      5. DB: get tenant subscription and resolve effective tier/level from `status` + `expiresAt`
       4. New user? JIT-provision:
            INSERT users
-           INSERT user_roles (from group mappings)
-           INSERT user_subscriptions (free tier)
-      5. Write auth_events (LOGIN)
-      6. Embed { userId, roles, subscriptionTier, subscriptionLevel } in JWT
+           INSERT user_idp_roles (from group mappings)
+      6. Write auth_events (LOGIN)
+      7. Embed { userId, roles, subscriptionTier, subscriptionLevel } in JWT
   → Encrypted JWT written to httpOnly Secure SameSite=Lax cookie
   → Redirect to originally requested URL
 ```
@@ -267,8 +268,9 @@ Protected routes must not trust JWT role and subscription claims as the sole sou
 The snapshot includes:
 - tenant existence and `status`
 - user existence and `isActive`
-- current tenant-local role slugs
-- current tenant subscription tier, level, and status
+- effective tenant-local role slugs merged from manual and current IDP-derived assignments
+- current tenant subscription tier, level, status, and `expiresAt`
+- effective tenant subscription tier and level after applying access rules to `status` and `expiresAt`
 - effective access requirements for the requested route when that route is represented by shared menu data
 
 The snapshot is intentionally small. It is not a full user profile reload. Its only purpose is next-request enforcement for auth-sensitive changes.
@@ -340,14 +342,13 @@ Layer 3 — Server Component    (layout, menu render)
 
 ### 7.3 Subscription Entitlement
 
-- Each user has a `subscriptionTier` (e.g. `free`) and numeric `subscriptionLevel` (0/1/2).
-- Both embedded in session JWT — no per-route DB call.
+- Each session embeds an effective `subscriptionTier` (e.g. `free`) and numeric `subscriptionLevel` (0/1/2), but protected requests must re-resolve them from the authoritative tenant subscription snapshot.
 - Shared menu items are assigned to a single owning subscription tier in `public.menu_items.subscriptionTierId`.
-- A tenant sees the union of all shared menu items whose owning tier level is less than or equal to `session.subscriptionLevel`.
+- A tenant sees the union of all shared menu items whose owning tier level is less than or equal to the request-time effective subscription level.
 - Platform-only menu items use `subscriptionTierId = NULL` and are eligible only when `isPlatformAdmin(...)` is true.
 - Tenant-local `menu_item_roles` continue to hide shared menu items per tenant after tier filtering.
 - Users below required level → Upgrade Prompt page (admin-configured content).
-- `subscriptionExpiresAt` → downgrade to `free` on next login.
+- Non-free subscriptions with non-active status or `expiresAt` in the past downgrade to `free` on the next authenticated request.
 
 ---
 

@@ -2,16 +2,16 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { withTenant } from "@/lib/db/tenant";
 import {
-  roles,
   subscriptionTiers,
   tenantSubscription,
   tenants,
-  userRoles,
   users,
 } from "@/lib/db/schema";
 import { getMenuRouteAccessForTenant } from "@/lib/menu";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import type { Session } from "next-auth";
+import { resolveEffectiveTenantSubscriptionAccess } from "@/lib/effective-subscription";
+import { getEffectiveRoleAssignmentsForUser } from "@/lib/role-assignments";
 
 export type RequestAccessOutcome =
   | "allow"
@@ -73,8 +73,6 @@ export function mapRequestAccessOutcomeToDecision({
 
   return isApi ? "403" : "rewrite:/403";
 }
-
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
 
 export function evaluateProtectedRequestAccess({
   requestTenantSlug,
@@ -167,14 +165,10 @@ export async function getRequestAccessSnapshot({
     .limit(1);
   const user = userRows[0];
 
-  const roleRows = user
-    ? await tenantDb
-        .select({ slug: roles.slug })
-        .from(userRoles)
-        .innerJoin(roles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, userId))
-    : [];
-  const userRolesList = roleRows.map((row) => row.slug);
+  const roleAssignments = user
+    ? await getEffectiveRoleAssignmentsForUser(tenantDb, userId)
+    : { manualRoles: [], idpRoles: [], effectiveRoles: [] };
+  const userRolesList = roleAssignments.effectiveRoles.map((role) => role.slug);
   const platformAdmin = isPlatformAdmin({
     roles: userRolesList,
     tenantSlug,
@@ -185,6 +179,7 @@ export async function getRequestAccessSnapshot({
       slug: subscriptionTiers.slug,
       level: subscriptionTiers.level,
       status: tenantSubscription.status,
+      expiresAt: tenantSubscription.expiresAt,
     })
     .from(tenantSubscription)
     .innerJoin(subscriptionTiers, eq(tenantSubscription.tierId, subscriptionTiers.id))
@@ -192,14 +187,19 @@ export async function getRequestAccessSnapshot({
     .limit(1);
   const subscription = subscriptionRows[0];
 
-  const subscriptionLevel =
-    subscription && ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)
-      ? subscription.level
-      : 0;
-  const subscriptionTier =
-    subscription && ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)
-      ? subscription.slug
-      : "free";
+  const effectiveSubscription = subscription
+    ? resolveEffectiveTenantSubscriptionAccess({
+        slug: subscription.slug,
+        level: subscription.level,
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+      })
+    : {
+        effectiveTierSlug: "free",
+        effectiveLevel: 0,
+      };
+  const subscriptionLevel = effectiveSubscription.effectiveLevel;
+  const subscriptionTier = effectiveSubscription.effectiveTierSlug;
 
   const routeAccess = pathname
     ? await getMenuRouteAccessForTenant({

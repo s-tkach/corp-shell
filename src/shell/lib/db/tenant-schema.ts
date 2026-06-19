@@ -44,6 +44,20 @@ export const userRoles = pgTable(
   (t) => [unique().on(t.userId, t.roleId)],
 );
 
+export const userIdpRoles = pgTable(
+  "user_idp_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.roleId)],
+);
+
 export const idpGroupRoleMappings = pgTable(
   "idp_group_role_mappings",
   {

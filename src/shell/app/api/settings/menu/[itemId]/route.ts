@@ -6,6 +6,7 @@ import { menuItems, menuItemRoles, roles, subscriptionTiers } from "@/lib/db/sch
 import { withTenant } from "@/lib/db/tenant";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { eq, inArray } from "drizzle-orm";
+import { getRequestAccessSnapshot } from "@/lib/request-access";
 
 export async function PATCH(
   req: NextRequest,
@@ -16,9 +17,16 @@ export async function PATCH(
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "";
-  const subscriptionLevel = session?.user.subscriptionLevel ?? 0;
+  const access = session
+    ? await getRequestAccessSnapshot({
+        tenantSlug,
+        pathname: "",
+        session,
+      })
+    : null;
+  const subscriptionLevel = access?.subscriptionLevel ?? 0;
   const platformAdmin = isPlatformAdmin({
-    roles: session?.user.roles ?? [],
+    roles: access?.userRoles ?? [],
     tenantSlug,
   });
 

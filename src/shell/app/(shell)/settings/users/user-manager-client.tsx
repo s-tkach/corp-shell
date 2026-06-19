@@ -41,7 +41,9 @@ interface User {
   displayName: string;
   isActive: boolean;
   lastLoginAt: Date | null;
-  roles: { slug: string; displayName: string }[];
+  manualRoles: { slug: string; displayName: string }[];
+  idpRoles: { slug: string; displayName: string }[];
+  effectiveRoles: { slug: string; displayName: string }[];
   subscription: UserSub | null;
   companyIds?: string[];
 }
@@ -89,7 +91,7 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
   function openEdit(user: User) {
     setForm({
       isActive: user.isActive,
-      selectedRoles: user.roles.map((r) => r.slug),
+      selectedRoles: user.manualRoles.map((r) => r.slug),
       tierId: user.subscription?.tierId ?? "",
       expiresAt: user.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toISOString().split("T")[0]! : "",
     });
@@ -159,7 +161,7 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    {user.roles.map((r) => (
+                    {user.effectiveRoles.map((r) => (
                       <Badge key={r.slug} variant="secondary" className="text-xs">{r.displayName}</Badge>
                     ))}
                   </div>
@@ -227,7 +229,7 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
             </div>
 
             <div className="space-y-1">
-              <Label>Roles</Label>
+              <Label>Manual Roles</Label>
               <div className="flex flex-wrap gap-2">
                 {allRoles.map((role) => (
                   <button
@@ -242,6 +244,32 @@ export function UserManagerClient({ users: initialUsers, allRoles, allTiers, all
                   >
                     {role.displayName}
                   </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>IDP-Derived Roles</Label>
+              <div className="flex flex-wrap gap-2">
+                {(editDialog.user?.idpRoles ?? []).length > 0 ? (
+                  (editDialog.user?.idpRoles ?? []).map((role) => (
+                    <Badge key={role.slug} variant="outline" className="text-xs">
+                      {role.displayName}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground">No current IDP-derived roles</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Effective Roles</Label>
+              <div className="flex flex-wrap gap-2">
+                {(editDialog.user?.effectiveRoles ?? []).map((role) => (
+                  <Badge key={role.slug} variant="secondary" className="text-xs">
+                    {role.displayName}
+                  </Badge>
                 ))}
               </div>
             </div>

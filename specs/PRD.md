@@ -156,15 +156,16 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 
 **FR-AUTH-8:** Authentication events (login, logout, failure, JIT provision) are written to the `auth_events` table. Admin viewer UI is v2.
 
-**FR-AUTH-9:** Every protected page request and protected API request must re-read a compact authoritative auth snapshot before continuing. The snapshot must include tenant status, user active state, current tenant-local role assignments, and current tenant subscription state required for enforcement.
+**FR-AUTH-9:** Every protected page request and protected API request must re-read a compact authoritative auth snapshot before continuing. The snapshot must include tenant status, user active state, the user's effective tenant-local roles (manual assignments union current IDP-derived assignments), and the tenant's effective subscription state required for enforcement (`tier`, `level`, `status`, and `expiresAt` as interpreted for access).
 
-**FR-AUTH-10:** Stale session claims are not sufficient for authorization. If the request-time auth snapshot disagrees with role, tenant status, user status, or subscription claims embedded in the session, the request-time snapshot wins and the request is denied or redirected immediately on that request.
+**FR-AUTH-10:** Stale session claims are not sufficient for authorization. If the request-time auth snapshot disagrees with role, tenant status, user status, or subscription claims embedded in the session, the request-time snapshot wins and the request is denied or redirected immediately on that request. Request-time subscription enforcement must use effective access state derived from both subscription `status` and `expiresAt`, not only the stored tier level.
 
 **FR-AUTH-11:** Session refresh semantics:
-- Role changes take effect on the next protected request.
+- Manual role changes take effect on the next protected request.
+- IDP-derived role removals and additions take effect on the next successful login, where derived assignments are recomputed and replaced from current group mappings.
 - User deactivation takes effect on the next protected request.
 - Tenant suspension or deletion takes effect on the next protected request.
-- Subscription tier or status changes take effect on the next protected request.
+- Subscription tier, status, or expiry changes take effect on the next protected request.
 - The default handling for stale privileged sessions is request-time revalidation, not waiting for the user to sign out and back in.
 
 ### 6.3 Authorization & RBAC
@@ -181,7 +182,7 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 
 **FR-RBAC-6:** The `super_admin` role is system-owned. It cannot be deleted or renamed.
 
-**FR-RBAC-7:** Roles can be assigned manually by an `admin` or `super_admin` in User Manager, or inherited automatically from IDP groups on login.
+**FR-RBAC-7:** Roles are stored by source. Manual roles are assigned by an `admin` or `super_admin` in User Manager and remain stable across logins. IDP-derived roles are computed from current IDP group mappings on each successful login and replace the prior derived set only. Effective access is the union of manual and current IDP-derived roles.
 
 **FR-RBAC-8:** Request-time route authorization for direct URL access must use the same effective access model as `/api/menu`: shared menu ownership by subscription tier combined with tenant-local role assignments on each shared menu item.
 

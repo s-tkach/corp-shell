@@ -1,5 +1,5 @@
 import { getTenantDb } from "@/lib/db/tenant";
-import { roles, userRoles, idpGroupRoleMappings } from "@/lib/db/schema";
+import { roles, userRoles, userIdpRoles, idpGroupRoleMappings } from "@/lib/db/schema";
 import { asc, sql } from "drizzle-orm";
 import { RoleManagerClient } from "./role-manager-client";
 
@@ -12,7 +12,15 @@ export default async function RoleManagerPage() {
       displayName: roles.displayName,
       isSystem: roles.isSystem,
       createdAt: roles.createdAt,
-      userCount: sql<number>`(select count(*) from ${userRoles} where ${userRoles.roleId} = ${roles.id})`.mapWith(Number),
+      userCount: sql<number>`(
+        select count(distinct assignments.user_id)
+        from (
+          select ${userRoles.userId} as user_id, ${userRoles.roleId} as role_id from ${userRoles}
+          union all
+          select ${userIdpRoles.userId} as user_id, ${userIdpRoles.roleId} as role_id from ${userIdpRoles}
+        ) assignments
+        where assignments.role_id = ${roles.id}
+      )`.mapWith(Number),
     })
     .from(roles)
     .orderBy(asc(roles.displayName));

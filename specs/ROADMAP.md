@@ -164,6 +164,17 @@
 - [x] Write `auth_events` (FAILURE) for any callback error
 - [x] **Acceptance:** Simulated OIDC error shows friendly error page; failure event written to DB
 
+#### M4-6: Separate manual and IDP-derived role assignments
+- [x] Add a dedicated tenant-scoped `user_idp_roles` table and update tenant provisioning DDL in place
+- [x] On login, recompute `user_idp_roles` from current IDP group mappings without mutating manual `user_roles`
+- [x] Compute effective session roles as `user_roles ∪ user_idp_roles`, preserving first-platform-login `super_admin`
+- [x] **Acceptance:** Manual roles remain unchanged across logins; removed IDP group mappings disappear on the next successful login
+
+#### M4-7: Effective tenant subscription resolution
+- [x] Add a shared helper that resolves effective subscription access from tier, level, status, and `expiresAt`
+- [x] Downgrade non-free subscriptions with non-active status or past `expiresAt` to effective free access on the next authenticated request
+- [x] **Acceptance:** Request-time auth, menu visibility, and notifications all use the same effective subscription result
+
 ---
 
 ## M5 — RBAC & Middleware
@@ -192,6 +203,16 @@
 #### M5-4: 403 page
 - [x] `app/(shell)/403/page.tsx`: "Access Denied" UI with link back to `/dashboard`
 - [x] **Acceptance:** Renders correctly for both middleware-blocked and API-blocked scenarios
+
+#### M5-5: Request-time auth snapshot hardening
+- [x] Extend the request-time auth snapshot to read effective roles and expiresAt-aware subscription access
+- [x] Ensure direct route guards and `/api/menu` continue to share the same effective access resolver
+- [x] **Acceptance:** Stale session roles or subscription claims lose access immediately on the next protected request
+
+#### M5-6: Platform lockout regression coverage
+- [x] Preserve the existing platform-only protections that block deactivating the last active platform user
+- [x] Preserve the existing platform-only protections that block disabling or deleting the last enabled platform SSO provider
+- [x] **Acceptance:** Automated tests cover both user deactivation and SSO-provider lockout paths
 
 ---
 

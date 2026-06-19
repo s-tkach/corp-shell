@@ -6,6 +6,7 @@ import { menuItems, menuItemRoles, menuSections, roles, subscriptionTiers } from
 import { withTenant } from "@/lib/db/tenant";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { and, asc, eq, inArray, isNull, not, or } from "drizzle-orm";
+import { getRequestAccessSnapshot } from "@/lib/request-access";
 
 export async function GET() {
   const authError = await requireRoles(["super_admin", "admin"]);
@@ -13,9 +14,16 @@ export async function GET() {
 
   const session = await auth();
   const tenantSlug = session?.user.tenantSlug ?? "";
-  const subscriptionLevel = session?.user.subscriptionLevel ?? 0;
+  const access = session
+    ? await getRequestAccessSnapshot({
+        tenantSlug,
+        pathname: "",
+        session,
+      })
+    : null;
+  const subscriptionLevel = access?.subscriptionLevel ?? 0;
   const platformAdmin = isPlatformAdmin({
-    roles: session?.user.roles ?? [],
+    roles: access?.userRoles ?? [],
     tenantSlug,
   });
 
@@ -99,7 +107,7 @@ export async function GET() {
 
   return NextResponse.json({
     currentTier: {
-      slug: session?.user.subscriptionTier ?? "free",
+      slug: access?.subscriptionTier ?? "free",
       level: subscriptionLevel,
     },
     sections,

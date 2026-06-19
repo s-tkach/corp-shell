@@ -5,14 +5,30 @@ import { notifications, notificationReads } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
 import { publishNotification } from "@/lib/sse-registry";
+import { getRequestAccessSnapshot, mapRequestAccessOutcomeToDecision } from "@/lib/request-access";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const tenantSlug = session.user.tenantSlug ?? "";
+  const access = await getRequestAccessSnapshot({
+    tenantSlug,
+    pathname: "/api/notifications",
+    session,
+  });
+  const decision = mapRequestAccessOutcomeToDecision({
+    outcome: access.outcome,
+    pathname: "/api/notifications",
+    isApi: true,
+  });
+  if (decision === "401") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (decision === "404") return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  if (decision === "403") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const tenantDb = await getTenantDb();
   const userId = session.user.userId;
-  const subLevel = session.user.subscriptionLevel ?? 0;
+  const subLevel = access.subscriptionLevel;
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const limit = 20;

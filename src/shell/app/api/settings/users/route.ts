@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
-import { users, userRoles, roles, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
+import { users, subscriptionTiers, tenantSubscription } from "@/lib/db/schema";
 import { requireRoles } from "@/lib/auth-guard";
-import { asc, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { getEffectiveRoleAssignmentsForUser } from "@/lib/role-assignments";
 
 export async function GET(req: NextRequest) {
   const authError = await requireRoles(["super_admin", "admin"]);
@@ -44,14 +45,15 @@ export async function GET(req: NextRequest) {
 
   const enriched = await Promise.all(
     rows.map(async (u) => {
-      const roleRows = await tenantDb
-        .select({ slug: roles.slug, displayName: roles.displayName })
-        .from(userRoles)
-        .innerJoin(roles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, u.id))
-        .orderBy(asc(roles.displayName));
+      const roleAssignments = await getEffectiveRoleAssignmentsForUser(tenantDb, u.id);
 
-      return { ...u, roles: roleRows, subscription: orgSubscription };
+      return {
+        ...u,
+        manualRoles: roleAssignments.manualRoles,
+        idpRoles: roleAssignments.idpRoles,
+        effectiveRoles: roleAssignments.effectiveRoles,
+        subscription: orgSubscription,
+      };
     })
   );
 

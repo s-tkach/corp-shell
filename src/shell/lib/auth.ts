@@ -5,7 +5,6 @@ import {
   users,
   roles,
   userRoles,
-  idpGroupRoleMappings,
   subscriptionTiers,
   tenantSubscription,
   authEvents,
@@ -14,7 +13,13 @@ import {
 } from "@/lib/db/schema";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { resolveEffectiveTenantSubscriptionAccess } from "@/lib/effective-subscription";
+import {
+  getEffectiveRoleAssignmentsForUser,
+  getMappedIdpRoleSlugs,
+  replaceIdpRoleAssignmentsForUser,
+} from "@/lib/role-assignments";
 
 async function isFirstPlatformLogin(
   tenantDb: ReturnType<typeof withTenant>,
@@ -83,15 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             ? ((profile as Record<string, unknown>)["groups"] as string[])
             : [];
 
-          let roleSlugs: string[] = [];
-          if (idpGroups.length > 0) {
-            const mappings = await tenantDb
-              .select({ slug: roles.slug })
-              .from(idpGroupRoleMappings)
-              .innerJoin(roles, eq(idpGroupRoleMappings.roleId, roles.id))
-              .where(inArray(idpGroupRoleMappings.idpGroupName, idpGroups));
-            roleSlugs = [...new Set(mappings.map((m) => m.slug))];
-          }
+          const idpRoleSlugs = await getMappedIdpRoleSlugs(tenantDb, idpGroups);
 
           const existingUsers = await tenantDb
             .select()
@@ -101,9 +98,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
 
           let userId: string;
           const grantPlatformSuperAdmin = await isFirstPlatformLogin(tenantDb, tenantSlug);
-          if (grantPlatformSuperAdmin) {
-            roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
-          }
 
           if (existingUsers.length === 0 || existingUsers[0] === undefined) {
             // New user — JIT provision
@@ -121,17 +115,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             if (!newUser) throw new Error("Failed to insert user");
             userId = newUser.id;
 
-            if (roleSlugs.length > 0) {
-              const roleRows = await tenantDb
-                .select({ id: roles.id })
-                .from(roles)
-                .where(inArray(roles.slug, roleSlugs));
-              if (roleRows.length > 0) {
-                await tenantDb.insert(userRoles).values(
-                  roleRows.map((r) => ({ userId, roleId: r.id }))
-                );
-              }
-            }
+            await replaceIdpRoleAssignmentsForUser(tenantDb, userId, idpRoleSlugs);
 
             await tenantDb.insert(authEvents).values({
               userId,
@@ -147,15 +131,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
               .update(users)
               .set({ idpSource: "oidc", idpSubject: sub, lastLoginAt: new Date() })
               .where(eq(users.id, userId));
+            await replaceIdpRoleAssignmentsForUser(tenantDb, userId, idpRoleSlugs);
 
-            const dbRoleRows = await tenantDb
-              .select({ slug: roles.slug })
-              .from(userRoles)
-              .innerJoin(roles, eq(userRoles.roleId, roles.id))
-              .where(eq(userRoles.userId, userId));
-            roleSlugs = [...new Set([...roleSlugs, ...dbRoleRows.map((r) => r.slug)])];
-
-            if (grantPlatformSuperAdmin && !roleSlugs.includes("super_admin")) {
+            if (grantPlatformSuperAdmin) {
               const superAdminRows = await tenantDb
                 .select({ id: roles.id })
                 .from(roles)
@@ -167,8 +145,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
                   userId,
                   roleId: superAdminRole.id,
                 });
-                roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
               }
+            }
+          }
+
+          if (grantPlatformSuperAdmin && existingUsers.length === 0) {
+            const superAdminRows = await tenantDb
+              .select({ id: roles.id })
+              .from(roles)
+              .where(eq(roles.slug, "super_admin"))
+              .limit(1);
+            const superAdminRole = superAdminRows[0];
+            if (superAdminRole) {
+              await tenantDb.insert(userRoles).values({
+                userId,
+                roleId: superAdminRole.id,
+              });
             }
           }
 
@@ -191,6 +183,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             .limit(1);
 
           const tier = subRow[0];
+          const effectiveSubscription = tier
+            ? resolveEffectiveTenantSubscriptionAccess({
+                slug: tier.slug,
+                level: tier.level,
+                status: tier.status,
+                expiresAt: tier.expiresAt,
+              })
+            : {
+                effectiveTierSlug: "free",
+                effectiveLevel: 0,
+              };
+          const roleAssignments = await getEffectiveRoleAssignmentsForUser(tenantDb, userId);
           const companyRows = await tenantDb
             .select({ companyId: userCompanies.companyId })
             .from(userCompanies)
@@ -201,9 +205,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
           token.companyId = companyIds[0] ?? null;
 
           token.userId = userId;
-          token.roles = roleSlugs;
-          token.subscriptionTier = tier?.slug ?? "free";
-          token.subscriptionLevel = tier?.level ?? 0;
+          token.roles = roleAssignments.effectiveRoles.map((role) => role.slug);
+          token.subscriptionTier = effectiveSubscription.effectiveTierSlug;
+          token.subscriptionLevel = effectiveSubscription.effectiveLevel;
         }
 
         return token;

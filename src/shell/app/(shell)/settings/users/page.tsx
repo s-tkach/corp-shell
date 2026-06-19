@@ -1,9 +1,10 @@
 import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
-import { users, userRoles, roles, subscriptionTiers, tenantSubscription, companies, userCompanies } from "@/lib/db/schema";
+import { users, roles, subscriptionTiers, tenantSubscription, companies, userCompanies } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { UserManagerClient } from "./user-manager-client";
+import { getEffectiveRoleAssignmentsForUser } from "@/lib/role-assignments";
 
 const PAGE_SIZE = 20;
 
@@ -51,19 +52,20 @@ export default async function UserManagerPage({
 
   const enriched = await Promise.all(
     userRows.map(async (u) => {
-      const roleRows = await tenantDb
-        .select({ slug: roles.slug, displayName: roles.displayName })
-        .from(userRoles)
-        .innerJoin(roles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, u.id))
-        .orderBy(asc(roles.displayName));
-
+      const roleAssignments = await getEffectiveRoleAssignmentsForUser(tenantDb, u.id);
       const companyRows = await tenantDb
         .select({ companyId: userCompanies.companyId })
         .from(userCompanies)
         .where(eq(userCompanies.userId, u.id));
 
-      return { ...u, roles: roleRows, subscription: orgSubscription, companyIds: companyRows.map((c) => c.companyId) };
+      return {
+        ...u,
+        manualRoles: roleAssignments.manualRoles,
+        idpRoles: roleAssignments.idpRoles,
+        effectiveRoles: roleAssignments.effectiveRoles,
+        subscription: orgSubscription,
+        companyIds: companyRows.map((c) => c.companyId),
+      };
     })
   );
 
