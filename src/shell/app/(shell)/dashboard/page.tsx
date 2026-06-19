@@ -5,7 +5,7 @@ import { notifications, notificationReads } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { visibilityFilter } from "@/lib/notifications";
 import { getVisibleMenuItemsForTenant } from "@/lib/menu";
-import { isPlatformAdmin } from "@/lib/platform-guard";
+import { getRequestAccessSnapshot } from "@/lib/request-access";
 import { GreetingBanner } from "./_components/greeting-banner";
 import { AppsGrid } from "./_components/apps-grid";
 import { ProfileCard } from "./_components/profile-card";
@@ -48,10 +48,15 @@ export default async function DashboardPage() {
   if (!session) redirect("/api/auth/signin");
 
   const userId = session.user.userId;
-  const roles = session.user.roles ?? [];
-  const subscriptionLevel = session.user.subscriptionLevel ?? 0;
   const tenantSlug = session.user.tenantSlug ?? "";
-  const platformAdmin = isPlatformAdmin({ roles, tenantSlug });
+  const access = await getRequestAccessSnapshot({
+    tenantSlug,
+    pathname: "",
+    session,
+  });
+  const roles = access.userRoles;
+  const subscriptionLevel = access.subscriptionLevel;
+  const platformAdmin = access.isPlatformAdmin;
 
   const [appMenuItems, { notifications: recentNotifications, unreadCount }] = await Promise.all([
     getVisibleMenuItemsForTenant({
@@ -65,7 +70,7 @@ export default async function DashboardPage() {
 
   const name = session.user.name ?? session.user.email ?? "there";
   const email = session.user.email ?? "";
-  const subscriptionTier = session.user.subscriptionTier ?? "free";
+  const subscriptionTier = access.subscriptionTier;
   const now = new Date();
 
   return (

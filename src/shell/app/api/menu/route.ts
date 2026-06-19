@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getMenuTreeForTenant } from "@/lib/menu";
-import { isPlatformAdmin } from "@/lib/platform-guard";
+import { getRequestAccessSnapshot, mapRequestAccessOutcomeToDecision } from "@/lib/request-access";
 
 export type { MenuItem, MenuSection } from "@/lib/menu";
 
@@ -12,18 +12,32 @@ export async function GET() {
   }
 
   const tenantSlug: string = session.user.tenantSlug ?? "";
-  const subscriptionLevel: number = session.user.subscriptionLevel ?? 0;
-  const userRoles: string[] = session.user.roles ?? [];
-  const platformAdmin = isPlatformAdmin({
-    roles: userRoles,
+  const access = await getRequestAccessSnapshot({
     tenantSlug,
+    pathname: "/api/menu",
+    session,
   });
+  const decision = mapRequestAccessOutcomeToDecision({
+    outcome: access.outcome,
+    pathname: "/api/menu",
+    isApi: true,
+  });
+
+  if (decision === "401") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (decision === "404") {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  }
+  if (decision === "403") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const tree = await getMenuTreeForTenant({
     tenantSlug,
-    subscriptionLevel,
-    userRoles,
-    isPlatformAdmin: platformAdmin,
+    subscriptionLevel: access.subscriptionLevel,
+    userRoles: access.userRoles,
+    isPlatformAdmin: access.isPlatformAdmin,
   });
   return NextResponse.json(tree);
 }

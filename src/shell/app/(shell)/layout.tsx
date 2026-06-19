@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { ShellLayoutClient } from "@/components/shell/shell-layout";
 import { cacheTag } from "next/cache";
 import { getMenuTreeForTenant } from "@/lib/menu";
-import { isPlatformAdmin } from "@/lib/platform-guard";
+import { getRequestAccessSnapshot } from "@/lib/request-access";
 
 async function getShellConfig(tenantSlug: string) {
   "use cache";
@@ -34,14 +34,21 @@ async function getUserPreferences(tenantSlug: string, userId: string): Promise<U
 
 export default async function ShellGroupLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  const tenantSlug = session?.user.tenantSlug ?? "";
+  const access = session
+    ? await getRequestAccessSnapshot({
+        tenantSlug,
+        pathname: "",
+        session,
+      })
+    : null;
 
   const userId = session?.user.userId ?? "";
-  const roles = session?.user.roles ?? [];
-  const subscriptionLevel = session?.user.subscriptionLevel ?? 0;
+  const roles = access?.userRoles ?? session?.user.roles ?? [];
+  const subscriptionLevel = access?.subscriptionLevel ?? session?.user.subscriptionLevel ?? 0;
   const userName = session?.user.name ?? "";
   const userEmail = session?.user.email ?? "";
-  const tenantSlug = session?.user.tenantSlug ?? "";
-  const platformAdmin = isPlatformAdmin({ roles, tenantSlug });
+  const platformAdmin = access?.isPlatformAdmin ?? false;
 
   const [menu, config, preferences] = await Promise.all([
     getMenuTreeForTenant({

@@ -2,13 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
+import {
+  getRequestAccessSnapshot,
+  mapRequestAccessOutcomeToDecision,
+} from "@/lib/request-access";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
-import { isTenantMismatch } from "@/lib/tenant-check";
-import { isPlatformAdmin } from "@/lib/platform-guard";
 import { autoBootstrapPlatform } from "@/lib/db/provision";
 import { eq } from "drizzle-orm";
-import { getRequiredSubscriptionLevelForRoute } from "@/lib/menu";
 
 const TENANT_ADMIN_ROUTES = ["/settings", "/api/settings"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
@@ -75,60 +76,67 @@ export async function proxy(request: NextRequest) {
   }
 
   const resolvedSlug = hostSlug ?? getPlatformSlug();
+  const session = await auth();
+  const access = await getRequestAccessSnapshot({
+    tenantSlug: resolvedSlug,
+    pathname,
+    session,
+  });
+  const isApi = pathname.startsWith("/api/");
+  const decision = mapRequestAccessOutcomeToDecision({
+    outcome: access.outcome,
+    pathname,
+    isApi,
+  });
 
-  // Verify the resolved tenant exists
-  const tenantRows = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(eq(tenants.slug, resolvedSlug))
-    .limit(1);
-  if (tenantRows.length === 0) {
+  if (decision === "404") {
     return new NextResponse("Tenant not found", { status: 404 });
   }
 
-  const session = await auth();
+  if (decision === "401") {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
-  if (!session) {
+  if (decision === "403") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  if (decision === "redirect:/login") {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Cross-tenant token replay check — runs on every authenticated request.
-  // Use resolvedSlug (falls back to platform slug at apex) so platform users
-  // served at the root domain are not rejected when hostSlug is null.
-  if (isTenantMismatch(session.user.tenantSlug, resolvedSlug)) {
-    return new NextResponse("Unauthorized — tenant mismatch", { status: 401 });
+  if (decision === "redirect:/suspended") {
+    return NextResponse.redirect(new URL("/suspended", request.url));
   }
 
-  const roles: string[] = session.user.roles ?? [];
+  if (decision === "redirect:/upgrade") {
+    const upgradeUrl = new URL("/upgrade", request.url);
+    upgradeUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(upgradeUrl);
+  }
+
+  if (decision === "rewrite:/403") {
+    return NextResponse.rewrite(new URL("/403", request.url));
+  }
+
+  const roles = access.userRoles;
 
   // Platform routes: require platform tenant + super_admin
   if (isPlatformRoute(pathname)) {
-    if (!isPlatformAdmin({ roles, tenantSlug: session.user.tenantSlug ?? "" })) {
-      return NextResponse.rewrite(new URL("/403", request.url));
+    if (!access.isPlatformAdmin) {
+      return isApi
+        ? new NextResponse("Forbidden", { status: 403 })
+        : NextResponse.rewrite(new URL("/403", request.url));
     }
   }
 
   // Tenant admin routes: require admin or super_admin role
   if (isTenantAdminRoute(pathname) && !hasAdminRole(roles)) {
-    return NextResponse.rewrite(new URL("/403", request.url));
-  }
-
-  const tenantSlug = session.user.tenantSlug ?? "";
-
-  // Subscription gate: skip for /upgrade itself to avoid redirect loop
-  if (tenantSlug && !pathname.startsWith("/upgrade") && !isTenantAdminRoute(pathname) && !isPlatformRoute(pathname)) {
-    const requiredLevel = await getRequiredSubscriptionLevelForRoute(pathname);
-    if (requiredLevel !== null) {
-      const userLevel: number = session.user.subscriptionLevel ?? 0;
-      if (userLevel < requiredLevel) {
-        const upgradeUrl = new URL("/upgrade", request.url);
-        upgradeUrl.searchParams.set("from", pathname);
-        upgradeUrl.searchParams.set("level", String(requiredLevel));
-        return NextResponse.redirect(upgradeUrl);
-      }
-    }
+    return isApi
+      ? new NextResponse("Forbidden", { status: 403 })
+      : NextResponse.rewrite(new URL("/403", request.url));
   }
 
   return NextResponse.next();

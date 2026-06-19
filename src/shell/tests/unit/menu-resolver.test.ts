@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildVisibleMenuTree,
   getRequiredSubscriptionLevelForRoute,
+  getRouteAccessForPathname,
 } from "@/lib/menu-resolver";
 
 const tiers = [
@@ -219,5 +220,49 @@ describe("getRequiredSubscriptionLevelForRoute", () => {
         pathname: "/platform/tenants",
       })
     ).toBeNull();
+  });
+});
+
+describe("getRouteAccessForPathname", () => {
+  it("returns forbidden when a menu-backed route requires tenant roles the user no longer has", () => {
+    expect(
+      getRouteAccessForPathname({
+        items,
+        tiers,
+        pathname: "/reports",
+        subscriptionLevel: 1,
+        userRoles: ["user"],
+        requiredRolesByItemId: new Map([["item-reports", ["admin"]]]),
+        isPlatformAdmin: false,
+      })
+    ).toBe("forbidden");
+  });
+
+  it("returns upgrade when the current subscription does not own the matched route tier", () => {
+    expect(
+      getRouteAccessForPathname({
+        items,
+        tiers,
+        pathname: "/enterprise",
+        subscriptionLevel: 1,
+        userRoles: ["user"],
+        requiredRolesByItemId: new Map(),
+        isPlatformAdmin: false,
+      })
+    ).toBe("upgrade");
+  });
+
+  it("returns allow when the matched route is still visible for the current tenant auth state", () => {
+    expect(
+      getRouteAccessForPathname({
+        items,
+        tiers,
+        pathname: "/reports",
+        subscriptionLevel: 1,
+        userRoles: ["admin"],
+        requiredRolesByItemId: new Map([["item-reports", ["admin"]]]),
+        isPlatformAdmin: false,
+      })
+    ).toBe("allow");
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getTenantDb } from "@/lib/db/tenant";
 import { roles, rolePolicies } from "@/lib/db/schema";
+import { getRequestAccessSnapshot } from "@/lib/request-access";
 import { and, eq, inArray } from "drizzle-orm";
 
 export async function requireRoles(requiredRoles: string[]): Promise<NextResponse | null> {
@@ -11,7 +12,23 @@ export async function requireRoles(requiredRoles: string[]): Promise<NextRespons
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRoles: string[] = session.user.roles ?? [];
+  const tenantSlug = session.user.tenantSlug ?? "";
+  const access = await getRequestAccessSnapshot({
+    tenantSlug,
+    pathname: "",
+    session,
+  });
+  if (access.outcome === "login") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (access.outcome === "not_found") {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  }
+  if (access.outcome !== "allow") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const userRoles: string[] = access.userRoles;
   const hasRole = requiredRoles.some((r) => userRoles.includes(r));
 
   if (!hasRole) {

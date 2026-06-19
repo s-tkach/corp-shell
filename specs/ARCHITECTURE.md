@@ -151,10 +151,17 @@ GitHub Packages
 2. proxy.ts:
      a. ensure the platform tenant exists (`autoBootstrapPlatform()`)
      b. validate tenant existence/status at the login boundary
-     c. all other routes: check NextAuth.js session cookie
+     c. all protected routes: read a compact auth snapshot for the resolved tenant
+        - tenant status
+        - user active state
+        - current tenant-local roles
+        - current tenant subscription tier/status
+        - effective route requirements derived from shared menu ownership + tenant-local role assignments
+     d. all other routes: check NextAuth.js session cookie
         - No session → redirect /login
-        - Session valid → check route RBAC
-          - Unauthorized → 403 page
+        - Session valid but stale vs. auth snapshot → deny immediately
+        - Session valid and snapshot-authorized → continue
+          - Unauthorized → redirect/rewrite based on page vs. API semantics
           - Authorized → continue
 3. Server Component (layout.tsx):
      - auth() reads session (no DB hit — JWT cookie)
@@ -165,7 +172,7 @@ GitHub Packages
      - React.lazy + dynamic import() loads child AppEntry
      - ErrorBoundary catches any child crash
 5. API routes (/api/**):
-     - Re-validate session on every mutating request
+     - Re-validate compact auth snapshot on every protected request
      - Admin routes additionally assert super_admin or admin role
 ```
 
@@ -253,7 +260,50 @@ User → middleware (no session) → NextAuth redirect to OIDC provider
 - **Refresh:** NextAuth.js handles silently; user is never redirected while session is valid.
 - **Logout:** `signOut()` → clears local cookie → OIDC RP-Initiated Logout ends the provider session.
 
-### 6.4 Future IDP Extensibility
+### 6.5 Request-Time Auth Snapshot
+
+Protected routes must not trust JWT role and subscription claims as the sole source of truth. The middleware and auth guard layer must resolve a compact request-time auth snapshot on every protected request.
+
+The snapshot includes:
+- tenant existence and `status`
+- user existence and `isActive`
+- current tenant-local role slugs
+- current tenant subscription tier, level, and status
+- effective access requirements for the requested route when that route is represented by shared menu data
+
+The snapshot is intentionally small. It is not a full user profile reload. Its only purpose is next-request enforcement for auth-sensitive changes.
+
+### 6.6 Request-Time Authorization Outcomes
+
+For protected HTML requests:
+- no session or inactive user → redirect to `/login`
+- suspended tenant → redirect to `/suspended`
+- deleted or unknown tenant → `404`
+- subscription shortfall → redirect to `/upgrade`
+- role denial or tenant mismatch → `403`
+
+For protected API requests:
+- no session or inactive user → `401`
+- suspended tenant → `403`
+- deleted or unknown tenant → `404`
+- subscription shortfall, role denial, or tenant mismatch → `403`
+
+### 6.7 Shared Route Access Resolution
+
+Direct URL access and menu visibility must use the same effective access model for menu-backed routes.
+
+Resolution order:
+1. Resolve the tenant from the request host and validate the session tenant matches.
+2. Load the compact auth snapshot for the current tenant/user.
+3. Resolve the requested pathname against shared menu ownership data.
+4. If the route maps to a shared menu item, evaluate:
+   - tier ownership against the tenant's current subscription
+   - tenant-local required roles against the user's current tenant roles
+5. If the route does not map to shared menu data, fall back to explicit platform and tenant-admin guards for non-menu-managed routes.
+
+This keeps `/api/menu`, page rendering, and direct URL authorization aligned.
+
+### 6.8 Future IDP Extensibility
 
 Adding Azure AD or Google Workspace requires:
 1. Add a new NextAuth.js provider entry in `lib/auth.ts`

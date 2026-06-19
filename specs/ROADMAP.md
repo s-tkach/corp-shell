@@ -404,6 +404,13 @@
 - [x] Preserve `menu_item_roles` semantics: no assigned roles means visible to all authenticated users in that tenant
 - [x] **Acceptance:** Two tenants on the same subscription tier can hide different shared items using their own role assignments without affecting each other
 
+#### M21-4: Request-time guard alignment
+- [x] Extend the protected request guard so tenant `status === active` is enforced on every protected page and protected API request, not only at `/login` and `/api/auth/**`
+- [x] Enforce inactive-user rejection and tenant mismatch rejection before any protected page or API continues
+- [x] Replace subscription-only checks for menu-backed direct URL access with the same shared menu ownership + tenant-local role assignment resolver used by `/api/menu`
+- [x] Define stale-session handling so role changes, deactivation, tenant suspension, deletion, and subscription changes take effect on the next protected request
+- [x] **Acceptance:** `/api/menu` visibility and direct URL authorization stay aligned for the same tenant, user, and route; stale privileged session claims are rejected on the next protected request when fresh auth state no longer permits access
+
 #### M10-2: Subscription expiry enforcement
 - [x] In NextAuth.js `jwt()` callback: if `user_subscriptions.expiresAt` is in the past, downgrade to `free` tier and update DB
 - [x] **Acceptance:** User with expired subscription gets `free` tier on next login; DB updated

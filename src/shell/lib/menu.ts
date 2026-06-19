@@ -4,7 +4,9 @@ import { menuItems, menuSections, menuItemRoles, roles, subscriptionTiers } from
 import { withTenant } from "@/lib/db/tenant";
 import {
   buildVisibleMenuTree,
+  getRouteAccessForPathname,
   getRequiredSubscriptionLevelForRoute as resolveRequiredSubscriptionLevelForRoute,
+  type MenuRouteAccess,
   type MenuItemRecord,
   type MenuSectionRecord,
   type MenuTier,
@@ -169,5 +171,56 @@ export async function getRequiredSubscriptionLevelForRoute(pathname: string): Pr
     items: items as MenuItemRecord[],
     tiers: tiers as MenuTier[],
     pathname,
+  });
+}
+
+export async function getMenuRouteAccessForTenant({
+  tenantSlug,
+  pathname,
+  subscriptionLevel,
+  userRoles,
+  isPlatformAdmin,
+}: {
+  tenantSlug: string;
+  pathname: string;
+  subscriptionLevel: number;
+  userRoles: string[];
+  isPlatformAdmin: boolean;
+}): Promise<MenuRouteAccess> {
+  const tiers = await db
+    .select({ id: subscriptionTiers.id, level: subscriptionTiers.level })
+    .from(subscriptionTiers)
+    .orderBy(asc(subscriptionTiers.level));
+
+  const items = await db
+    .select({
+      id: menuItems.id,
+      sectionId: menuItems.sectionId,
+      parentItemId: menuItems.parentItemId,
+      isFolder: menuItems.isFolder,
+      label: menuItems.label,
+      route: menuItems.route,
+      icon: menuItems.icon,
+      badge: menuItems.badge,
+      subscriptionTierId: menuItems.subscriptionTierId,
+      sortOrder: menuItems.sortOrder,
+    })
+    .from(menuItems)
+    .where(eq(menuItems.route, pathname))
+    .limit(1);
+
+  const requiredRolesByItemId = await getRequiredRolesByItemId(
+    tenantSlug,
+    items.map((item) => item.id)
+  );
+
+  return getRouteAccessForPathname({
+    items: items as MenuItemRecord[],
+    tiers: tiers as MenuTier[],
+    pathname,
+    subscriptionLevel,
+    userRoles,
+    requiredRolesByItemId,
+    isPlatformAdmin,
   });
 }

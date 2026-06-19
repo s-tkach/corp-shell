@@ -58,6 +58,18 @@ interface GetRequiredSubscriptionLevelForRouteArgs {
   pathname: string;
 }
 
+interface GetRouteAccessForPathnameArgs {
+  items: MenuItemRecord[];
+  tiers: MenuTier[];
+  pathname: string;
+  subscriptionLevel: number;
+  userRoles: string[];
+  requiredRolesByItemId: Map<string, string[]>;
+  isPlatformAdmin: boolean;
+}
+
+export type MenuRouteAccess = "allow" | "upgrade" | "forbidden" | "unmatched";
+
 function getTierLevelById(tiers: MenuTier[]): Map<string, number> {
   return new Map(tiers.map((tier) => [tier.id, tier.level]));
 }
@@ -174,4 +186,43 @@ export function getRequiredSubscriptionLevelForRoute({
   }
 
   return requiredLevel;
+}
+
+export function getRouteAccessForPathname({
+  items,
+  tiers,
+  pathname,
+  subscriptionLevel,
+  userRoles,
+  requiredRolesByItemId,
+  isPlatformAdmin,
+}: GetRouteAccessForPathnameArgs): MenuRouteAccess {
+  const item = items.find((candidate) => candidate.route === pathname);
+  if (!item) {
+    return "unmatched";
+  }
+
+  if (item.subscriptionTierId === null) {
+    if (!isPlatformAdmin) {
+      return "forbidden";
+    }
+  } else {
+    const tierLevels = getTierLevelById(tiers);
+    const requiredLevel = tierLevels.get(item.subscriptionTierId);
+    if (requiredLevel === undefined) {
+      return "forbidden";
+    }
+    if (requiredLevel > subscriptionLevel) {
+      return "upgrade";
+    }
+  }
+
+  const requiredRoles = requiredRolesByItemId.get(item.id) ?? [];
+  if (requiredRoles.length === 0) {
+    return "allow";
+  }
+
+  return requiredRoles.some((role) => userRoles.includes(role))
+    ? "allow"
+    : "forbidden";
 }

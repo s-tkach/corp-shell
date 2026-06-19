@@ -156,6 +156,17 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 
 **FR-AUTH-8:** Authentication events (login, logout, failure, JIT provision) are written to the `auth_events` table. Admin viewer UI is v2.
 
+**FR-AUTH-9:** Every protected page request and protected API request must re-read a compact authoritative auth snapshot before continuing. The snapshot must include tenant status, user active state, current tenant-local role assignments, and current tenant subscription state required for enforcement.
+
+**FR-AUTH-10:** Stale session claims are not sufficient for authorization. If the request-time auth snapshot disagrees with role, tenant status, user status, or subscription claims embedded in the session, the request-time snapshot wins and the request is denied or redirected immediately on that request.
+
+**FR-AUTH-11:** Session refresh semantics:
+- Role changes take effect on the next protected request.
+- User deactivation takes effect on the next protected request.
+- Tenant suspension or deletion takes effect on the next protected request.
+- Subscription tier or status changes take effect on the next protected request.
+- The default handling for stale privileged sessions is request-time revalidation, not waiting for the user to sign out and back in.
+
 ### 6.3 Authorization & RBAC
 
 **FR-RBAC-1:** The shell maintains its own role registry. Roles are slugs (e.g. `finance_manager`) created by admins, independent of IDP group names.
@@ -171,6 +182,12 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 **FR-RBAC-6:** The `super_admin` role is system-owned. It cannot be deleted or renamed.
 
 **FR-RBAC-7:** Roles can be assigned manually by an `admin` or `super_admin` in User Manager, or inherited automatically from IDP groups on login.
+
+**FR-RBAC-8:** Request-time route authorization for direct URL access must use the same effective access model as `/api/menu`: shared menu ownership by subscription tier combined with tenant-local role assignments on each shared menu item.
+
+**FR-RBAC-9:** A protected request for a menu-backed route is allowed only when all of the following are true: the tenant exists and is `active`, the user exists and is active in that tenant, the session tenant matches the request tenant, the tenant's current subscription satisfies the route's owning tier, and the user's current tenant-local roles satisfy that route's required roles.
+
+**FR-RBAC-10:** Route guards must not rely only on subscription level or static route prefixes when a route is represented by shared menu data. Sidebar visibility and direct URL authorization must be derived from the same shared resolver so they cannot drift apart.
 
 ### 6.4 Navigation Shell & Menu System
 
@@ -189,6 +206,8 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 **FR-NAV-7:** Platform Admin menu editor: full CRUD for shared sections/items, drag-and-drop reorder, tier-scope selection, and preview of inherited lower-tier items.
 
 **FR-NAV-8:** Tenant Admin menu editor (`/settings/menu`): view the tenant's effective shared menu for its current subscription tier and assign tenant-local roles per item to hide items. Tenant admins cannot edit labels, routes, icons, ordering, or tier ownership.
+
+**FR-NAV-9:** The effective access resolver used for `/api/menu` must also be reusable by request-time route guards. A menu item hidden by tenant-local role assignments or current subscription state must also be denied on direct URL access to its route.
 
 ### 6.5 Child Application Integration — Module Federation
 
