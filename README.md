@@ -8,7 +8,7 @@ A host web application that serves as the single entry point for all internal co
 - **Data-driven navigation** — left sidebar populated entirely from the database, filtered per user's roles and subscription tier
 - **Micro-frontend hosting** — child apps deploy independently to S3/CloudFront and register themselves via the Admin Panel; live within 60 seconds, no shell redeploy
 - **Admin Panel** — manage menus, roles, users, child apps, subscriptions, SSO config, and branding without engineering involvement
-- **First-run wizard** — captures branding, OIDC connection, and the initial super-admin account before the shell goes live
+- **Auto-bootstrap** — platform tenant provisions on first request, authenticates with env-configured OIDC, and grants `super_admin` to the first successful platform login
 
 ## Stack
 
@@ -37,7 +37,6 @@ corp-shell/
 │   │   ├── (shell)/           # Protected routes
 │   │   │   ├── admin/         # Admin panel (7 sections)
 │   │   │   └── [...slug]/     # Child app catch-all mount point
-│   │   └── setup/             # First-run wizard (404 after completion)
 │   ├── components/
 │   │   ├── shell/             # Sidebar, Header, Breadcrumbs, ErrorBoundary
 │   │   └── ui/                # Shadcn components
@@ -59,7 +58,7 @@ corp-shell/
 - Node 22 LTS (`nvm install 22 && nvm use 22`)
 - pnpm 9.x+ (`npm install -g pnpm`)
 - Docker (for local PostgreSQL)
-- An OIDC application registered (Web, Authorization Code + PKCE) — only needed to complete the setup wizard
+- An OIDC application registered (Web, Authorization Code + PKCE) for local and platform login
 
 ### 1. Install dependencies
 
@@ -102,7 +101,7 @@ pnpm drizzle-kit migrate
 pnpm --filter shell dev
 ```
 
-Open `http://localhost:3000` — you are redirected to `/setup`. Complete the 4-step wizard (branding → OIDC connection → super-admin → launch). After completion `/setup` returns 404 permanently.
+Open `http://localhost:3000` — the platform tenant auto-bootstraps on first request and redirects unauthenticated users to `/login`.
 
 OIDC redirect URI to register with your provider: `http://localhost:3000/api/auth/callback/oidc`
 
@@ -136,9 +135,9 @@ WEBHOOK_SECRET=<from Secrets Manager>
 
 1. Create an S3 bucket and set `AWS_S3_BUCKET` (and optionally `LOGO_CDN_BASE`) in Amplify environment variables
 2. Deploy shell via AWS Amplify (manually configured)
-3. Visit your domain — you are redirected to `/setup`
-4. Complete the 4-step wizard: branding → OIDC connection → super-admin → launch
-5. `/setup` returns 404 permanently after completion
+3. Visit your domain — the platform tenant auto-bootstraps on first request
+4. Sign in through the OIDC provider configured by `PLATFORM_OIDC_*`
+5. The first successful platform login receives `super_admin`
 
 ## Provisioning a shell instance
 
@@ -155,7 +154,7 @@ pnpm drizzle-kit migrate
 pnpm --filter @s-tkach/shell-app dev
 ```
 
-Open `http://localhost:3000` → complete the setup wizard.
+Open `http://localhost:3000` → sign in through the configured OIDC provider.
 
 To update to a newer shell version:
 
@@ -194,8 +193,9 @@ Secrets are stored in AWS Secrets Manager or KMS-encrypted in the database — n
 
 | Secret | Storage | Purpose |
 |--------|---------|---------|
-| OIDC issuer + client ID | `shell_config` DB row (plaintext) | Read by `lib/auth.ts` at startup |
-| OIDC client secret | `shell_config.oidcClientSecret` (KMS-encrypted) | Decrypted at runtime via `lib/kms.ts` |
+| `PLATFORM_OIDC_ISSUER` | Amplify env / `.env.local` | Platform tenant OIDC issuer |
+| `PLATFORM_OIDC_CLIENT_ID` | Amplify env / `.env.local` | Platform tenant OIDC client ID |
+| `PLATFORM_OIDC_CLIENT_SECRET` | Amplify env / `.env.local` | Platform tenant OIDC client secret |
 | `KMS_KEY_ID` | Amplify env / Secrets Manager | AWS KMS key used to encrypt/decrypt OIDC client secret |
 | `DATABASE_URL` | Secrets Manager / Amplify env | PostgreSQL connection |
 | `NEXTAUTH_SECRET` | Secrets Manager / Amplify env | JWT cookie encryption |

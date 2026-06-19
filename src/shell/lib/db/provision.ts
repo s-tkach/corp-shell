@@ -35,7 +35,7 @@ export async function autoBootstrapPlatform(): Promise<void> {
   }
 
   try {
-    await provisionTenant(platformSlug, "Platform Admin", "", freeTierId, { setupComplete: false });
+    await provisionTenant(platformSlug, "Platform Admin", "", freeTierId);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists") || msg.includes("duplicate key")) return;
@@ -134,8 +134,7 @@ export async function provisionTenant(
   slug: string,
   displayName: string,
   adminEmail: string,
-  tierId: string,
-  options?: { setupComplete?: boolean }
+  tierId: string
 ): Promise<{ tenantId: string }> {
   if (!SLUG_PATTERN.test(slug)) {
     throw new Error("Invalid slug");
@@ -177,7 +176,7 @@ export async function provisionTenant(
 
       // Seed tenant data on the same connection with correct search_path
       await tx.unsafe(`SET LOCAL search_path TO "${schemaName}", public`);
-      await seedTenantOnConnection(tx, tenant.id, displayName, adminEmail, options?.setupComplete ?? true);
+      await seedTenantOnConnection(tx, tenant.id, displayName, adminEmail);
 
       return { tenantId: tenant.id };
     });
@@ -268,7 +267,6 @@ export function perTenantDDL(schema: string): string {
       toast_text_color text DEFAULT '#020817',
       toast_border_color text DEFAULT '#e2e8f0',
       toast_duration integer DEFAULT 5000,
-      setup_complete boolean NOT NULL DEFAULT false,
       updated_at timestamp with time zone NOT NULL DEFAULT now()
     );
 
@@ -345,8 +343,7 @@ async function seedTenantOnConnection(
   sql: postgres.Sql | postgres.TransactionSql,
   _tenantId: string,
   displayName: string,
-  adminEmail: string,
-  setupComplete: boolean
+  adminEmail: string
 ): Promise<void> {
   const superAdminRows = await sql<{ id: string }[]>`
     INSERT INTO roles (slug, display_name, is_system)
@@ -360,8 +357,8 @@ async function seedTenantOnConnection(
   await sql`INSERT INTO roles (slug, display_name, is_system) VALUES ('user', 'User', true)`;
 
   await sql`
-    INSERT INTO shell_config (app_name, setup_complete)
-    VALUES ('Shell', ${setupComplete})
+    INSERT INTO shell_config (app_name)
+    VALUES ('Shell')
   `;
 
   const companyRows = await sql<{ id: string }[]>`

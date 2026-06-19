@@ -16,6 +16,33 @@ import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
 import { eq, inArray } from "drizzle-orm";
 
+async function isFirstPlatformLogin(
+  tenantDb: ReturnType<typeof withTenant>,
+  tenantSlug: string
+): Promise<boolean> {
+  if (tenantSlug !== getPlatformSlug()) {
+    return false;
+  }
+
+  const superAdminRows = await tenantDb
+    .select({ id: roles.id })
+    .from(roles)
+    .where(eq(roles.slug, "super_admin"))
+    .limit(1);
+  const superAdminRole = superAdminRows[0];
+  if (!superAdminRole) {
+    return false;
+  }
+
+  const existingSuperAdmins = await tenantDb
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.roleId, superAdminRole.id))
+    .limit(1);
+
+  return existingSuperAdmins.length === 0;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
   const host = req?.headers?.get("host") ?? process.env["NEXTAUTH_URL"] ?? "";
   const tenantSlug = getTenantSlug(host) ?? getPlatformSlug();
@@ -73,6 +100,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             .limit(1);
 
           let userId: string;
+          const grantPlatformSuperAdmin = await isFirstPlatformLogin(tenantDb, tenantSlug);
+          if (grantPlatformSuperAdmin) {
+            roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
+          }
 
           if (existingUsers.length === 0 || existingUsers[0] === undefined) {
             // New user — JIT provision
@@ -109,7 +140,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
             });
           } else {
             // Existing user — update IDP linkage and last login
-            // Handles the case where setup pre-seeded the user with idpSource: "pending"
+            // Handles users that were pre-created before their first OIDC login.
             userId = existingUsers[0].id;
 
             await tenantDb
@@ -123,6 +154,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
               .innerJoin(roles, eq(userRoles.roleId, roles.id))
               .where(eq(userRoles.userId, userId));
             roleSlugs = [...new Set([...roleSlugs, ...dbRoleRows.map((r) => r.slug)])];
+
+            if (grantPlatformSuperAdmin && !roleSlugs.includes("super_admin")) {
+              const superAdminRows = await tenantDb
+                .select({ id: roles.id })
+                .from(roles)
+                .where(eq(roles.slug, "super_admin"))
+                .limit(1);
+              const superAdminRole = superAdminRows[0];
+              if (superAdminRole) {
+                await tenantDb.insert(userRoles).values({
+                  userId,
+                  roleId: superAdminRole.id,
+                });
+                roleSlugs = [...new Set([...roleSlugs, "super_admin"])];
+              }
+            }
           }
 
           await tenantDb.insert(authEvents).values({

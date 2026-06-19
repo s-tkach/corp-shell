@@ -1,71 +1,107 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const nextAuthFactory = vi.fn();
+
+vi.mock("next-auth", () => ({
+  default: nextAuthFactory,
+}));
+
+vi.mock("@/lib/auth-config", () => ({
+  getAuthConfig: vi.fn(async () => ({ providers: [{ id: "oidc" }] })),
+}));
+
+vi.mock("@/lib/tenant-resolver", () => ({
+  getTenantSlug: vi.fn(() => null),
+  getPlatformSlug: vi.fn(() => "platform"),
+}));
+
+function makeQuery(result: unknown) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(result),
+  };
+}
+
+const dbSelect = vi.fn();
 vi.mock("@/lib/db/client", () => ({
   db: {
-    select: vi.fn(),
-    insert: vi.fn(),
-    update: vi.fn(),
+    select: dbSelect,
   },
 }));
-vi.mock("@/lib/crypto", () => ({
-  decrypt: async (ct: string) => ct,
-  encrypt: async (pt: string) => pt,
+
+const tenantDb = {
+  select: vi.fn(),
+  from: vi.fn(),
+  where: vi.fn(),
+  innerJoin: vi.fn(),
+  limit: vi.fn(),
+  insert: vi.fn(),
+  values: vi.fn(),
+  returning: vi.fn(),
+  update: vi.fn(),
+  set: vi.fn(),
+};
+
+vi.mock("@/lib/db/tenant", () => ({
+  withTenant: vi.fn(() => tenantDb),
 }));
 
-describe("JIT provisioning — new user", () => {
-  it("inserts user row, role rows, and subscription row on first login", async () => {
-    // The JWT callback logic determines a new user needs provisioning when
-    // existingUsers.length === 0. Verify that condition correctly triggers provisioning.
-    const existingUsers: Array<{ id: string }> = [];
-    const shouldProvision = existingUsers.length === 0 || existingUsers[0] === undefined;
-    expect(shouldProvision).toBe(true);
-  });
-});
+describe("auth bootstrap", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
 
-describe("Existing user — lastLoginAt update", () => {
-  it("does not provision when user already exists", () => {
-    const existingUsers = [{ id: "uuid-existing" }];
-    const shouldProvision = existingUsers.length === 0 || existingUsers[0] === undefined;
-    expect(shouldProvision).toBe(false);
-  });
-});
+    nextAuthFactory.mockImplementation((factory) => ({
+      handlers: {},
+      auth: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      __factory: factory,
+    }));
 
-describe("Subscription expiry", () => {
-  it("recognises expired non-free subscription", () => {
-    const tier = { slug: "standard", level: 1, expiresAt: new Date("2020-01-01") };
-    const isExpired = tier.expiresAt < new Date() && tier.slug !== "free";
-    expect(isExpired).toBe(true);
-  });
+    dbSelect
+      .mockImplementationOnce(() => makeQuery([{ id: "tenant-1", slug: "platform" }]))
+      .mockImplementationOnce(() => makeQuery([{ slug: "free", level: 0, expiresAt: null, status: "active" }]));
 
-  it("does not flag active subscription as expired", () => {
-    const tier = { slug: "standard", level: 1, expiresAt: new Date("2099-01-01") };
-    const isExpired = tier.expiresAt < new Date() && tier.slug !== "free";
-    expect(isExpired).toBe(false);
-  });
-
-  it("does not flag free tier as expired regardless of date", () => {
-    const tier = { slug: "free", level: 0, expiresAt: new Date("2020-01-01") };
-    const isExpired = tier.expiresAt < new Date() && tier.slug !== "free";
-    expect(isExpired).toBe(false);
-  });
-
-  it("does not flag tier with no expiry", () => {
-    const tier = { slug: "enterprise", level: 2, expiresAt: null as Date | null };
-    const isExpired = tier.expiresAt !== null && tier.expiresAt < new Date() && tier.slug !== "free";
-    expect(isExpired).toBe(false);
-  });
-});
-
-describe("Group mapping", () => {
-  it("deduplicates role slugs from IDP group mappings", () => {
-    const mappings = [{ slug: "admin" }, { slug: "admin" }, { slug: "super_admin" }];
-    const roleSlugs = [...new Set(mappings.map((m) => m.slug))];
-    expect(roleSlugs).toEqual(["admin", "super_admin"]);
+    tenantDb.select.mockImplementation(() => tenantDb);
+    tenantDb.from.mockReturnValue(tenantDb);
+    tenantDb.where
+      .mockReturnValueOnce(tenantDb)
+      .mockReturnValueOnce(tenantDb)
+      .mockReturnValueOnce(tenantDb)
+      .mockResolvedValueOnce([{ id: "role-super-admin" }])
+      .mockResolvedValueOnce([]);
+    tenantDb.innerJoin.mockReturnValue(tenantDb);
+    tenantDb.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "role-super-admin" }])
+      .mockResolvedValueOnce([]);
+    tenantDb.insert.mockReturnValue(tenantDb);
+    tenantDb.values.mockReturnValue(tenantDb);
+    tenantDb.returning.mockResolvedValue([{ id: "user-1" }]);
+    tenantDb.update.mockReturnValue(tenantDb);
+    tenantDb.set.mockReturnValue(tenantDb);
   });
 
-  it("returns empty array when no IDP groups are present", () => {
-    const idpGroups: string[] = [];
-    const roleSlugs = idpGroups.length > 0 ? ["some-role"] : [];
-    expect(roleSlugs).toEqual([]);
+  it("grants super_admin on the first successful platform login", async () => {
+    const authModule = await import("@/lib/auth");
+    const factory = nextAuthFactory.mock.calls[0]?.[0];
+    expect(authModule).toBeDefined();
+    expect(factory).toBeTypeOf("function");
+
+    const config = await factory({
+      headers: new Headers({ host: "corp.example.com" }),
+    });
+
+    const token = await config.callbacks.jwt({
+      token: { email: "first-admin@example.com", sub: "sub-1", name: "First Admin" },
+      account: { provider: "oidc", id_token: "id-token" },
+      profile: {},
+      trigger: "signIn",
+    });
+
+    expect(token.roles).toContain("super_admin");
   });
 });

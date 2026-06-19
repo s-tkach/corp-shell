@@ -173,7 +173,7 @@
 ### Tasks
 
 #### M5-1: Route protection middleware
-- [x] Extend `shell/middleware.ts` (post-setup path):
+- [x] Extend `shell/proxy.ts`:
   - No session → redirect to `/api/auth/signin`
   - Session valid → continue
 - [x] Apply to all routes except `/api/auth/**`, `/(auth)/**`, `/_next/**`, `/favicon.ico`
@@ -614,21 +614,16 @@
   - Subscription expiry: expired subscription downgrades to `free` tier in the JWT
   - Group mapping: IDP group mapped to shell role appears in JWT `roles[]`
 - [x] Create `shell/tests/middleware.test.ts`:
-  - Setup not complete: any non-`/setup` path redirects to `/setup`
-  - Setup complete: `/setup` returns 404
+  - No residual setup gate exists in the request path
   - No session: protected route redirects to `/api/auth/signin`
   - Session with `admin` role: `/admin/menu` passes through
   - Session without `admin` role: `/admin/menu` returns 403
-- [x] Create `shell/tests/setup-complete.test.ts` (mock Drizzle client):
-  - Idempotency: second POST to `/api/setup/complete` after `setup_complete = true` returns 400
-  - Atomic write: if any INSERT fails, transaction rolls back (no partial state)
-  - Encrypts OIDC client secret before writing (verifies ciphertext != plaintext in DB)
 - [x] **Acceptance:** `pnpm --filter shell test` passes all tests with zero failures
 
 #### M14-7: Local bootstrap crypto preflight
 
 - [x] `src/shell/scripts/dev-fresh.ts` validates the effective encryption provider before Docker teardown and app startup
-- [x] KMS-backed local setup fails early with an actionable message instead of reaching `/api/setup`
+- [x] KMS-backed local auth bootstrap fails early with an actionable message before startup continues
 - [x] **Acceptance:** `pnpm --filter @s-tkach/shell-app exec vitest run tests/crypto.test.ts tests/unit/dev-fresh-crypto.test.ts` passes and `pnpm run dev:fresh` stops before Docker teardown and app startup when config resolves to KMS
 
 ---
@@ -637,8 +632,8 @@
 
 Before marking M14 complete:
 
-- [x] `git clone` on a machine with zero AWS credentials → `docker compose up -d` → fill `.env.local` → `pnpm dev` → `/setup` wizard reachable with no errors
-- [x] Wizard completes end-to-end in local mode (local crypto + local storage)
+- [x] `git clone` on a machine with zero AWS credentials → `docker compose up -d` → fill `.env.local` → `pnpm dev` → platform tenant boots and `/login` is reachable with no errors
+- [x] Local mode signs in end-to-end without any setup wizard dependency
 - [x] `pnpm --filter shell test` passes with zero failures
 - [x] Switching to AWS mode (`ENCRYPTION_PROVIDER=kms`, `STORAGE_PROVIDER=s3`, real credentials) works without code changes
 - [x] All Gap 7 files present and reviewed
@@ -650,7 +645,7 @@ Before marking M14 complete:
 Before marking v1 as released, confirm:
 
 - [x] All M1–M12 acceptance criteria passed
-- [ ] `/setup` returns 404 in production
+- [x] Remove legacy `/setup` runtime and schema gate
 - [ ] `super_admin` account verified and secured
 - [ ] All secrets in Secrets Manager; zero secrets in git or Lambda env vars (only ARN references)
 - [ ] CloudWatch alarms configured for error rate, PostgreSQL ACU, and Lambda throttling
@@ -767,7 +762,7 @@ Before marking v1 as released, confirm:
     3. `INSERT public.tenants`
     4. `CREATE SCHEMA tenant_{slug}` (raw SQL via `postgres()`)
     5. Run DDL for all per-tenant tables against `tenant_{slug}` schema (using `withTenant(slug)`)
-    6. Seed: `shellConfig` (setup_complete=true, default branding), `subscriptionTiers` (free level 0, standard level 1, enterprise level 2), `roles` (super_admin isSystem=true, admin), initial admin `users` row (email=adminEmail, isActive=true), `userRoles` (super_admin → admin user), `tenantSubscription` (free tier, status=active)
+    6. Seed: default `shellConfig`, `subscriptionTiers` (free level 0, standard level 1, enterprise level 2), `roles` (super_admin isSystem=true, admin), initial admin `users` row (email=adminEmail, isActive=true), `userRoles` (super_admin → admin user), `tenantSubscription` (free tier, status=active)
     7. Return the created tenant record
 - [x] **Acceptance:** Calling `provisionTenant("acme", "Acme Corp", "admin@acme.com")` creates `tenant_acme` schema with all tables and seed data; re-calling with same slug throws
 
@@ -926,7 +921,7 @@ Before marking v1 as released, confirm:
 - [x] Create `src/shell/scripts/bootstrap-platform.ts` (run once, not part of app startup):
   - Check if `tenant_platform` schema exists — exit if already bootstrapped
   - Call `provisionTenant("platform", "Platform Admin", platformAdminEmail)` where `platformAdminEmail` is read from `PLATFORM_ADMIN_EMAIL` env var
-  - Log the setup link: `https://platform.corp.com/setup` (or dev equivalent)
+  - Log the login URL: `https://platform.corp.com/login` (or dev equivalent)
 - [x] Add script to `src/shell/package.json`: `"bootstrap-platform": "tsx scripts/bootstrap-platform.ts"`
 - [x] **Acceptance:** Running `pnpm bootstrap-platform` creates `tenant_platform` schema with seeded super_admin user; re-running is a no-op
 

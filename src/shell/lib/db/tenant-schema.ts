@@ -114,7 +114,6 @@ export const shellConfig = pgTable("shell_config", {
   toastTextColor: text("toast_text_color").default("#020817"),
   toastBorderColor: text("toast_border_color").default("#e2e8f0"),
   toastDuration: integer("toast_duration").default(5000),
-  setupComplete: boolean("setup_complete").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

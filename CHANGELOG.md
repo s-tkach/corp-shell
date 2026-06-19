@@ -21,6 +21,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Platform bootstrap cleanup now matches the v2.1.0 design in runtime: removed the residual `/setup` gate, moved platform auth to env-derived OIDC only, and dropped `shell_config.setup_complete`
 - Published package scope renamed `@corp/*` → `@s-tkach/*` to match the GitHub org (`github.com/s-tkach`); GitHub Packages ties the scope to the owning org. Affects `@s-tkach/shell-sdk`, `@s-tkach/create-shell-app`, `@s-tkach/shell-app`, and the child-app template
 - Packages now publish with **public** access (`--access public`) instead of restricted, so anyone with a GitHub account can install them (a read token is still required, as GitHub Packages mandates auth even for public packages)
 - Added `publishConfig` (GitHub Packages registry + public access) and `repository` metadata to all three publishable packages; added root `.npmrc` mapping the `@s-tkach` scope and `.npmrc.example` documenting auth setup

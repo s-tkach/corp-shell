@@ -56,6 +56,12 @@ describe("withTenant", () => {
 describe("provisionTenant", () => {
   beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); });
 
+  it("does not include setup_complete in tenant DDL", async () => {
+    const { perTenantDDL } = await import("@/lib/db/provision");
+
+    expect(perTenantDDL("tenant_acme")).not.toContain("setup_complete");
+  });
+
   it("throws if slug contains invalid characters", async () => {
     const { provisionTenant } = await import("@/lib/db/provision");
 

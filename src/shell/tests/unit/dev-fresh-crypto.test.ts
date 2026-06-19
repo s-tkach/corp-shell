@@ -101,8 +101,8 @@ describe("getDevFreshCryptoPreflightError", () => {
       KMS_KEY_ID: "alias/test-key",
     });
 
-    expect(error).toContain("dev:fresh does not support KMS-backed local setup");
-    expect(error).toContain("/api/setup would use AWS KMS");
+    expect(error).toContain("dev:fresh does not support KMS-backed local auth bootstrap");
+    expect(error).not.toContain("/api/setup");
     expect(error).toContain(
       "ENCRYPTION_PROVIDER=local with a valid ENCRYPTION_KEY"
     );
@@ -114,8 +114,8 @@ describe("getDevFreshCryptoPreflightError", () => {
       ENCRYPTION_KEY: KEY,
     });
 
-    expect(error).toContain("dev:fresh does not support KMS-backed local setup");
-    expect(error).toContain("/api/setup would use AWS KMS");
+    expect(error).toContain("dev:fresh does not support KMS-backed local auth bootstrap");
+    expect(error).not.toContain("/api/setup");
   });
 
   it("returns a targeted error when local crypto config is missing", () => {

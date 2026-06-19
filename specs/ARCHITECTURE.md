@@ -25,8 +25,7 @@ corp-shell/                          ← monorepo root (also the @s-tkach/shell-
 │   └── shell/                       # Next.js 15 application — published as @s-tkach/shell-app
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout (Server Component): auth, menu, sidebar
-│   │   ├── (auth)/                  # /login, /api/auth/callback, /error, /setup
-│   │   │   └── setup/               # First-run setup page (404 after completion)
+│   │   ├── (auth)/                  # /login, /api/auth/callback, /error
 │   │   ├── (shell)/                 # Protected routes (require valid session)
 │   │   │   ├── dashboard/
 │   │   │   ├── admin/
@@ -41,8 +40,6 @@ corp-shell/                          ← monorepo root (also the @s-tkach/shell-
 │   │   │   └── [...slug]/           # Child app catch-all (Client Component)
 │   ├── api/
 │   │   ├── auth/[...nextauth]/      # NextAuth.js v5 handler
-│   │   ├── setup/                   # POST — complete setup; 409 if already done
-│   │   │   └── validate-oidc/       # GET ?issuer= — pings /.well-known/openid-configuration
 │   │   ├── menu/
 │   │   ├── users/
 │   │   ├── roles/
@@ -98,7 +95,7 @@ corp-shell/                          ← monorepo root (also the @s-tkach/shell-
 | DNS / TLS | Amazon Route 53 + ACM | — | Custom domain, auto-renewing SSL |
 | Secrets | AWS Secrets Manager + AWS KMS | — | Webhook HMAC key, DB URL (Secrets Manager for production / plain env vars for local); OIDC client secret encrypted in DB via configurable crypto provider (KMS in prod, AES-256-GCM locally via `ENCRYPTION_PROVIDER` env var) |
 | File storage | S3 or local disk | — | Logo uploads; `STORAGE_PROVIDER=s3\|local`; defaults to `local` when `AWS_S3_BUCKET` is absent |
-| Unit/integration tests | Vitest | latest | `crypto.ts`, `auth.ts`, `middleware.ts`, setup-complete route |
+| Unit/integration tests | Vitest | latest | `crypto.ts`, `auth.ts`, `proxy.ts`, tenant provisioning |
 | CI/CD | GitHub Actions | — | Child apps deploy independently; shell via Amplify |
 | Package registry | GitHub Packages | — | `@s-tkach/shell-sdk`, `@s-tkach/create-shell-app` |
 | Package manager | pnpm workspaces | 9.x | Monorepo; shared lockfile |
@@ -145,17 +142,17 @@ GitHub Packages
 
 **Local / self-hosted topology:** Browser → `localhost:3000` (Next.js dev server) → PostgreSQL (Docker Compose, port 5432). No Route 53, CloudFront, Lambda, or Amplify layers exist. KMS is replaced by the local AES-256-GCM provider in `lib/crypto.ts`. S3 is replaced by the local disk provider in `lib/storage.ts`. Secrets Manager is replaced by values in `src/shell/.env.local`.
 
-**Local bootstrap preflight:** `src/shell/scripts/dev-fresh.ts` validates the effective encryption provider before Docker teardown or Next.js startup. If local config resolves to KMS, the script stops with an actionable error instead of continuing to `/api/setup`, because that route encrypts the OIDC client secret during setup. Local bootstrap refuses KMS-backed setup unless the developer intentionally provides a working KMS configuration outside this workflow.
+**Local bootstrap preflight:** `src/shell/scripts/dev-fresh.ts` validates the effective encryption provider before Docker teardown or Next.js startup. Local bootstrap refuses KMS-backed local auth bootstrap and requires a local encryption key so tenant OIDC secrets can be stored without AWS dependencies.
 
 ### 4.2 Request Lifecycle
 
 ```
 1. Browser → CloudFront → Lambda (Next.js middleware.ts)
-2. middleware.ts:
-     a. setup gate: if !shell_config.setup_complete && path !== '/setup': redirect /setup
-        /setup itself: if shell_config.setup_complete: return 404
-     b. all other routes: check NextAuth.js session cookie
-        - No session → redirect /api/auth/signin (OIDC provider)
+2. proxy.ts:
+     a. ensure the platform tenant exists (`autoBootstrapPlatform()`)
+     b. validate tenant existence/status at the login boundary
+     c. all other routes: check NextAuth.js session cookie
+        - No session → redirect /login
         - Session valid → check route RBAC
           - Unauthorized → 403 page
           - Authorized → continue
@@ -381,7 +378,7 @@ Admin Panel → Application Registry:
 | `menu_sections` | Top-level nav groupings (label, icon, sortOrder) |
 | `menu_items` | Shared nav leaf items (route, owning subscription tier, badge) |
 | `app_registry` | Registered child apps (remoteUrl, routePrefix, healthCheckUrl) |
-| `shell_config` | Single-row: branding, OIDC issuer + client ID + KMS-encrypted client secret, setup_complete flag |
+| `shell_config` | Single-row tenant presentation config: branding, login copy, header, and toast settings |
 | `auth_events` | Login/logout/failure events (viewer UI in v2) |
 | `notifications` | Notification records with title, body, targeting (all/user/subscription), optional action, optional expiry |
 | `notification_reads` | Per-user read state junction table (notificationId + userId) |
@@ -540,46 +537,29 @@ The publish gate runs `tsc --noEmit`, not `next build`. With `cacheComponents` e
 
 ---
 
-## 14. First-Run Setup Page Architecture
+## 14. Platform Bootstrap Architecture
 
-The setup page is a self-contained single-page form at `/setup` (`app/(auth)/setup/page.tsx`). It is the only route reachable before `shell_config.setup_complete = true`.
+The platform tenant auto-provisions on first request. There is no pre-login wizard route. Instead, the shell ensures `tenant_platform` exists, derives the platform OIDC provider from `PLATFORM_OIDC_*`, and promotes the first successful platform login to `super_admin`.
 
 ```
-middleware.ts:
-  if (!shell_config.setup_complete && path !== '/setup'):
-    redirect('/setup')
-  if (shell_config.setup_complete && path === '/setup'):
-    return 404
+proxy.ts:
+  autoBootstrapPlatform()
+  validate tenant at login boundary
+  all other unauthenticated requests -> /login
 
-Form state: React local state only (not persisted until submission)
+auth-config.ts:
+  if tenantSlug === platform:
+    build OIDC provider from PLATFORM_OIDC_ISSUER / CLIENT_ID / CLIENT_SECRET
+  else:
+    read enabled providers from tenant idp_providers
 
-Fields:
-  - Admin Email          (required)
-  - OIDC Issuer URL      (required) + inline "Validate" button
-  - Client ID            (required)
-  - Client Secret        (required, password input)
-  - Scopes               (default: "openid profile email")
-  - Token Endpoint Auth Method  (client_secret_post | client_secret_basic)
-
-Validation:  GET /api/setup/validate-oidc?issuer=<url>
-               → fetches /.well-known/openid-configuration
-               → verifies issuer and authorization_endpoint fields present
-               → HTTPS-only; 8 s timeout
-
-Submission:  POST /api/setup
-               → guard: returns 409 if shellConfig.setupComplete already true
-               → validates required fields + email format
-               → looks up super_admin role (must exist from auto-bootstrap)
-               → INSERT users (adminEmail, idpSource="pending", idpSubject="pending")
-               → INSERT userRoles (admin user → super_admin)
-               → encrypt(oidcClientSecret) via CryptoProvider
-               → INSERT idpProviders (slug="oidc", displayName="Platform SSO", ...)
-               → UPDATE shellConfig SET setupComplete = true
-               → 200 { ok: true }
-             → client redirects to /login
+auth.ts jwt callback:
+  on successful sign-in:
+    resolve tenant
+    JIT provision user if needed
+    if tenantSlug === platform and no super_admin exists:
+      assign super_admin to this user
 ```
-
-The platform tenant schema (roles, subscriptionTiers, tenantSubscription, shellConfig) is pre-seeded by `autoBootstrapPlatform()` on first request — the setup page only configures the admin user and IDP provider on top of that seed data.
 
 ---
 
@@ -734,9 +714,7 @@ await fetch('/api/notifications', {
 
 ### 17.3 Callers
 
-`shell/lib/kms.ts` re-exports `encrypt`/`decrypt` from `crypto.ts` for backwards compatibility. Direct callers are:
-- `shell/app/api/setup/complete/route.ts` (encrypt on wizard completion)
-- `shell/lib/auth.ts:getOidcConfig()` (decrypt on every OIDC bootstrap)
+`shell/lib/kms.ts` re-exports `encrypt`/`decrypt` from `crypto.ts` for backwards compatibility. Direct callers are tenant SSO mutation and auth config loading paths.
 
 ### 17.4 Security Note
 
@@ -760,12 +738,9 @@ AES-256-GCM is equivalent security to KMS for single-tenant deployments. KMS is 
 - **S3 mode:** API returns `{ uploadUrl, publicUrl }`; client PUTs the file directly to S3 via the presigned URL, then stores `publicUrl` in `shell_config.logoUrl`.
 - **Local mode:** API returns `{ publicUrl }` with no `uploadUrl`; client POSTs the file directly to the same route (multipart); route writes to disk and returns `publicUrl`.
 
-`shell/app/setup/page.tsx` checks for the presence of `uploadUrl` in the response to determine which path to follow.
-
 ### 18.3 Callers
 
-- `shell/app/api/setup/upload-logo/route.ts` (wizard step 1)
-- `shell/app/(shell)/admin/branding` logo upload handler (existing duplicated S3 presign logic consolidated into `storage.ts`)
+- `shell/app/(shell)/settings/branding` logo upload handler
 
 ---
 

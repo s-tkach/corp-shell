@@ -46,7 +46,7 @@
    pnpm --filter shell dev
    ```
 
-7. Open `http://localhost:3000` — you should be redirected to `/setup`.
+7. Open `http://localhost:3000` — the platform tenant auto-bootstraps and unauthenticated users are redirected to `/login`.
 
 No AWS credentials are required for local development.
 

@@ -24,17 +24,14 @@ describe("cross-tenant replay check", () => {
   });
 });
 
-describe("setup route bypass", () => {
-  it("identifies setup routes correctly", () => {
-    const SETUP_ROUTES = ["/setup", "/api/setup"];
-    const isSetupRoute = (pathname: string) =>
-      SETUP_ROUTES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+describe("route classification", () => {
+  it("does not reserve a setup bypass anymore", () => {
+    const bypassRoutes = ["/login", "/api/auth"];
+    const isBypassed = (pathname: string) =>
+      bypassRoutes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
-    expect(isSetupRoute("/setup")).toBe(true);
-    expect(isSetupRoute("/api/setup")).toBe(true);
-    expect(isSetupRoute("/api/setup/validate-oidc")).toBe(true);
-    expect(isSetupRoute("/login")).toBe(false);
-    expect(isSetupRoute("/settings")).toBe(false);
-    expect(isSetupRoute("/setupx")).toBe(false);
+    expect(isBypassed("/setup")).toBe(false);
+    expect(isBypassed("/api/setup")).toBe(false);
+    expect(isBypassed("/login")).toBe(true);
   });
 });

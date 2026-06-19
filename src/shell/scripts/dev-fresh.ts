@@ -7,6 +7,7 @@ import {
   getDevFreshCryptoPreflightError,
   parseDevFreshEnv,
 } from "./dev-fresh-crypto";
+import { getDevFreshPlatformOidcEnv } from "./dev-fresh-env";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -14,25 +15,22 @@ const shellRoot = resolve(__dirname, "..");
 const envFile = resolve(shellRoot, ".env.test.local");
 const localEnvFile = resolve(shellRoot, ".env.local");
 
-// ── 1. Load and validate .env.test.local ────────────────────────────────────
+// ── 1. Load and validate auth bootstrap env ─────────────────────────────────
 
 if (!existsSync(envFile)) {
   console.error(
-    `\nMissing ${envFile}\nCopy .env.test.local.example and fill in your credentials.\n`
+    `\nMissing ${envFile}\nCopy .env.test.local.example and fill in your OIDC test credentials.\n`
   );
   process.exit(1);
 }
 
-function parseEnvFile(path: string): Record<string, string> {
-  return parseDevFreshEnv(readFileSync(path, "utf8"));
-}
+const devFreshEnv = parseDevFreshEnv(readFileSync(envFile, "utf8"));
+const platformOidcEnv = getDevFreshPlatformOidcEnv(devFreshEnv);
 
-const env = parseEnvFile(envFile);
-
-const required = ["SETUP_EMAIL", "SETUP_ISSUER", "SETUP_CLIENT_ID", "SETUP_CLIENT_SECRET"];
-const missing = required.filter((k) => !env[k]);
-if (missing.length > 0) {
-  console.error(`\nMissing required vars in .env.test.local:\n  ${missing.join("\n  ")}\n`);
+if (!platformOidcEnv) {
+  console.error(
+    "\nMissing platform OIDC vars in .env.test.local.\nProvide PLATFORM_OIDC_ISSUER / PLATFORM_OIDC_CLIENT_ID / PLATFORM_OIDC_CLIENT_SECRET\nor the legacy SETUP_ISSUER / SETUP_CLIENT_ID / SETUP_CLIENT_SECRET values.\n"
+  );
   process.exit(1);
 }
 
@@ -99,6 +97,10 @@ writeFileSync(
 console.log("\n▶ Starting Next.js dev server...");
 const nextProcess = spawn("pnpm", ["dev"], {
   cwd: shellRoot,
+  env: {
+    ...process.env,
+    ...platformOidcEnv,
+  },
   stdio: "inherit",
 });
 
@@ -143,36 +145,14 @@ async function waitForApp(): Promise<void> {
   throw new Error(`Next.js did not start within ${TIMEOUT_MS / 1000}s`);
 }
 
-// ── 7. POST to /api/setup ───────────────────────────────────────────────────
+// ── 7. Wait for the app and report readiness ────────────────────────────────
 
-async function runSetup(): Promise<void> {
+async function waitForReady(): Promise<void> {
   await waitForApp();
-
-  console.log("\n▶ Running /api/setup...");
-  const res = await fetch(`${APP_URL}/api/setup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      adminEmail: env["SETUP_EMAIL"],
-      oidcIssuer: env["SETUP_ISSUER"],
-      oidcClientId: env["SETUP_CLIENT_ID"],
-      oidcClientSecret: env["SETUP_CLIENT_SECRET"],
-      scopes: "openid profile email",
-      tokenEndpointAuthMethod: "client_secret_post",
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`\n/api/setup failed (${res.status}):\n${body}\n`);
-    nextProcess.kill();
-    process.exit(1);
-  }
-
-  console.log(`\n✓ Setup complete. App ready at ${APP_URL}\n`);
+  console.log(`\n✓ App ready at ${APP_URL}\n`);
 }
 
-runSetup().catch((err) => {
+waitForReady().catch((err) => {
   console.error("\n" + err.message);
   nextProcess.kill();
   process.exit(1);

@@ -89,8 +89,8 @@ export function getDevFreshCryptoPreflightError(
 
   if (provider === "kms") {
     return [
-      "dev:fresh does not support KMS-backed local setup.",
-      "This command would fail because /api/setup would use AWS KMS to encrypt the OIDC client secret.",
+      "dev:fresh does not support KMS-backed local auth bootstrap.",
+      "This command would fail because tenant OIDC secrets would depend on AWS KMS during local development.",
       "For local bootstrap, use ENCRYPTION_PROVIDER=local with a valid ENCRYPTION_KEY.",
     ].join("\n");
   }

@@ -104,7 +104,7 @@ Next steps:
   pnpm install
   pnpm drizzle-kit migrate
   pnpm --filter @s-tkach/shell-app dev
-  # Open http://localhost:3000 → complete the setup wizard
+  # Open http://localhost:3000 → sign in through the configured OIDC provider
 `);
 }
 

@@ -11,7 +11,7 @@
 |---------|--------|
 | 1.0 | Initial draft |
 | 1.1 | Next.js confirmed; iFrame/audit logs/subdomains → v2; OIDC-only auth; PostgreSQL replaces DynamoDB; AWS Amplify deployment |
-| 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry; first-run setup wizard added for branding/naming |
+| 1.2 | All open questions resolved: OIDC as first IDP (config documented); single AWS account (infra simplified); GitHub Packages for SDK registry |
 | 1.3 | Open-source readiness: G10 added (self-hosted deployment); FR-SETUP-2/5 and FR-AUTH-1 updated for storage/crypto provider abstraction; NFR-13–16 added; §8.1 secrets note updated; §10.6 local dev user flow added |
 | 2.0 | v2 multi-tenant: schema-per-tenant PostgreSQL isolation; subdomain routing with tenant-in-JWT; dynamic IDP registration per tenant; org-level subscription model; platform admin tenant management. Stripe/self-serve billing deferred to v3. |
 
@@ -21,7 +21,7 @@
 
 This document describes a **Corporate Application Shell** — a host web application built with **Next.js 15 (App Router)** and **Shadcn/ui** that serves as the single entry point for all internal corporate tools. It provides SSO via **OIDC** with support for any OIDC-compliant IDP without code changes, role-gated and subscription-gated navigation, micro-frontend hosting for independently deployed child React applications, and a self-contained admin panel for all configuration.
 
-All child apps share the same AWS account as the shell. The SDK and CLI scaffolder are published to **GitHub Packages**. A **first-run setup wizard** captures branding and the initial super-admin account before the shell becomes operational.
+All child apps share the same AWS account as the shell. The SDK and CLI scaffolder are published to **GitHub Packages**. The platform tenant auto-provisions on first request, authenticates with env-configured OIDC, and promotes the first successful platform login to `super_admin`.
 
 The shell is founded on a fork of an existing Next.js + Shadcn admin starter — extended, not built from scratch.
 
@@ -43,7 +43,7 @@ As internal tooling grows, organizations accumulate disconnected applications wi
 | G2 | Data-driven left sidebar navigation, gated by role and subscription tier |
 | G3 | Micro-frontend hosting via Module Federation; child apps deploy independently |
 | G4 | Admin panel covering menus, roles, users, apps, subscriptions, SSO status, and branding |
-| G5 | First-run setup wizard to configure app name, logo, brand color, and initial super-admin |
+| G5 | Auto-bootstrap the platform tenant with env-configured OIDC and first-login super-admin assignment |
 | G6 | Shell SDK + CLI published to GitHub Packages for child app teams |
 | G7 | Shell host distributed as a versioned npm package (`@s-tkach/shell-app`) installable and updatable via CLI |
 | G8 | All infrastructure (shell + child apps) on a single AWS account, managed via AWS Amplify |
@@ -118,7 +118,7 @@ An org admin within a specific tenant subdomain. Configures their own OIDC provi
 - `PLATFORM_OIDC_CLIENT_ID` — client ID
 - `PLATFORM_OIDC_CLIENT_SECRET` — client secret
 
-If these are set, the platform tenant uses them directly (no DB-stored OIDC config needed). If unset, it falls back to DB-stored providers.
+If these are set, the platform tenant uses them directly. No DB-stored platform OIDC provider is required.
 
 **FR-SETUP-3:** The first user to log in to the platform tenant is automatically granted the `super_admin` role. Additional platform admins can be invited from `/platform/admins`.
 
@@ -168,7 +168,7 @@ If these are set, the platform tenant uses them directly (no DB-stored OIDC conf
 
 **FR-RBAC-5:** Users can hold multiple roles. Effective access is the union.
 
-**FR-RBAC-6:** The `super_admin` role is system-owned. It cannot be deleted, renamed, or removed from a user who created it via the wizard (to prevent lockout).
+**FR-RBAC-6:** The `super_admin` role is system-owned. It cannot be deleted or renamed.
 
 **FR-RBAC-7:** Roles can be assigned manually by an `admin` or `super_admin` in User Manager, or inherited automatically from IDP groups on login.
 
@@ -182,7 +182,7 @@ If these are set, the platform tenant uses them directly (no DB-stored OIDC conf
 
 **FR-NAV-4:** Each menu item has: `label`, `icon` (Lucide name), `routeType` (`internal` | `external`), `route`, `subscriptionTierId` (nullable; `NULL` = platform-only), tenant-local `requiredRoles[]` (optional), `badge` (optional string), `sortOrder`, `isEnabled`.
 
-**FR-NAV-5:** Top header bar: configurable app logo and name (from DB, set in wizard / Admin Panel), breadcrumb trail, user avatar dropdown (name, roles, logout), notification bell with unread badge (see §6.8).
+**FR-NAV-5:** Top header bar: configurable app logo and name (from DB, managed in the Admin Panel), breadcrumb trail, user avatar dropdown (name, roles, logout), notification bell with unread badge (see §6.8).
 
 **FR-NAV-6:** Light/dark mode toggle; theme persisted per user in DB.
 
@@ -533,43 +533,24 @@ PostgreSQL                   (private subnet, VPC)
 11. User sees their personalized shell
 ```
 
-### 8.5 First-Run Wizard Flow
+### 8.5 Platform Bootstrap Flow
 
 ```
 Deploy shell to AWS (Amplify)
   ↓
 User visits app.corp.com
   ↓
-Shell checks: does shell_config row exist in DB?
-  ↓ No
-Redirect to /setup
+Shell auto-provisions tenant_platform on first request
   ↓
-Step 1 — Branding
-  App name, logo upload (→ S3), primary color
+Unauthenticated user is redirected to /login
   ↓
-Step 2 — OIDC Connection
-  Issuer URL, Client ID, Client Secret
-  Shell pings {issuer}/.well-known/openid-configuration
-  ✓ Connected → proceed  |  ✗ Error → show failure, stay on step
+OIDC provider uses PLATFORM_OIDC_ISSUER / CLIENT_ID / CLIENT_SECRET
   ↓
-Step 3 — Super Admin
-  Enter email for super_admin account
-  User clicks "Verify via OIDC Login" → completes OIDC auth flow inline
-  NextAuth.js session created → verified email matches input
-  ✓ Match → proceed  |  ✗ Mismatch → show error, retry
-  ↓
-Step 4 — Review & Launch
-  Summary card of all inputs
-  "Launch Shell" button:
-    → INSERT shell_config (branding + OIDC config)
-    → INSERT user (super admin)
-    → INSERT user_roles (super_admin role)
-    → INSERT subscription (enterprise tier, no expiry)
-    → INSERT default subscription tiers (free, standard, enterprise)
-    → Mark setup complete (shell_config.setup_complete = true)
+Successful callback:
+  → JIT provision user if needed
+  → if no platform super_admin exists, assign it to this user
   ↓
 Redirect to /dashboard
-/setup now returns 404 for everyone
 ```
 
 ### 8.6 Module Federation — Implementation Detail
@@ -707,12 +688,7 @@ export const shellConfig = pgTable('shell_config', {
   appName:      text('app_name').default('Corporate Shell'),
   logoUrl:      text('logo_url'),
   primaryColor: text('primary_color').default('#0f172a'),
-  setupComplete: boolean('setup_complete').default(false),
   updatedAt:    timestamp('updated_at').defaultNow(),
-  // OIDC config — issuer and clientId are plaintext; clientSecret is KMS-encrypted
-  oidcIssuer:        text('oidc_issuer'),
-  oidcClientId:      text('oidc_client_id'),
-  oidcClientSecret:  text('oidc_client_secret'),  // KMS-encrypted ciphertext
 });
 
 export const authEvents = pgTable('auth_events', {
@@ -789,9 +765,9 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 ### 10.1 First-Time Deployment
 1. Engineer deploys shell via AWS Amplify (manually configured)
 2. Amplify provisions hosting; PostgreSQL, Secrets Manager, and Route 53 configured separately
-3. Engineer visits `app.corp.com` → redirected to `/setup`
-4. Completes 4-step wizard (branding → OIDC → super admin → launch)
-5. Shell is live; `/setup` returns 404 permanently
+3. Engineer visits `app.corp.com` → platform tenant auto-bootstraps
+4. Engineer signs in through the OIDC provider configured in `PLATFORM_OIDC_*`
+5. First successful platform login receives `super_admin`
 
 ### 10.2 Employee First Login (JIT Provisioning)
 1. Employee visits `app.corp.com` → no session → OIDC login
@@ -826,8 +802,8 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 2. `docker compose up -d` — starts PostgreSQL on localhost:5432
 3. Copy `.env.local.example` → `src/shell/.env.local`; fill in `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` (two `openssl rand -hex 32` calls); no AWS credentials needed
 4. `pnpm install && pnpm --filter shell dev`
-5. Navigate to `http://localhost:3000` → redirected to `/setup`
-6. Complete wizard: logo stored to `public/uploads/`; OIDC config encrypted with AES-256-GCM
+5. Navigate to `http://localhost:3000` → redirected to `/login`
+6. Sign in through the configured OIDC provider; tenant OIDC secrets remain encrypted with AES-256-GCM for non-platform tenants
 7. Shell loads at `/dashboard`; admin panel accessible
 8. To switch to AWS-backed production: set `AWS_S3_BUCKET`, `KMS_KEY_ID`, `AWS_REGION`, `ENCRYPTION_PROVIDER=kms` — no code changes required
 
@@ -836,7 +812,7 @@ Dev/staging: near zero — PostgreSQL pauses to 0 ACUs, Lambda scales to zero.
 2. `cd my-corp-shell && cp .env.local.example .env.local`
 3. Fill in `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, `DATABASE_URL`
 4. `docker compose up -d && pnpm drizzle-kit migrate`
-5. `pnpm --filter shell dev` → navigate to `/setup`, complete wizard
+5. `pnpm --filter shell dev` → navigate to `/login` and sign in
 6. `.shell-version` file at repo root records the installed `@s-tkach/shell-app` version
 
 ### 10.8 Operator Updates an Existing Shell Instance
@@ -878,7 +854,7 @@ Per-user `userSubscriptions` is replaced by a single `tenantSubscription` row pe
 `/platform/tenants` is accessible only to users authenticated in the `tenant_platform` schema with `super_admin` role. It provides: tenant list with status and current org subscription tier, create-tenant form (slug + display name + admin email + required tier selection), tier-change action, suspend/reactivate, soft-delete. Tenant creation calls `provisionTenant()` which creates the schema, runs DDL, and seeds defaults.
 
 ### FR-MT-10: Tenant Provisioning
-`provisionTenant(slug, displayName, adminEmail, tierId)` is the sole mechanism for creating a new tenant. It: validates slug format (`^[a-z0-9-]+$`), inserts into `public.tenants`, creates `tenant_{slug}` schema, writes the selected org subscription tier into `public.tenant_subscription`, runs all per-tenant DDL, seeds default `shellConfig`, `super_admin`/`admin`/`user` roles, and an initial admin user record. The platform admin then sends the tenant admin a setup link to `https://{slug}.corp.example.com/setup`.
+`provisionTenant(slug, displayName, adminEmail, tierId)` is the sole mechanism for creating a new tenant. It: validates slug format (`^[a-z0-9-]+$`), inserts into `public.tenants`, creates `tenant_{slug}` schema, writes the selected org subscription tier into `public.tenant_subscription`, runs all per-tenant DDL, seeds default `shellConfig`, `super_admin`/`admin`/`user` roles, and an initial admin user record.
 
 ---
 
@@ -931,7 +907,7 @@ All open questions are resolved. No outstanding items.
 | Admin task completion without documentation | > 90% | Usability test |
 | Monthly AWS cost per 100 active users | < $50 | AWS Cost Explorer |
 | Shell availability | > 99.9% | Route 53 health check |
-| First-run wizard completion rate | 100% (blocking gate) | DB: shell_config.setup_complete |
+| First platform login super-admin assignment rate | 100% | Auth events + platform role assignment |
 
 ---
 

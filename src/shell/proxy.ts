@@ -1,43 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { shellConfig, tenants } from "@/lib/db/schema";
+import { tenants } from "@/lib/db/schema";
 import { ADMIN_ROLES } from "@/lib/roles";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { isTenantMismatch } from "@/lib/tenant-check";
 import { isPlatformAdmin } from "@/lib/platform-guard";
-import { withTenant } from "@/lib/db/tenant";
 import { autoBootstrapPlatform } from "@/lib/db/provision";
 import { eq } from "drizzle-orm";
 import { getRequiredSubscriptionLevelForRoute } from "@/lib/menu";
 
 const TENANT_ADMIN_ROUTES = ["/settings", "/api/settings"];
 const PLATFORM_ROUTES = ["/platform", "/api/platform"];
-const SETUP_ROUTES = ["/setup", "/api/setup"];
-
-function isSetupRoute(pathname: string): boolean {
-  return SETUP_ROUTES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-}
 
 async function ensurePlatformTenant(): Promise<boolean> {
   await autoBootstrapPlatform();
 
   const check = await db.select({ id: tenants.id }).from(tenants).limit(1);
   return check.length > 0;
-}
-
-async function isTenantReady(tenantSlug: string): Promise<boolean> {
-  try {
-    const tenantDb = withTenant(tenantSlug);
-    const rows = await tenantDb
-      .select({ setupComplete: shellConfig.setupComplete })
-      .from(shellConfig)
-      .limit(1);
-    return rows[0]?.setupComplete ?? false;
-  } catch (e) {
-    console.error(`[proxy] isTenantReady("${tenantSlug}") error:`, e instanceof Error ? e.message : e);
-    return false;
-  }
 }
 
 function isTenantAdminRoute(pathname: string): boolean {
@@ -94,12 +74,9 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(`Platform bootstrap error: ${msg}`, { status: 500 });
   }
 
-  // Setup routes bypass all remaining gates — they run before any tenant is ready
-  if (isSetupRoute(pathname)) return NextResponse.next();
-
   const resolvedSlug = hostSlug ?? getPlatformSlug();
 
-  // Verify the resolved tenant exists and is ready
+  // Verify the resolved tenant exists
   const tenantRows = await db
     .select({ id: tenants.id })
     .from(tenants)
@@ -107,10 +84,6 @@ export async function proxy(request: NextRequest) {
     .limit(1);
   if (tenantRows.length === 0) {
     return new NextResponse("Tenant not found", { status: 404 });
-  }
-
-  if (!await isTenantReady(resolvedSlug)) {
-    return NextResponse.redirect(new URL("/setup", request.url));
   }
 
   const session = await auth();
