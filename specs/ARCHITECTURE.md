@@ -406,6 +406,8 @@ Admin Panel → Application Registry:
   routePrefix = /inventory
 ```
 
+All issuer, `remoteUrl`, and `healthCheckUrl` values that cross an API boundary are validated by a shared server-side remote target guard in `src/shell/lib`. The guard normalizes URLs, allows only `https:`, rejects loopback/RFC1918/link-local IPv4 targets, applies one timeout to all outbound validation fetches, and maps all client-visible failures to sanitized messages that never include the submitted host or derived remote endpoint URL.
+
 ---
 
 ## 9. Database Architecture
@@ -570,7 +572,7 @@ The publish gate runs `tsc --noEmit`, not `next build`. With `cacheComponents` e
 | Crypto provider fallback | Local AES-256-GCM provider uses `randomBytes(16)` per-value IV; output prefixed `local:<iv>:<ct>:<tag>` to distinguish from KMS blobs; key rotation requires re-encryption of stored secrets |
 | XSS | Shadcn/ui + React; no `dangerouslySetInnerHTML`; CSP header via CloudFront |
 | Child app crash | React ErrorBoundary per child app mount; shell unaffected |
-| OIDC misconfiguration | Platform admin validates OIDC discovery endpoint during tenant creation |
+| OIDC misconfiguration | Shared remote target guard validates issuer discovery during tenant creation and SSO updates; HTTPS only, blocks loopback/private/link-local targets, uses one timeout, and returns sanitized client-visible errors |
 | Lockout prevention | `super_admin` role is system-owned and auto-assigned to the first platform user |
 
 ---
@@ -582,7 +584,7 @@ The publish gate runs `tsc --noEmit`, not `next build`. With `cacheComponents` e
 | Structured logs | `console.log(JSON.stringify({...}))` → CloudWatch Logs (Lambda auto-captures) |
 | Request tracing | Next.js `instrumentation.ts` with OpenTelemetry; trace IDs in every log line |
 | Auth events | Written to `auth_events` table on login/logout/failure/JIT-provision |
-| Child app health | Admin Panel pings each `healthCheckUrl` from `app_registry`; last healthy timestamp stored |
+| Child app health | Admin Panel pings each `healthCheckUrl` from `app_registry` through the shared remote target guard; last healthy timestamp stored on success and failures stay sanitized |
 | Performance | CloudWatch RUM for shell load time (P95 target: <2s) and MF child load (P95: <1.5s) |
 | Cost | AWS Cost Explorer tagged by `project=corp-shell` |
 

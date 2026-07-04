@@ -69,6 +69,7 @@ describe("POST /api/settings/sso", () => {
   });
 
   it("returns 400 when issuer is a private network address", async () => {
+    global.fetch = vi.fn();
     const { POST } = await import("@/app/api/settings/sso/route");
     const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
@@ -78,11 +79,13 @@ describe("POST /api/settings/sso", () => {
     const res = await POST(req);
     expect(res.status).toBe(400);
     const data = await res.json() as { error?: string };
-    expect(data.error).toMatch(/private networks/i);
+    expect(data.error).toBe("issuer must be a valid public HTTPS URL");
+    expect(data.error).not.toContain("10.0.0.1");
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("returns 400 when OIDC discovery fails", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response);
+    global.fetch = vi.fn().mockRejectedValue(new Error("getaddrinfo ENOTFOUND bad.example.com"));
     const { POST } = await import("@/app/api/settings/sso/route");
     const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",
@@ -92,11 +95,18 @@ describe("POST /api/settings/sso", () => {
     const res = await POST(req);
     expect(res.status).toBe(400);
     const data = await res.json() as { error?: string };
-    expect(data.error).toMatch(/OIDC discovery failed/);
+    expect(data.error).toBe("OIDC discovery failed");
+    expect(data.error).not.toContain("bad.example.com");
   });
 
   it("encrypts client secret and returns 201 on success", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true } as Response);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        issuer: "https://okta.example.com",
+        authorization_endpoint: "https://okta.example.com/oauth2/v1/authorize",
+      }),
+    } as Response);
     const { POST } = await import("@/app/api/settings/sso/route");
     const req = new NextRequest("http://localhost/api/settings/sso", {
       method: "POST",

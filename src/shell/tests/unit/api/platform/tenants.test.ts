@@ -189,7 +189,97 @@ describe("/api/platform/tenants", () => {
       expect(mockProvisionTenant).not.toHaveBeenCalled();
     });
 
+    it("rejects private OIDC issuer targets server-side", async () => {
+      global.fetch = vi.fn();
+      mockDb.select
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ id: "tier-standard" }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        });
+
+      const { POST } = await import("@/app/api/platform/tenants/route");
+      const req = new Request("http://localhost/api/platform/tenants", {
+        method: "POST",
+        body: JSON.stringify({
+          slug: "new",
+          displayName: "New",
+          adminEmail: "a@b.com",
+          tierId: "tier-standard",
+          oidcIssuer: "https://127.0.0.1/oidc",
+          oidcClientId: "id",
+          oidcClientSecret: "secret",
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const res = await POST(req as Parameters<typeof POST>[0]);
+      const body = await res.json() as { error: string };
+
+      expect(res.status).toBe(400);
+      expect(body.error).toBe("oidcIssuer must be a valid public HTTPS URL");
+      expect(body.error).not.toContain("127.0.0.1");
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockProvisionTenant).not.toHaveBeenCalled();
+    });
+
+    it("rejects unreachable OIDC issuers before provisioning", async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error("getaddrinfo ENOTFOUND broken.example.com"));
+      mockDb.select
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ id: "tier-standard" }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        });
+
+      const { POST } = await import("@/app/api/platform/tenants/route");
+      const req = new Request("http://localhost/api/platform/tenants", {
+        method: "POST",
+        body: JSON.stringify({
+          slug: "new",
+          displayName: "New",
+          adminEmail: "a@b.com",
+          tierId: "tier-standard",
+          oidcIssuer: "https://broken.example.com",
+          oidcClientId: "id",
+          oidcClientSecret: "secret",
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const res = await POST(req as Parameters<typeof POST>[0]);
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({
+        error: "OIDC discovery failed",
+      });
+      expect(mockProvisionTenant).not.toHaveBeenCalled();
+    });
+
     it("creates a tenant with the selected tier", async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          issuer: "https://example.com",
+          authorization_endpoint: "https://example.com/auth",
+        }),
+      } as Response);
       mockDb.select
         .mockReturnValueOnce({
           from: vi.fn().mockReturnValue({

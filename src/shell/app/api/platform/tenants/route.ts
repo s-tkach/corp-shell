@@ -7,6 +7,7 @@ import { provisionTenant } from "@/lib/db/provision";
 import { withTenant } from "@/lib/db/tenant";
 import { getPlatformSlug } from "@/lib/tenant-resolver";
 import { encrypt } from "@/lib/crypto";
+import { fetchOidcDiscovery, getPublicHttpsFieldError, isRemoteUrlValidationFailure } from "@/lib/remote-target-guard";
 import { eq, asc } from "drizzle-orm";
 
 const SLUG_RE = /^[a-z0-9-]+$/;
@@ -90,6 +91,14 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (existing[0]) {
     return NextResponse.json({ error: `Slug "${slug}" is already taken` }, { status: 409 });
+  }
+
+  const discovery = await fetchOidcDiscovery(oidcIssuer);
+  if (!discovery.ok) {
+    const error = isRemoteUrlValidationFailure(discovery.kind)
+      ? getPublicHttpsFieldError("oidcIssuer")
+      : discovery.error;
+    return NextResponse.json({ error }, { status: 400 });
   }
 
   try {

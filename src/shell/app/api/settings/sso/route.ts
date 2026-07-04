@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { withTenant } from "@/lib/db/tenant";
 import { idpProviders } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
-import { isSafeRemoteUrl } from "@/lib/url-guard";
+import { fetchOidcDiscovery, getPublicHttpsFieldError, isRemoteUrlValidationFailure } from "@/lib/remote-target-guard";
 import { asc } from "drizzle-orm";
 
 export async function GET() {
@@ -61,24 +61,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!isSafeRemoteUrl(issuer)) {
-    return NextResponse.json({ error: "issuer must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
-  }
-
-  const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-  try {
-    const res = await fetch(discoveryUrl, { next: { revalidate: 0 } });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `OIDC discovery failed: HTTP ${res.status} from ${discoveryUrl}` },
-        { status: 400 }
-      );
-    }
-  } catch (e) {
-    return NextResponse.json(
-      { error: `OIDC discovery unreachable: ${e instanceof Error ? e.message : "Network error"}` },
-      { status: 400 }
-    );
+  const discovery = await fetchOidcDiscovery(issuer);
+  if (!discovery.ok) {
+    const error = isRemoteUrlValidationFailure(discovery.kind)
+      ? getPublicHttpsFieldError("issuer")
+      : discovery.error;
+    return NextResponse.json({ error }, { status: 400 });
   }
 
   const encryptedClientSecret = await encrypt(clientSecret);

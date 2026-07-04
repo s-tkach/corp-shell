@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
-import { isSafeRemoteUrl } from "@/lib/url-guard";
+import { getPublicHttpsFieldError, validateRemoteUrl } from "@/lib/remote-target-guard";
 import { asc } from "drizzle-orm";
 
 async function guardPlatformAdmin() {
@@ -33,14 +33,14 @@ export async function POST(req: NextRequest) {
   if (!body.name || body.name.length > 100) {
     return NextResponse.json({ error: "name is required and must be ≤ 100 characters" }, { status: 400 });
   }
-  if (!isSafeRemoteUrl(body.remoteUrl)) {
-    return NextResponse.json({ error: "remoteUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  if (!validateRemoteUrl(body.remoteUrl).ok) {
+    return NextResponse.json({ error: getPublicHttpsFieldError("remoteUrl") }, { status: 400 });
   }
   if (!body.routePrefix?.startsWith("/") || body.routePrefix.length > 200) {
     return NextResponse.json({ error: "routePrefix must start with / and be ≤ 200 characters" }, { status: 400 });
   }
-  if (body.healthCheckUrl && !isSafeRemoteUrl(body.healthCheckUrl)) {
-    return NextResponse.json({ error: "healthCheckUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  if (body.healthCheckUrl && !validateRemoteUrl(body.healthCheckUrl).ok) {
+    return NextResponse.json({ error: getPublicHttpsFieldError("healthCheckUrl") }, { status: 400 });
   }
   const [row] = await db
     .insert(appRegistry)

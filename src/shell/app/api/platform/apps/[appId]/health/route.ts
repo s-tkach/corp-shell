@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
-import { isSafeRemoteUrl } from "@/lib/url-guard";
+import { fetchHealthTarget } from "@/lib/remote-target-guard";
 import { eq } from "drizzle-orm";
 
 async function guardPlatformAdmin() {
@@ -27,21 +27,18 @@ export async function POST(
     return NextResponse.json({ healthy: false, error: "No healthCheckUrl configured" });
   }
 
-  if (!isSafeRemoteUrl(app.healthCheckUrl)) {
-    return NextResponse.json({ healthy: false, error: "healthCheckUrl is not a safe remote URL" });
+  const health = await fetchHealthTarget(app.healthCheckUrl);
+  if (!health.ok) {
+    return NextResponse.json({ healthy: false, error: health.error });
   }
 
-  try {
-    const res = await fetch(app.healthCheckUrl, { next: { revalidate: 0 } });
-    const healthy = res.ok;
-    if (healthy) {
-      await db
-        .update(appRegistry)
-        .set({ lastHealthyAt: new Date() })
-        .where(eq(appRegistry.id, appId));
-    }
-    return NextResponse.json({ healthy, status: res.status });
-  } catch (e) {
-    return NextResponse.json({ healthy: false, error: e instanceof Error ? e.message : "Fetch failed" });
+  const healthy = health.response.ok;
+  if (healthy) {
+    await db
+      .update(appRegistry)
+      .set({ lastHealthyAt: new Date() })
+      .where(eq(appRegistry.id, appId));
   }
+
+  return NextResponse.json({ healthy, status: health.response.status });
 }

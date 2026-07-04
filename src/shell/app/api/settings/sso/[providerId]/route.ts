@@ -5,6 +5,7 @@ import { withTenant } from "@/lib/db/tenant";
 import { db } from "@/lib/db/client";
 import { idpProviders, tenants } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
+import { fetchOidcDiscovery, getPublicHttpsFieldError, isRemoteUrlValidationFailure } from "@/lib/remote-target-guard";
 import { eq, sql } from "drizzle-orm";
 
 export async function PATCH(
@@ -26,20 +27,12 @@ export async function PATCH(
   };
 
   if (body.issuer) {
-    const discoveryUrl = `${body.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-    try {
-      const res = await fetch(discoveryUrl, { next: { revalidate: 0 } });
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `OIDC discovery failed: HTTP ${res.status}` },
-          { status: 400 }
-        );
-      }
-    } catch (e) {
-      return NextResponse.json(
-        { error: `OIDC discovery unreachable: ${e instanceof Error ? e.message : "Network error"}` },
-        { status: 400 }
-      );
+    const discovery = await fetchOidcDiscovery(body.issuer);
+    if (!discovery.ok) {
+      const error = isRemoteUrlValidationFailure(discovery.kind)
+        ? getPublicHttpsFieldError("issuer")
+        : discovery.error;
+      return NextResponse.json({ error }, { status: 400 });
     }
   }
 

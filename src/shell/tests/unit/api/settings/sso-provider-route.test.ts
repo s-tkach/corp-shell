@@ -120,4 +120,25 @@ describe("settings sso provider route", () => {
       error: "Cannot remove the last SSO provider on a platform tenant",
     });
   });
+
+  it("sanitizes issuer validation failures on update", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("connect ETIMEDOUT internal.example.com"));
+    tenantDb.where.mockResolvedValue([{ count: 2 }]);
+
+    const { PATCH } = await import("@/app/api/settings/sso/[providerId]/route");
+    const request = new NextRequest("http://localhost/api/settings/sso/provider-1", {
+      method: "PATCH",
+      body: JSON.stringify({ issuer: "https://internal.example.com" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ providerId: "provider-1" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: "OIDC discovery failed",
+    });
+  });
 });

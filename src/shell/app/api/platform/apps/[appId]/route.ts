@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-guard";
 import { db } from "@/lib/db/client";
 import { appRegistry } from "@/lib/db/schema";
-import { isSafeRemoteUrl } from "@/lib/url-guard";
+import { getPublicHttpsFieldError, validateRemoteUrl } from "@/lib/remote-target-guard";
 import { eq } from "drizzle-orm";
 
 async function guardPlatformAdmin() {
@@ -28,11 +28,11 @@ export async function PATCH(
     healthCheckUrl: string;
     isEnabled: boolean;
   }>;
-  if (body.remoteUrl !== undefined && !isSafeRemoteUrl(body.remoteUrl)) {
-    return NextResponse.json({ error: "remoteUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  if (body.remoteUrl !== undefined && !validateRemoteUrl(body.remoteUrl).ok) {
+    return NextResponse.json({ error: getPublicHttpsFieldError("remoteUrl") }, { status: 400 });
   }
-  if (body.healthCheckUrl !== undefined && !isSafeRemoteUrl(body.healthCheckUrl)) {
-    return NextResponse.json({ error: "healthCheckUrl must be a valid HTTPS URL and not point to private networks" }, { status: 400 });
+  if (body.healthCheckUrl !== undefined && !validateRemoteUrl(body.healthCheckUrl).ok) {
+    return NextResponse.json({ error: getPublicHttpsFieldError("healthCheckUrl") }, { status: 400 });
   }
   const [row] = await db
     .update(appRegistry)

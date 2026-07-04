@@ -124,7 +124,7 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 
 **FR-SETUP-4:** There is no setup wizard. Tenants are fully configured by the platform admin from `/platform/tenants`, including OIDC provider, admin email, and optional branding.
 
-**FR-SETUP-5:** When creating a tenant, the platform admin provides OIDC credentials (issuer, client ID, client secret). The OIDC discovery endpoint is validated before tenant creation. The client secret is encrypted at rest.
+**FR-SETUP-5:** When creating a tenant, the platform admin provides OIDC credentials (issuer, client ID, client secret). The server validates the OIDC discovery endpoint before tenant creation by using the shared remote target guard: HTTPS only, no loopback/private/link-local targets, one fixed timeout, and sanitized client-visible errors that never echo hostnames or derived URLs. The client secret is encrypted at rest.
 
 ### 6.2 Authentication & SSO
 
@@ -319,8 +319,8 @@ Accessible to `super_admin` and `admin` roles only. All sections are reachable f
 | **Menu Manager** | Platform admin: full CRUD for shared sections and items by subscription tier, including platform-only items. Drag-and-drop reorder. Inherited preview for higher tiers. Tenant admin: role-assignment-only editor for hiding shared items within that tenant. |
 | **Role Manager** | Create/rename/delete roles. Define IDP group → shell role mappings. View users per role. |
 | **User Manager** | View all JIT-provisioned users. Assign/revoke roles. Set subscription tier + expiry. View last login + IDP source. Deactivate users. |
-| **SSO Status** | Read-only display of current OIDC config (issuer, client ID). Live reachability check (pings `{issuer}/.well-known/openid-configuration`). Shows "Connected ✓" or error detail. |
-| **Application Registry** | Register/update/remove child apps. Validate manifest. Map routes to menu items. Live health status indicator. |
+| **SSO Status** | Read-only display of current OIDC config (issuer, client ID). Live reachability check validates `{issuer}/.well-known/openid-configuration` through the shared server-side remote target guard. Client-visible failures are sanitized and never include hostnames or derived URLs. |
+| **Application Registry** | Register/update/remove child apps. All `remoteUrl` and `healthCheckUrl` inputs are validated through the shared server-side remote target guard before save and before remote fetches. Manifest validation and health checks use the same timeout and sanitized client-visible failure behavior. |
 | **Subscription Tiers** | Create/rename/delete tiers. Set numeric level. Configure Upgrade Prompt content per tier. |
 | **Theme & Branding** | Edit app name, re-upload logo, change primary brand color. Live preview. Changes apply globally without redeployment. |
 | **Notifications** | Create notifications with title, body, targeting, optional expiry, and optional action. View and delete existing notifications. |
