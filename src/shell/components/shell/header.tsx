@@ -16,21 +16,14 @@ import {
 import { SETTINGS_ROUTE_LABEL_MAP, PLATFORM_ROUTE_LABEL_MAP } from "@/lib/settings-routes";
 import type { MenuSection } from "@/app/api/menu/route";
 import { NotificationBell } from "@/components/shell/notifications/notification-bell";
+import { startMinuteAlignedTicker } from "@/components/shell/header-date-ticker";
 import { useShellStore } from "@/lib/store/shell-store";
 
 function HeaderDate({ dateFormat }: { dateFormat: string }) {
   const [date, setDate] = useState(() => new Date());
 
   useEffect(() => {
-    const tick = () => setDate(new Date());
-    const now = new Date();
-    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-    const timeout = setTimeout(() => {
-      tick();
-      const interval = setInterval(tick, 60_000);
-      return () => clearInterval(interval);
-    }, msUntilNextMinute);
-    return () => clearTimeout(timeout);
+    return startMinuteAlignedTicker(() => setDate(new Date()));
   }, []);
 
   return <>{format(date, dateFormat)}</>;
