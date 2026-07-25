@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getDevFreshPlatformOidcEnv } from "@/scripts/dev-fresh-env";
+import {
+  getDevFreshPlatformOidcEnv,
+  updateDevFreshEnvValue,
+} from "@/scripts/dev-fresh-env";
 
 describe("getDevFreshPlatformOidcEnv", () => {
   it("passes through PLATFORM_OIDC_* values when they are provided", () => {
@@ -38,5 +41,29 @@ describe("getDevFreshPlatformOidcEnv", () => {
         SETUP_CLIENT_ID: "legacy-client",
       })
     ).toBeNull();
+  });
+});
+
+describe("updateDevFreshEnvValue", () => {
+  it("rotates the local cookie namespace without changing the auth secret", () => {
+    expect(
+      updateDevFreshEnvValue(
+        "NEXTAUTH_SECRET=stable-secret\nAUTH_COOKIE_NAMESPACE=previous\n",
+        "AUTH_COOKIE_NAMESPACE",
+        "fresh-a"
+      )
+    ).toBe("NEXTAUTH_SECRET=stable-secret\nAUTH_COOKIE_NAMESPACE=fresh-a\n");
+  });
+
+  it("replaces every prior namespace assignment so dotenv uses the fresh value", () => {
+    expect(
+      updateDevFreshEnvValue(
+        "AUTH_COOKIE_NAMESPACE=first\nNEXTAUTH_SECRET=stable-secret\nAUTH_COOKIE_NAMESPACE=last\n",
+        "AUTH_COOKIE_NAMESPACE",
+        "fresh-a"
+      )
+    ).toBe(
+      "AUTH_COOKIE_NAMESPACE=fresh-a\nNEXTAUTH_SECRET=stable-secret\nAUTH_COOKIE_NAMESPACE=fresh-a\n"
+    );
   });
 });

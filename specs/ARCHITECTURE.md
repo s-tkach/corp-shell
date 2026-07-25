@@ -500,6 +500,12 @@ The following are sufficient to run the shell without any AWS account:
 
 AWS env vars (`AWS_REGION`, `KMS_KEY_ID`, `AWS_S3_BUCKET`) are all optional. Omitting them activates the local providers automatically.
 
+### 10.4 Fresh Local Authentication Environments
+
+`pnpm run dev:fresh` recreates the local database and requires a new OIDC login. It preserves `NEXTAUTH_SECRET`; rotating that secret while the browser still holds an Auth.js PKCE verifier makes the verifier impossible to decrypt during an in-flight OAuth callback.
+
+Instead, the command writes a new local-only `AUTH_COOKIE_NAMESPACE` value to `src/shell/.env.local`. `lib/auth.ts` applies this namespace to every Auth.js cookie name (session, callback URL, CSRF, PKCE verifier, state, nonce, and WebAuthn challenge), so cookies from a prior fresh environment are ignored. The auth callback route detects a callback with no PKCE cookie in the current namespace and redirects it to `/login`, where the user starts a new SSO flow. Production leaves `AUTH_COOKIE_NAMESPACE` unset and uses Auth.js defaults.
+
 ---
 
 ## 11. CI/CD

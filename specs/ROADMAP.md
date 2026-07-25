@@ -41,6 +41,7 @@
 | M19 | Platform Admin Tenant Management *(planned)* | `/platform/tenants` panel; provisioning API; org-level subscription |
 | M20 | Company Hierarchy | Unlimited-depth company tree; user company scope; active company switcher |
 | M21 | Tier-Scoped Shared Menu Ownership | Shared menus by subscription tier; tenant-local role hiding; platform-only scope |
+| M22 | Fresh Local Authentication | Per-run Auth.js cookie namespace; stale OAuth callback recovery |
 
 ---
 
@@ -1018,6 +1019,21 @@ Before marking v1 as released, confirm:
 
 #### M20-5: Company switcher
 - [x] `CompanySwitcher` component in shell header
+
+---
+
+## M22 — Fresh Local Authentication
+
+**Goal:** Each `pnpm run dev:fresh` invocation creates a new local auth environment and sends the user through a clean SSO login without Auth.js attempting to decrypt a PKCE verifier from a previous environment.
+
+### Tasks
+
+#### M22-1: Isolate fresh-environment Auth.js cookies
+- [x] Keep `NEXTAUTH_SECRET` unchanged during `dev:fresh`; write a new random `AUTH_COOKIE_NAMESPACE` to `.env.local` instead
+- [x] Apply the namespace to all Auth.js cookie names only when the env var is set
+- [x] Redirect a stale OIDC callback that lacks the current namespace's PKCE cookie to `/login`
+- [x] Add regression coverage for namespaced cookies, stale callbacks, and namespace rotation
+- [x] **Acceptance:** A browser holding an old PKCE cookie can run `pnpm run dev:fresh`, navigate to `/login`, and complete a new SSO flow without receiving `InvalidCheck` or an Auth.js configuration error
 
 ---
 

@@ -168,6 +168,8 @@ If these are set, the platform tenant uses them directly. No DB-stored platform 
 - Subscription tier, status, or expiry changes take effect on the next protected request.
 - The default handling for stale privileged sessions is request-time revalidation, not waiting for the user to sign out and back in.
 
+**FR-AUTH-12:** `pnpm run dev:fresh` creates a new local authentication environment. Each run must require a new OIDC login without attempting to decrypt or parse Auth.js cookies from a prior run. It must keep the configured `NEXTAUTH_SECRET` stable and rotate a local-only Auth.js cookie namespace instead. A callback that belongs to an older namespace must redirect to `/login` rather than render an authentication configuration error.
+
 ### 6.3 Authorization & RBAC
 
 **FR-RBAC-1:** The shell maintains its own role registry. Roles are slugs (e.g. `finance_manager`) created by admins, independent of IDP group names.

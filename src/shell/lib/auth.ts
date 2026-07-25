@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { getTenantSlug, getPlatformSlug } from "@/lib/tenant-resolver";
 import { getAuthConfig } from "@/lib/auth-config";
+import { getAuthCookies } from "@/lib/auth-cookies";
 import { eq } from "drizzle-orm";
 import { resolveEffectiveTenantSubscriptionAccess } from "@/lib/effective-subscription";
 import {
@@ -58,6 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
     secret: process.env["NEXTAUTH_SECRET"],
     pages: { signIn: "/login" },
     providers,
+    cookies: getAuthCookies(process.env["AUTH_COOKIE_NAMESPACE"]),
     callbacks: {
       async jwt({ token, account, profile, trigger }) {
         if (trigger === "signIn" && account && profile) {

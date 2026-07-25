@@ -7,7 +7,7 @@ import {
   getDevFreshCryptoPreflightError,
   parseDevFreshEnv,
 } from "./dev-fresh-crypto";
-import { getDevFreshPlatformOidcEnv } from "./dev-fresh-env";
+import { getDevFreshPlatformOidcEnv, updateDevFreshEnvValue } from "./dev-fresh-env";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -76,20 +76,15 @@ try {
   process.exit(1);
 }
 
-// ── 4. Rotate NEXTAUTH_SECRET so stale session cookies are rejected ──────────
-// A fresh DB has new company/user UUIDs, but a browser may still hold a cookie
-// signed against the old secret carrying the old UUIDs. Rotating the secret
-// invalidates that cookie, forcing a clean re-login against the fresh DB.
+// ── 4. Rotate the local Auth.js cookie namespace ─────────────────────────────
+// A fresh DB needs a new login, but rotating NEXTAUTH_SECRET leaves an existing
+// PKCE verifier impossible to decrypt during an in-flight OAuth callback.
 
-console.log("\n▶ Rotating NEXTAUTH_SECRET in .env.local...");
-const newSecret = randomBytes(32).toString("base64");
-if (!/^NEXTAUTH_SECRET=.*$/m.test(localEnv)) {
-  console.error(`\nNo NEXTAUTH_SECRET line found in ${localEnvFile}`);
-  process.exit(1);
-}
+console.log("\n▶ Rotating AUTH_COOKIE_NAMESPACE in .env.local...");
+const namespace = randomBytes(16).toString("hex");
 writeFileSync(
   localEnvFile,
-  localEnv.replace(/^NEXTAUTH_SECRET=.*$/m, `NEXTAUTH_SECRET=${newSecret}`)
+  updateDevFreshEnvValue(localEnv, "AUTH_COOKIE_NAMESPACE", namespace)
 );
 
 // ── 5. Start Next.js dev server ──────────────────────────────────────────────

@@ -27,3 +27,14 @@ export function getDevFreshPlatformOidcEnv(
 
   return null;
 }
+
+export function updateDevFreshEnvValue(source: string, key: string, value: string): string {
+  const line = `${key}=${value}`;
+  const expression = new RegExp(`^${key}=.*$`, "gm");
+
+  if (expression.test(source)) {
+    return source.replace(expression, line);
+  }
+
+  return `${source}${source.endsWith("\n") ? "" : "\n"}${line}\n`;
+}
